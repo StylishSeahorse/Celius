@@ -80,3 +80,21 @@ def test_production_requires_strong_secret():
     with pytest.raises(ValidationError):
         Settings(app_env="production")
     Settings(app_env="production", app_secret_key="x" * 40)
+
+
+def test_env_example_loads(monkeypatch):
+    """Every value in .env.example (including the empty ones) must parse."""
+    from pathlib import Path
+
+    example = Path(__file__).resolve().parents[3] / ".env.example"
+    for line in example.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        key, _, value = line.partition("=")
+        monkeypatch.setenv(key, value.strip('"'))
+    monkeypatch.setenv("APP_SECRET_KEY", "x" * 40)
+    settings = Settings()
+    assert settings.model_max_output_tokens is None
+    assert settings.model_default_context_tokens is None
+    assert settings.model_api_key is None

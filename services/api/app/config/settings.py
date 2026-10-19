@@ -12,7 +12,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore", protected_namespaces=())
+    # env_ignore_empty: `MODEL_MAX_OUTPUT_TOKENS=` in .env means "unset", not an empty string.
+    model_config = SettingsConfigDict(
+        env_file=".env", extra="ignore", protected_namespaces=(), env_ignore_empty=True
+    )
 
     # Application
     app_env: Literal["development", "test", "production"] = "development"
