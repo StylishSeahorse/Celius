@@ -58,6 +58,8 @@ class Run(UUIDPrimaryKey, Timestamps, Base):
     params: Mapped[dict] = mapped_column(JSONType, default=dict, nullable=False)
     cancel_requested: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     tool_iterations: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Wall-clock spent in tool calls, across pauses for approval.
+    tool_ms: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     # Worker lease: a run whose lease expires while `running` is recovered by another worker.
     attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     worker_id: Mapped[str | None] = mapped_column(String(128))

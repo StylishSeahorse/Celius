@@ -16,6 +16,7 @@
         "message.delta",
         "tool_call.proposed",
         "tool_call.awaiting_approval",
+        "tool_call.decided",
         "tool_call.started",
         "tool_call.completed",
         "run.progress",

@@ -6,7 +6,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.base import utcnow
 from app.errors import not_found
-from app.models import TERMINAL_RUN_STATUSES, Message, MessageStatus, Run, RunEvent, RunStatus
+from app.models import (
+    TERMINAL_RUN_STATUSES,
+    Message,
+    MessageStatus,
+    Run,
+    RunEvent,
+    RunStatus,
+    ToolCall,
+    ToolCallStatus,
+)
 from app.schemas.events import RunEventType
 from app.services.sync import record_sync
 
@@ -32,12 +41,26 @@ async def request_cancel(db: AsyncSession, run: Run) -> Run:
     if run.status in TERMINAL_RUN_STATUSES:
         return run
     run.cancel_requested = True
-    if run.status == RunStatus.queued:
+    if run.status in (RunStatus.queued, RunStatus.awaiting_approval):
         await finish_cancelled(db, run)
     return run
 
 
 async def finish_cancelled(db: AsyncSession, run: Run) -> None:
+    # Calls still waiting for a decision (or approved but not started) never run now.
+    waiting = (
+        await db.scalars(
+            select(ToolCall).where(
+                ToolCall.run_id == run.id,
+                ToolCall.status.in_([ToolCallStatus.pending_approval, ToolCallStatus.approved]),
+            )
+        )
+    ).all()
+    for call in waiting:
+        call.status = ToolCallStatus.cancelled
+        call.decided_at = call.decided_at or utcnow()
+        call.decision_source = call.decision_source or "system"
+        call.decision_reason = "The reply was stopped"
     run.status = RunStatus.cancelled
     run.finished_at = utcnow()
     run.lease_expires_at = None

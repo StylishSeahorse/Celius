@@ -91,12 +91,29 @@ class Settings(BaseSettings):
     memory_auto_extraction: bool = True
     memory_require_review: bool = True
 
-    # Tools
+    # Tools (ADR 0008)
+    # Profile for conversations that don't pick one (users can change their own default).
     tool_default_profile: Literal["read_only", "standard", "developer", "administrator"] = (
-        "read_only"
+        "standard"
     )
-    tool_sandbox_required: bool = True
-    tool_default_network_access: bool = False
+    # The sandbox service (services/sandbox). Unset: Python, shell, Git and the document
+    # and image tools are not offered at all.
+    sandbox_url: str | None = None
+    sandbox_token: SecretStr | None = None
+    # Web access (web_fetch, git_clone) from the worker, through the SSRF guard.
+    tool_network_enabled: bool = True
+    # Comma-separated host suffixes (e.g. "github.com,python.org"). Empty: any public host.
+    tool_web_allowlist: str = ""
+    tool_web_max_bytes: int = Field(default=5 * 1024 * 1024, ge=1024)
+    tool_max_iterations: int = Field(default=12, ge=1, le=100)
+    tool_max_run_seconds: int = Field(default=900, ge=10)
+    tool_call_timeout_seconds: int = Field(default=120, ge=1, le=3600)
+    tool_memory_mb: int = Field(default=1024, ge=64)
+    tool_max_result_chars: int = Field(default=20_000, ge=500)
+    tool_approval_ttl_minutes: int = Field(default=60, ge=1)
+    mcp_timeout_seconds: float = Field(default=30, gt=0)
+    schedule_min_interval_minutes: int = Field(default=15, ge=1)
+    schedule_max_per_user: int = Field(default=20, ge=0)
 
     # Backups
     backup_root: str = "/data/backups"
@@ -109,6 +126,11 @@ class Settings(BaseSettings):
             if secret.startswith("dev-insecure") or len(secret) < 32:
                 raise ValueError("APP_SECRET_KEY must be a random value of at least 32 characters")
         return self
+
+    @property
+    def web_allowlist(self) -> list[str]:
+        hosts = (h.strip().lower().lstrip(".") for h in self.tool_web_allowlist.split(","))
+        return [h for h in hosts if h]
 
     @property
     def cookie_secure(self) -> bool:

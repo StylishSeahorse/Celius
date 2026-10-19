@@ -74,7 +74,7 @@ async def test_project_instructions_reach_the_model(
     await send(client, auth_headers, conv["id"])
     await drain_runs(sessionmaker, gateway, settings)
     system = fake.requests[0]["messages"][0]
-    assert system["role"] == "system" and system["content"].endswith("Talk like a pirate.")
+    assert system["role"] == "system" and "\n\nTalk like a pirate." in system["content"]
 
 
 async def test_deleting_a_project_keeps_its_conversations(client, auth_headers):

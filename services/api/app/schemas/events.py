@@ -13,6 +13,7 @@ class RunEventType(StrEnum):
     message_delta = "message.delta"
     tool_call_proposed = "tool_call.proposed"
     tool_call_awaiting_approval = "tool_call.awaiting_approval"
+    tool_call_decided = "tool_call.decided"
     tool_call_started = "tool_call.started"
     tool_call_completed = "tool_call.completed"
     run_progress = "run.progress"

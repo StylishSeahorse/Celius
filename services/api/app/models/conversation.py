@@ -44,6 +44,8 @@ class Conversation(UUIDPrimaryKey, Timestamps, Base):
     memory_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     # Model "thinking": None = model default, True = on, False = off.
     reasoning: Mapped[bool | None] = mapped_column(Boolean)
+    # Tool profile name (built-in or "custom:<id>"); None = the user's default.
+    tool_profile: Mapped[str | None] = mapped_column(String(80))
     active_branch_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
     # Optimistic concurrency: bumped on every durable change, checked on writes.
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)

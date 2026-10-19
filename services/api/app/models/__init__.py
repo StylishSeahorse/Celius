@@ -36,9 +36,25 @@ from app.models.identity import (
     User,
     UserSettings,
 )
+from app.models.tools import (
+    FINAL_TOOL_CALL_STATUSES,
+    McpServer,
+    ScheduledTask,
+    ToolCall,
+    ToolCallStatus,
+    ToolGrant,
+    ToolProfile,
+)
 
 __all__ = [
+    "FINAL_TOOL_CALL_STATUSES",
     "TERMINAL_RUN_STATUSES",
+    "McpServer",
+    "ScheduledTask",
+    "ToolCall",
+    "ToolCallStatus",
+    "ToolGrant",
+    "ToolProfile",
     "AuditEvent",
     "Branch",
     "Conversation",
