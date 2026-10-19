@@ -3,7 +3,7 @@
 A self-hosted, Claude-style AI workspace. It syncs conversations across Windows (Tauri),
 Android (PWA) and web clients, and talks to a remote llama.cpp inference server.
 
-**Status:** Phases 1–4 are implemented. You can:
+**Status:** Phases 1–5 are implemented. You can:
 - chat with streaming replies
 - edit messages, regenerate replies and switch between versions
 - group chats into projects with their own instructions
@@ -15,6 +15,13 @@ Android (PWA) and web clients, and talks to a remote llama.cpp inference server.
 - give projects knowledge files, and export conversations (Markdown/JSON/ZIP) or projects (ZIP)
 - switch the model's thinking on, off or to its default
 - attach files from approved folders on your PC in the Windows app
+- let the model use tools: run Python and shell commands in an isolated sandbox, read
+  and write workspace files, use Git, fetch web pages, edit images and make Word, Excel,
+  PowerPoint and PDF files, and call MCP servers you register
+- decide what tools may do: permission profiles, approvals for exact arguments, and an
+  approvals inbox
+- schedule prompts to run every N minutes, daily or weekly, and follow all work in the
+  activity panel
 
 See [`docs/backlog.md`](docs/backlog.md) for the full plan and what is done.
 
@@ -29,12 +36,14 @@ See [`docs/backlog.md`](docs/backlog.md) for the full plan and what is done.
 - `python -m app.worker`: the generation worker. It claims runs from PostgreSQL with
   leases, so a crashed worker's run is picked up again. It also handles cancellation
   and context budgeting.
+- `services/sandbox`: runs model-written code with no network, no secrets and hard
+  limits ([ADR 0008](docs/adr/0008-sandbox-and-tools.md)).
 - `apps/web`: React + Vite + Tailwind chat UI, served by the API in production. It is an
   installable PWA with an IndexedDB cache and an offline outbox.
 - `apps/desktop`: Tauri v2 Windows app that connects to your server.
 - `packages/api-client`: TypeScript types generated from the API (`pnpm gen:api`).
 - `packages/contracts`: run-event JSON Schema and payload reference.
-- `infra/`: one Docker image (API, worker and web) and Compose files.
+- `infra/`: Docker images (API + worker + web, and the sandbox) and Compose files.
 - `devtools/fake_llama_server.py`: a stand-in llama-server for development and e2e tests without a GPU.
 
 ## Quick start (development)
@@ -59,15 +68,16 @@ API docs: http://localhost:8000/api/docs (disabled in production).
 ## Tests
 
 ```sh
-make test             # API tests (SQLite, mocked model server)
+make test             # API tests (SQLite, mocked model server, in-process sandbox)
+make test-sandbox     # sandbox service tests (bubblewrap ones skip if unavailable)
 make test-api-pg      # same suite on PostgreSQL + migration round-trip
 make test-web         # web unit tests + typecheck
 make e2e              # Playwright against a full local stack, desktop + mobile viewports
 make lint
 ```
 
-See [`docs/acceptance-tests/phase-2.md`](docs/acceptance-tests/phase-2.md) for the
-Phase 2 exit-gate checks, including manual worker-restart and real-GPU checks.
+Each phase's exit-gate checks are in [`docs/acceptance-tests/`](docs/acceptance-tests/),
+including the manual ones for the real deployment.
 
 ## Deployment
 
@@ -82,12 +92,11 @@ apps/web/             React chat UI and PWA
 apps/desktop/         Tauri v2 Windows app
 packages/api-client/  Generated TypeScript API types
 services/api/         API, worker, migrations, tests, dev tools
+services/sandbox/     Code execution service
 packages/contracts/   JSON Schemas shared with clients
 infra/                Dockerfile, Compose files, scripts
 docs/                 Backlog, ADRs, deployment, acceptance tests
 ```
-
-Planned but not created yet: `services/tool-runner`.
 
 ## Architecture decisions
 
@@ -98,3 +107,4 @@ Planned but not created yet: `services/tool-runner`.
 - [0005: PostgreSQL run queue; API serves the web app](docs/adr/0005-postgres-run-queue.md)
 - [0006: Change feed, outbox and branches for multi-device use](docs/adr/0006-sync-and-offline.md)
 - [0007: File uploads, storage and processing](docs/adr/0007-file-storage.md)
+- [0008: Sandbox, tool policy and approvals](docs/adr/0008-sandbox-and-tools.md)

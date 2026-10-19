@@ -8,6 +8,10 @@ images it received, and "thinks" (reasoning_content) unless the request turns th
 off with chat_template_kwargs.enable_thinking=false. "[link]" adds a markdown link to the
 reply. A message containing "[fail]" returns
 HTTP 400; "[slow]" streams very slowly (for cancellation tests).
+
+Tool calling (when the request offers tools): "[tool:write]" calls write_file,
+"[tool:python]" calls run_python, "[tool:list]" calls list_files. After a tool result the
+reply quotes it ("Tool result: …").
 """
 
 import argparse
@@ -76,10 +80,56 @@ def _reply_for(messages: list[dict]) -> str:
     )
 
 
+TOOL_TRIGGERS = {
+    "[tool:write]": ("write_file", {"path": "hello.txt", "content": "Hello from Celius"}),
+    "[tool:python]": ("run_python", {"code": "print(6 * 7)"}),
+    "[tool:list]": ("list_files", {}),
+}
+
+
+def _tool_stream(name: str, arguments: dict):
+    async def stream():
+        call = {
+            "index": 0,
+            "id": "call_fake",
+            "type": "function",
+            "function": {"name": name, "arguments": json.dumps(arguments)},
+        }
+        chunk = {"choices": [{"index": 0, "delta": {"tool_calls": [call]}}]}
+        yield f"data: {json.dumps(chunk)}\n\n"
+        done = {"choices": [{"index": 0, "delta": {}, "finish_reason": "tool_calls"}]}
+        yield f"data: {json.dumps(done)}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+def _text_stream(text: str):
+    async def stream():
+        for word in text.split(" "):
+            await asyncio.sleep(DELAY)
+            chunk = {"choices": [{"index": 0, "delta": {"content": word + " "}}]}
+            yield f"data: {json.dumps(chunk)}\n\n"
+        done = {"choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]}
+        yield f"data: {json.dumps(done)}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
 @app.post("/v1/chat/completions")
 async def chat(request: Request):
     body = await request.json()
     messages = body.get("messages", [])
+    offered = {t["function"]["name"] for t in body.get("tools") or []}
+    if messages and messages[-1].get("role") == "tool":
+        result = str(messages[-1].get("content") or "")[:200]
+        return _text_stream(f"Tool result: {result}")
+    if messages and messages[-1].get("role") == "user":
+        last_user = _text_of(messages[-1].get("content"))[0]
+        for trigger, (name, arguments) in TOOL_TRIGGERS.items():
+            if trigger in last_user and name in offered:
+                return _tool_stream(name, arguments)
     # Only the newest paragraph: the app merges a failed turn into the next user message.
     last = _text_of(messages[-1].get("content") if messages else "")[0].split("\n\n")[-1]
     thinking = (body.get("chat_template_kwargs") or {}).get("enable_thinking") is not False

@@ -40,6 +40,7 @@ cp .env.example .env
 chmod 600 .env
 sed -i "s|REPLACE_WITH_RANDOM_SECRET|$(openssl rand -hex 32)|" .env
 sed -i "s|REPLACE_WITH_RANDOM_PASSWORD|$(openssl rand -hex 24)|" .env
+sed -i "s|REPLACE_WITH_RANDOM_TOKEN|$(openssl rand -hex 32)|" .env
 nano .env
 ```
 
@@ -86,10 +87,44 @@ Keep `MODEL_PARALLEL_REQUESTS` in `.env` equal to `--parallel`.
 Point your domain at `API_BIND_ADDRESS:8000`. Disable buffering for `/api/v1/runs/`
 (see [reverse-proxy.md](reverse-proxy.md)).
 
+## Tools and the sandbox
+
+`make up` also builds and starts the `sandbox` container, which runs the code the model
+writes. It has no network, no secrets except `SANDBOX_TOKEN` and no access to the app's
+data (see [ADR 0008](../adr/0008-sandbox-and-tools.md)). Check it from the app: **Tools &
+activity → Permissions** shows "Running".
+
+- **Mode.** Inside an LXC with Docker's default seccomp profile, bubblewrap can't create
+  namespaces, so the sandbox runs in `process` mode: the container is the isolation
+  boundary, with per-run limits on CPU, memory, processes, files and time. That is the
+  expected setup. In this mode code from one chat could read another chat's workspace
+  (all are yours).
+- **More isolation (optional).** Give the sandbox per-run namespaces (bubblewrap) by
+  allowing unprivileged user namespaces for that container only: set
+  `security_opt: ["no-new-privileges:true", "seccomp=unconfined", "apparmor=unconfined"]`
+  for `sandbox` in a `compose.override.yaml`, and make sure the LXC has
+  `features: nesting=1`. Restart, then check `docker compose logs sandbox` says
+  `mode=bwrap`. Only do this if you understand the trade-off: a wider kernel surface in
+  exchange for per-run network/PID/filesystem isolation.
+- **Web tools** (`web_fetch`, `git_clone`) run in the worker and refuse private and LAN
+  addresses, always. To restrict them further, set `TOOL_WEB_ALLOWLIST` (for example
+  `github.com,python.org`), or turn them off with `TOOL_NETWORK_ENABLED=false`.
+- **Permissions.** New chats use `TOOL_DEFAULT_PROFILE` (`standard`: asks before anything
+  that writes, runs code or uses the web). Change your default, edit profiles and see the
+  approval inbox under **Tools & activity**.
+
 ## Updating
 
 ```sh
 cd /opt/celius && git pull && make up      # migrations run automatically before the API starts
+```
+
+**From phase 4 to phase 5:** add a sandbox token to `.env` first, or `make up` stops with
+`set SANDBOX_TOKEN`:
+
+```sh
+echo "SANDBOX_URL=http://sandbox:8100" >> .env
+echo "SANDBOX_TOKEN=$(openssl rand -hex 32)" >> .env
 ```
 
 ## Troubleshooting

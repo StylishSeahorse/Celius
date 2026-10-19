@@ -4,7 +4,7 @@ COMPOSE_DEV := docker compose -f infra/compose.dev.yaml
 DEV_DB := postgresql+asyncpg://celius:celius@localhost:5432/celius
 
 .PHONY: gen-api desktop install dev-deps dev-api dev-worker dev-web fake-llama migrate migration test test-api-pg \
-	test-web lint format e2e up down logs
+	test-web test-sandbox lint format e2e up down logs
 
 install:            ## Install API and web dependencies
 	cd $(API) && uv sync
@@ -34,6 +34,9 @@ migration:          ## Autogenerate a migration: make migration m="add files"
 test:               ## Unit tests (SQLite, mocked model server)
 	cd $(API) && uv run pytest -q
 
+test-sandbox:       ## Sandbox service tests
+	cd services/sandbox && uv sync --quiet && uv run pytest -q
+
 test-api-pg:        ## API tests on PostgreSQL (uses a celius_test database) + migration round-trip
 	-docker compose -f infra/compose.dev.yaml exec -T postgres createdb -U celius celius_test
 	cd $(API) && TEST_POSTGRES_URL=$(DEV_DB) \
@@ -56,10 +59,12 @@ desktop:            ## Build the desktop app for this OS (Windows installers on 
 
 lint:
 	cd $(API) && uv run ruff check . && uv run ruff format --check .
+	cd services/sandbox && uv run ruff check . && uv run ruff format --check .
 	pnpm typecheck
 
 format:
 	cd $(API) && uv run ruff check --fix . && uv run ruff format .
+	cd services/sandbox && uv run ruff check --fix . && uv run ruff format .
 
 up:                 ## Build and start the production stack
 	$(COMPOSE_PROD) up -d --build

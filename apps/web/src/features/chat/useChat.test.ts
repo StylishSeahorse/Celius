@@ -10,6 +10,7 @@ const base: LiveRun = {
   reasoning: "",
   status: "queued",
   error: null,
+  toolCalls: {},
 };
 
 const ev = (type: RunEvent["type"], data: Record<string, unknown> = {}, run_id = "r1"): RunEvent => ({
@@ -45,5 +46,19 @@ describe("applyEvent", () => {
 
   it("ignores events for other runs", () => {
     expect(applyEvent(base, ev("message.delta", { text: "x" }, "other"))).toBe(base);
+  });
+
+  it("tracks tool calls and resets the step's text once it is saved", () => {
+    const call = { id: "t1", status: "pending_approval" };
+    let live = applyEvent({ ...base, status: "running", text: "Let me check" },
+      ev("tool_call.proposed", { tool_call: call }));
+    expect(live?.text).toBe("");
+    expect(live?.toolCalls.t1).toEqual(call);
+    live = applyEvent(live, ev("run.progress", { stage: "awaiting_approval" }));
+    expect(live?.status).toBe("awaiting_approval");
+    live = applyEvent(live, ev("tool_call.completed", { tool_call: { id: "t1", status: "completed" } }));
+    expect(live?.toolCalls.t1.status).toBe("completed");
+    live = applyEvent(live, ev("run.progress", { stage: "resumed" }));
+    expect(live?.status).toBe("running");
   });
 });

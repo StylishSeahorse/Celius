@@ -5,6 +5,8 @@ import socket
 import time
 import uuid
 
+import anyio
+
 import app.services.exports  # noqa: F401 - registers job handlers
 import app.services.files.processing  # noqa: F401 - registers job handlers
 from app.config import Settings
@@ -14,12 +16,30 @@ from app.services.jobs import claim_next_job, recover_stale_jobs, run_job
 from app.services.model_gateway import ModelGateway
 from app.services.schedules import fire_due
 from app.services.tools.calls import expire_approvals
+from app.services.tools.sandbox_client import SandboxClient
+from app.services.tools.sandbox_status import write_status
 from app.worker.executor import claim_next_run, execute_run, recover_stale_runs
 
 log = logging.getLogger(__name__)
 
 SHUTDOWN_GRACE_SECONDS = 20
 MAINTENANCE_INTERVAL_SECONDS = 60
+
+
+async def _record_sandbox_health(settings: Settings) -> None:
+    client = SandboxClient.from_settings(settings)
+    if client is None:
+        return
+    try:
+        health = await client.health()
+    finally:
+        await client.aclose()
+    if health is None:
+        log.warning("The sandbox at %s is unreachable", settings.sandbox_url)
+    try:
+        await anyio.to_thread.run_sync(write_status, settings, health)
+    except OSError:
+        log.warning("Could not record the sandbox status")
 
 
 def make_worker_id() -> str:
@@ -75,6 +95,7 @@ async def run_worker(
             if now - last_maintenance >= MAINTENANCE_INTERVAL_SECONDS:
                 if expired := await cleanup_expired_uploads(factory, settings):
                     log.info("Expired %d abandoned upload(s)", expired)
+                await _record_sandbox_health(settings)
                 last_maintenance = now
             while len(runs) < settings.model_parallel_requests:
                 run_id = await claim_next_run(factory, worker_id, settings)

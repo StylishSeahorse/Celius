@@ -22,6 +22,7 @@ export interface OutboxItem {
     model_override: string | null;
     project_id: string | null;
     reasoning?: boolean | null;
+    tool_profile?: string | null;
   };
   status: "queued" | "failed";
   error?: string;

@@ -102,6 +102,10 @@ model (`TOOL_MAX_RESULT_CHARS`). When a limit is hit, the model is told and aske
 answer with what it has. Cancelling a run cancels the in-flight sandbox request, and
 closing that request kills the code.
 
+### Health
+Only the worker can reach the sandbox, so the worker records the sandbox's health (mode,
+limits) on the app-data volume every minute, and the API shows it in settings.
+
 ### Audit
 Every tool call is a `tool_calls` row: tool, arguments, decision and its source
 (policy, user, grant, expired), timings and result summary. Policy decisions, approvals,
@@ -124,9 +128,10 @@ storage quotas that already apply.
 
 ## Consequences
 
-- Without bubblewrap, all executions share the sandbox container's kernel view and
-  network-less namespace; the container is the main boundary. Workspaces are
-  separated by directory and path checks, not by mounts.
+- Without bubblewrap (the default inside an LXC), all executions share the sandbox
+  container's view of the filesystem: code from one conversation could read another
+  conversation's workspace. All workspaces belong to the one user, so this is accepted;
+  the container is the boundary that protects the app, the host and the network.
 - The workspaces volume is shared between the worker and the sandbox (same uid). The
   worker never follows symlinks out of a workspace when reading or attaching files.
 - Adding a heavier runner later (gVisor) means a new sandbox image, not new app code.

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, api, isNetworkError } from "../../lib/api";
 import { newId } from "../../lib/ids";
 import { followRun } from "../../lib/sse";
-import type { ConversationDetail, ConversationSummary, Run, RunEvent } from "../../lib/types";
+import type { ConversationDetail, ConversationSummary, Run, RunEvent, ToolCall } from "../../lib/types";
 import { cache } from "../../offline/db";
 import { type OutboxItem, outbox } from "../../offline/outbox";
 
@@ -12,8 +12,17 @@ export interface LiveRun {
   messageId: string | null;
   text: string;
   reasoning: string;
-  status: "queued" | "running" | "reconnecting" | "completed" | "failed" | "cancelled";
+  status:
+    | "queued"
+    | "running"
+    | "reconnecting"
+    | "awaiting_approval"
+    | "completed"
+    | "failed"
+    | "cancelled";
   error: string | null;
+  /** Latest state of each tool call seen on the stream, by id. */
+  toolCalls: Record<string, ToolCall>;
 }
 
 export interface Conflict {
@@ -24,12 +33,19 @@ export interface Conflict {
 interface Options {
   conversationId: string | null;
   /** For a conversation started from this view (new chat). */
-  draft: { modelOverride: string | null; projectId: string | null; reasoning: boolean | null };
+  draft: {
+    modelOverride: string | null;
+    projectId: string | null;
+    reasoning: boolean | null;
+    toolProfile: string | null;
+  };
   onConversationCreated: (id: string) => void;
   onChanged: () => void;
 }
 
-const LIVE_STATUSES = ["queued", "running", "reconnecting"];
+const LIVE_STATUSES = ["queued", "running", "reconnecting", "awaiting_approval"];
+// Events after which the persisted message changed (a step was saved, a call finished).
+const RELOAD_EVENTS = new Set(["tool_call.proposed", "tool_call.completed", "tool_call.decided"]);
 
 function placeholder(id: string, draft: Options["draft"], title: string): ConversationDetail {
   const now = new Date().toISOString();
@@ -40,6 +56,7 @@ function placeholder(id: string, draft: Options["draft"], title: string): Conver
     model_override: draft.modelOverride,
     memory_enabled: true,
     reasoning: draft.reasoning,
+    tool_profile: draft.toolProfile,
     active_branch_id: null,
     version: 0,
     archived: false,
@@ -83,12 +100,28 @@ export function useChat({ conversationId, draft, onConversationCreated, onChange
       messageId: run.output_message_id,
       text: "",
       reasoning: "",
-      status: run.status === "queued" ? "queued" : "running",
+      status:
+        run.status === "queued" ? "queued" : run.status === "awaiting_approval" ? "awaiting_approval" : "running",
       error: null,
+      toolCalls: {},
     });
+    let reload: ReturnType<typeof setTimeout> | null = null;
     followRun(run.id, {
       signal: controller.signal,
-      onEvent: (event) => setLive((current) => applyEvent(current, event)),
+      onEvent: (event) => {
+        setLive((current) => applyEvent(current, event));
+        // Saved steps and tool results show from the server's copy of the message.
+        if (RELOAD_EVENTS.has(event.type) && !reload) {
+          reload = setTimeout(() => {
+            reload = null;
+            if (idRef.current !== conversation) return;
+            void api.getConversation(conversation).then((fresh) => {
+              if (idRef.current === conversation && !controller.signal.aborted) setDetail(fresh);
+            }).catch(() => undefined);
+          }, 150);
+        }
+        if (event.type === "tool_call.awaiting_approval") callbacks.current.onChanged();
+      },
       onReconnecting: () =>
         setLive((current) => (current ? { ...current, status: "reconnecting" } : current)),
     })
@@ -181,6 +214,7 @@ export function useChat({ conversationId, draft, onConversationCreated, onChange
                 modelOverride: created.model_override,
                 projectId: created.project_id,
                 reasoning: created.reasoning ?? null,
+                toolProfile: created.tool_profile ?? null,
               },
               queuedCreate.content.slice(0, 80) || queuedCreate.attachments?.[0]?.filename || "New chat",
             ),
@@ -213,6 +247,7 @@ export function useChat({ conversationId, draft, onConversationCreated, onChange
           model_override: draft.modelOverride,
           project_id: draft.projectId,
           reasoning: draft.reasoning,
+          tool_profile: draft.toolProfile,
         };
         setDetailState(placeholder(id, draft, content.slice(0, 80) || attachments[0]?.filename || "New chat"));
         onConversationCreated(id);
@@ -338,11 +373,31 @@ export function applyEvent(current: LiveRun | null, event: RunEvent): LiveRun | 
         text: current.text + (data.text ?? ""),
         reasoning: current.reasoning + (data.reasoning ?? ""),
       };
+    case "tool_call.proposed": {
+      // The step's text is now saved on the message; the stream continues with the next.
+      const call = (event.data as { tool_call?: ToolCall }).tool_call;
+      return {
+        ...current,
+        text: "",
+        reasoning: "",
+        toolCalls: call ? { ...current.toolCalls, [call.id]: call } : current.toolCalls,
+      };
+    }
+    case "tool_call.awaiting_approval":
+    case "tool_call.decided":
+    case "tool_call.started":
+    case "tool_call.completed": {
+      const call = (event.data as { tool_call?: ToolCall }).tool_call;
+      return call ? { ...current, toolCalls: { ...current.toolCalls, [call.id]: call } } : current;
+    }
     case "run.progress":
-      // The worker restarted generation from scratch; discard the partial output.
-      return data.stage === "restarted"
-        ? { ...current, text: "", reasoning: "", status: "queued" }
-        : current;
+      if (data.stage === "restarted") {
+        // The worker restarted this step from scratch; discard its partial output.
+        return { ...current, text: "", reasoning: "", status: "queued" };
+      }
+      if (data.stage === "awaiting_approval") return { ...current, status: "awaiting_approval" };
+      if (data.stage === "resumed") return { ...current, status: "running" };
+      return current;
     case "run.completed":
       return { ...current, status: "completed" };
     case "run.cancelled":

@@ -7,6 +7,7 @@ import { outbox } from "../../offline/outbox";
 import { startSync } from "../../offline/sync";
 import { useOnline } from "../../offline/useOnline";
 import { desktop } from "../../lib/desktop";
+import { ToolsPanel } from "../tools/ToolsPanel";
 import { ChatView } from "./ChatView";
 import { FolderBrowser } from "./FolderBrowser";
 import { ProjectDialog } from "./ProjectDialog";
@@ -32,9 +33,12 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const [models, setModels] = useState<ModelList | null>(null);
   const [draftModel, setDraftModel] = useState<string | null>(null);
   const [draftReasoning, setDraftReasoning] = useState<boolean | null>(null);
+  const [draftToolProfile, setDraftToolProfile] = useState<string | null>(null);
   const [storage, setStorage] = useState<StorageUsage | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [queued, setQueued] = useState(outbox.size);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [pendingApprovals, setPendingApprovals] = useState(0);
   const [projectDialog, setProjectDialog] = useState<{ project: Project | null } | null>(null);
   // Desktop app only: a folder browser that resolves with the files the user picked.
   const [folderPick, setFolderPick] = useState<((files: File[]) => void) | null>(null);
@@ -66,6 +70,15 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
     api.storageUsage().then(setStorage).catch(() => undefined);
   }, []);
   useEffect(refreshStorage, [refreshStorage]);
+
+  const refreshApprovals = useCallback(() => {
+    api.pendingApprovals().then((items) => setPendingApprovals(items.length)).catch(() => undefined);
+  }, []);
+  useEffect(() => {
+    refreshApprovals();
+    const timer = setInterval(refreshApprovals, 15_000);
+    return () => clearInterval(timer);
+  }, [refreshApprovals]);
 
   const refreshProjects = useCallback(async () => {
     try {
@@ -115,9 +128,12 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
 
   const chat = useChat({
     conversationId: selectedId,
-    draft: { modelOverride: draftModel, projectId, reasoning: draftReasoning },
+    draft: { modelOverride: draftModel, projectId, reasoning: draftReasoning, toolProfile: draftToolProfile },
     onConversationCreated: (id) => select(id),
-    onChanged: () => void refreshList(),
+    onChanged: () => {
+      void refreshList();
+      refreshApprovals();
+    },
   });
 
   // Outbox: show the queue size, and deliver whenever we might be able to.
@@ -133,13 +149,15 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
   }, []);
 
   // Changes from other devices.
-  const latest = useRef({ refreshList, refreshProjects, refreshStorage, chat, selectedId, select });
-  latest.current = { refreshList, refreshProjects, refreshStorage, chat, selectedId, select };
+  const latest = useRef({ refreshList, refreshProjects, refreshStorage, refreshApprovals, chat, selectedId, select });
+  latest.current = { refreshList, refreshProjects, refreshStorage, refreshApprovals, chat, selectedId, select };
   useEffect(
     () =>
       startSync((changes: SyncChange[], resync: boolean) => {
-        const { refreshList, refreshProjects, refreshStorage, chat, selectedId, select } = latest.current;
+        const { refreshList, refreshProjects, refreshStorage, refreshApprovals, chat, selectedId, select } =
+          latest.current;
         void refreshList();
+        if (changes.some((c) => c.entity_type === "message")) refreshApprovals();
         if (changes.some((c) => c.entity_type === "file")) {
           refreshStorage();
           window.dispatchEvent(new Event("celius:files-changed"));
@@ -208,6 +226,11 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
           onEditProject={(project) => setProjectDialog({ project })}
           onDelete={(id) => void remove(id)}
           onLogout={() => void logout()}
+          pendingApprovals={pendingApprovals}
+          onOpenTools={() => {
+            setToolsOpen(true);
+            setSidebarOpen(false);
+          }}
         />
       </aside>
       {sidebarOpen && (
@@ -222,6 +245,8 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
         projectName={projectName}
         onDraftModel={setDraftModel}
         onDraftReasoning={setDraftReasoning}
+        draftToolProfile={draftToolProfile}
+        onDraftToolProfile={setDraftToolProfile}
         onOpenSidebar={() => setSidebarOpen(true)}
         onStorageChanged={refreshStorage}
         extraAttach={extraAttach}
@@ -232,6 +257,24 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
           onClose={() => {
             folderPick([]);
             setFolderPick(null);
+          }}
+        />
+      )}
+      {toolsOpen && (
+        <ToolsPanel
+          isAdmin={me.is_admin}
+          initialTab={pendingApprovals ? "approvals" : "activity"}
+          onOpenConversation={(id) => {
+            setToolsOpen(false);
+            select(id);
+          }}
+          onPendingChanged={() => {
+            refreshApprovals();
+            void chat.refresh();
+          }}
+          onClose={() => {
+            setToolsOpen(false);
+            refreshApprovals();
           }}
         />
       )}

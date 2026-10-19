@@ -7,6 +7,7 @@ import { desktop } from "../../lib/desktop";
 import type { Message } from "../../lib/types";
 import { formatBytes } from "../../lib/uploads";
 import type { OutboxItem } from "../../offline/outbox";
+import { ToolCallCard } from "../tools/ToolCallCard";
 import type { LiveRun } from "./useChat";
 
 function partText(message: Message, type: string) {
@@ -95,13 +96,16 @@ interface FilePartData {
   has_thumbnail?: boolean;
 }
 
-export function AttachmentList({ message }: { message: Message }) {
+export function AttachmentList({ message, align = "end" }: { message: Message; align?: "start" | "end" }) {
   const files = message.parts
     .filter((p) => p.type === "file" && p.data)
     .map((p) => p.data as unknown as FilePartData);
   if (!files.length) return null;
   return (
-    <ul className="flex flex-wrap justify-end gap-2" aria-label="Attached files">
+    <ul
+      className={`flex flex-wrap gap-2 ${align === "end" ? "justify-end" : "justify-start"}`}
+      aria-label="Attached files"
+    >
       {files.map((f) =>
         f.kind === "image" ? (
           <li key={f.file_id}>
@@ -251,49 +255,70 @@ function UserMessage({ message, actions }: { message: Message; actions: MessageA
   );
 }
 
+function Reasoning({ text }: { text: string }) {
+  return (
+    <details className="rounded-lg border border-line px-3 py-2 text-sm text-muted">
+      <summary className="cursor-pointer select-none">Reasoning</summary>
+      <p className="mt-2 whitespace-pre-wrap">{text}</p>
+    </details>
+  );
+}
+
 export function MessageView({
   message,
   live,
   actions,
+  onToolDecided,
 }: {
   message: Message;
   live: LiveRun | null;
   actions: MessageActions;
+  onToolDecided?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   if (message.role === "user") return <UserMessage message={message} actions={actions} />;
 
   const isLive = live !== null && live.messageId === message.id;
-  const text = isLive ? live.text : partText(message, "text");
-  const reasoning = isLive ? live.reasoning : partText(message, "reasoning");
+  const text = partText(message, "text") + (isLive ? live.text : "");
   const status = isLive ? live.status : message.status;
   const inProgress = ["queued", "running", "reconnecting", "pending", "streaming"].includes(status);
-  const waiting = inProgress && !text;
+  const calls = new Map((message.tool_calls ?? []).map((c) => [c.id, c]));
+  const hasSteps = message.parts.some((p) => p.type !== "text" || p.text);
+  const waiting = inProgress && !(isLive && (live.text || live.reasoning));
 
   return (
     <div className="group space-y-2">
-      {reasoning && (
-        <details className="rounded-lg border border-line px-3 py-2 text-sm text-muted">
-          <summary className="cursor-pointer select-none">Reasoning</summary>
-          <p className="mt-2 whitespace-pre-wrap">{reasoning}</p>
-        </details>
-      )}
-      {waiting ? (
+      {message.parts.map((part, index) => {
+        if (part.type === "reasoning" && part.text) return <Reasoning key={index} text={part.text} />;
+        if (part.type === "text" && part.text) return <AssistantMarkdown key={index} text={part.text} />;
+        if (part.type === "tool_call") {
+          const id = (part.data as { tool_call_id?: string } | null)?.tool_call_id ?? "";
+          const call = (isLive && live.toolCalls[id]) || calls.get(id);
+          return call ? <ToolCallCard key={index} call={call} onDecided={onToolDecided} /> : null;
+        }
+        return null;
+      })}
+      {!inProgress && <AttachmentList message={message} align="start" />}
+      {isLive && live.reasoning && <Reasoning text={live.reasoning} />}
+      {isLive && live.text && <AssistantMarkdown text={live.text} />}
+      {status === "awaiting_approval" ? (
+        <p className="text-sm text-amber-700 dark:text-amber-400" aria-live="polite">
+          Waiting for your approval above.
+        </p>
+      ) : waiting ? (
         <div className="flex items-center gap-2 text-muted" aria-live="polite">
           <span className="inline-flex gap-1">
             <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.2s]" />
             <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.1s]" />
             <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted" />
           </span>
-          {status === "queued" || status === "pending"
+          {(status === "queued" || status === "pending") && !hasSteps
             ? "Waiting for the model…"
             : status === "reconnecting"
               ? "Reconnecting…"
               : null}
         </div>
-      ) : (
-        <AssistantMarkdown text={text} />
-      )}
+      ) : null}
       {status === "cancelled" && <p className="text-xs text-muted">Stopped</p>}
       {status === "failed" && (
         <p role="alert" className="text-sm text-red-600 dark:text-red-400">

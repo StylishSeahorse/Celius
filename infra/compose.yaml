@@ -83,7 +83,12 @@ services:
     volumes:
       - app-data:/data/app
       - workspaces:/data/workspaces
-    networks: [backend, egress]
+    # sandbox: the worker sends code there. egress: model server and web tools.
+    networks: [backend, egress, sandbox]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-celius}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-celius}
+      REDIS_URL: redis://redis:6379/0
+      SANDBOX_URL: http://sandbox:8100
     stop_grace_period: 30s
     healthcheck:
       disable: true
@@ -92,12 +97,45 @@ services:
     read_only: true
     tmpfs: [/tmp]
 
+  # Runs model-written code (docs/adr/0008-sandbox-and-tools.md). Deliberately minimal:
+  # no env file (it holds no secret but its own token), no app data, no Docker socket,
+  # and only the internal `sandbox` network, so it can reach nothing and nothing but the
+  # worker can reach it.
+  sandbox:
+    image: ${CELIUS_SANDBOX_IMAGE:-celius-sandbox:local}
+    build:
+      context: ..
+      dockerfile: infra/docker/Dockerfile.sandbox
+    restart: unless-stopped
+    environment:
+      SANDBOX_TOKEN: ${SANDBOX_TOKEN:?set SANDBOX_TOKEN}
+      SANDBOX_MODE: ${SANDBOX_MODE:-auto}
+      SANDBOX_MAX_CONCURRENT: ${SANDBOX_MAX_CONCURRENT:-2}
+      SANDBOX_MAX_MEMORY_MB: ${TOOL_MEMORY_MB:-1024}
+    volumes:
+      - workspaces:/workspaces
+    networks: [sandbox]
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 256
+    mem_limit: ${SANDBOX_MEM_LIMIT:-3g}
+    cpus: ${SANDBOX_CPUS:-2}
+    ulimits:
+      nofile: { soft: 1024, hard: 1024 }
+
 networks:
   # No outbound route: postgres and redis are reachable only from inside the stack.
   backend:
     internal: true
   # The api needs egress to reach the model server on the LAN.
   egress: {}
+  # Worker <-> sandbox only. internal: no route to the LAN or the internet.
+  sandbox:
+    internal: true
 
 volumes:
   postgres-data:

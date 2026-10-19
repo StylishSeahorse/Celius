@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { ModelList, StoredFile } from "../../lib/types";
 import { outbox } from "../../offline/outbox";
+import { ToolProfilePicker } from "../tools/ToolProfilePicker";
 import { Composer } from "./Composer";
 import { runExport } from "./exporting";
 import { MessageView, PendingMessage } from "./MessageView";
@@ -17,6 +18,8 @@ interface Props {
   extraAttach?: { label: string; pick: () => Promise<File[]> };
   onDraftModel: (model: string | null) => void;
   onDraftReasoning: (value: boolean | null) => void;
+  draftToolProfile: string | null;
+  onDraftToolProfile: (value: string | null) => void;
   onOpenSidebar: () => void;
   onStorageChanged: () => void;
 }
@@ -34,7 +37,8 @@ export function ChatView(props: Props) {
   }, [detail?.messages.length, live?.text, live?.status, chat.pending.length]);
 
   const messages = detail?.messages ?? [];
-  const canStop = live !== null && ["queued", "running", "reconnecting"].includes(live.status);
+  const canStop =
+    live !== null && ["queued", "running", "reconnecting", "awaiting_approval"].includes(live.status);
   const savedOnServer = detail !== null && detail.version > 0;
   const actions = {
     disabled: chat.busy || !online || !savedOnServer,
@@ -56,7 +60,7 @@ export function ChatView(props: Props) {
 
   return (
     <main aria-label="Chat" className="flex h-full min-w-0 flex-1 flex-col">
-      <header className="flex items-center gap-3 border-b border-line px-4 py-2.5">
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-4 py-2.5">
         <button
           onClick={onOpenSidebar}
           className="rounded-md px-2 py-1 text-muted hover:bg-panel md:hidden"
@@ -72,11 +76,21 @@ export function ChatView(props: Props) {
             onRename={(title) => void save({ title })}
           />
         </div>
-        <ModelPicker
-          models={models}
-          value={detail ? detail.model_override : draftModel}
-          onChange={(model) => (savedOnServer ? void save({ model_override: model }) : onDraftModel(model))}
-        />
+        {/* On phones the pickers get their own row, so the title keeps its space. */}
+        <div className="flex min-w-0 items-center gap-2 max-sm:order-last max-sm:w-full">
+          <ToolProfilePicker
+            value={detail && savedOnServer ? (detail.tool_profile ?? null) : props.draftToolProfile}
+            disabled={savedOnServer && !online}
+            onChange={(profile) =>
+              savedOnServer ? void save({ tool_profile: profile }) : props.onDraftToolProfile(profile)
+            }
+          />
+          <ModelPicker
+            models={models}
+            value={detail ? detail.model_override : draftModel}
+            onChange={(model) => (savedOnServer ? void save({ model_override: model }) : onDraftModel(model))}
+          />
+        </div>
         {savedOnServer && online && <ExportMenu conversationId={detail!.id} />}
       </header>
 
@@ -102,7 +116,13 @@ export function ChatView(props: Props) {
             <EmptyState models={models} />
           )}
           {messages.map((m) => (
-            <MessageView key={m.id} message={m} live={live} actions={actions} />
+            <MessageView
+              key={m.id}
+              message={m}
+              live={live}
+              actions={actions}
+              onToolDecided={() => void chat.refresh()}
+            />
           ))}
           {chat.pending.map((item) => (
             <PendingMessage
@@ -316,7 +336,7 @@ function ModelPicker({
       value={value ?? ""}
       onChange={(e) => onChange(e.target.value || null)}
       aria-label="Model"
-      className="max-w-[45%] truncate rounded-md border border-line bg-canvas px-2 py-1 text-sm"
+      className="min-w-0 max-w-56 truncate rounded-md border border-line bg-canvas px-2 py-1 text-sm max-sm:max-w-none max-sm:flex-1"
     >
       <option value="">Default ({models.default_model_id})</option>
       {[...ids].map((id) => (

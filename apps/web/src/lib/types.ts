@@ -4,8 +4,18 @@
 export type {
   ConversationDetail,
   ConversationSummary,
+  ActivityItem,
   ExportJob,
   FileKind,
+  McpServer,
+  PendingApproval,
+  Schedule,
+  ScheduleCreate,
+  ToolCall,
+  ToolCallStatus,
+  ToolInfo,
+  ToolProfile,
+  ToolSettings,
   StorageUsage,
   StoredFile,
   UploadSession,
@@ -31,6 +41,7 @@ export type RunEventType =
   | "message.delta"
   | "tool_call.proposed"
   | "tool_call.awaiting_approval"
+  | "tool_call.decided"
   | "tool_call.started"
   | "tool_call.completed"
   | "run.progress"

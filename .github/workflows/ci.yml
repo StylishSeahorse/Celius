@@ -38,6 +38,23 @@ jobs:
           TEST_POSTGRES_URL: postgresql+asyncpg://celius:celius@localhost:5432/celius
           TEST_DATABASE_URL: postgresql+asyncpg://celius:celius@localhost:5432/celius_test
 
+  sandbox:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/sandbox
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - name: bubblewrap (its tests skip if the runner forbids user namespaces)
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest -q
+
   web:
     runs-on: ubuntu-latest
     steps:
@@ -102,10 +119,29 @@ jobs:
       - name: Validate compose files
         run: |
           cp .env.example .env
+          echo "SANDBOX_TOKEN=ci-sandbox-token-0123456789" >> .env
           docker compose -f infra/compose.yaml --env-file .env config -q
           docker compose -f infra/compose.dev.yaml config -q
       - name: Build image (API + worker + web)
         run: docker build -f infra/docker/Dockerfile.api -t celius-api:ci .
+      - name: Build the sandbox image
+        run: docker build -f infra/docker/Dockerfile.sandbox -t celius-sandbox:ci .
+      - name: The sandbox image runs code and has no network
+        run: |
+          docker run -d --name sb --network none --read-only --tmpfs /tmp --cap-drop ALL \
+            --security-opt no-new-privileges -e SANDBOX_TOKEN=ci-sandbox-token-0123456789 \
+            celius-sandbox:ci
+          for i in $(seq 1 30); do docker exec sb /srv/sandbox/.venv/bin/python -c \
+            "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/v1/health')" && break; sleep 1; done
+          docker exec sb /srv/sandbox/.venv/bin/python -c "
+          import json, urllib.request
+          body = json.dumps({'workspace': 'ci', 'kind': 'python', 'code': 'import pandas, docx, openpyxl, pptx, fpdf, matplotlib; print(6*7)'}).encode()
+          req = urllib.request.Request('http://127.0.0.1:8100/v1/executions', body, {'Authorization': 'Bearer ci-sandbox-token-0123456789', 'Content-Type': 'application/json'})
+          result = json.load(urllib.request.urlopen(req))
+          print(result)
+          assert result['stdout'] == '42\\n', result
+          "
+          docker rm -f sb
 
   desktop:
     runs-on: windows-latest

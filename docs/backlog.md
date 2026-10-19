@@ -92,15 +92,18 @@ Status key: ✅ done in repo · 🔶 partially done · ⬜ not started
 **Exit gate:** sandbox isolation, policy enforcement, cancellation and audit tests pass.
 Arbitrary shell stays disabled until T-01 is decided and validated.
 
-| ID | Item | Acceptance criteria |
-| --- | --- | --- |
-| T-01 | ADR: sandbox technology (gVisor / Firecracker / rootless containers) | Threat model reviewed; no Docker socket in the tool runner |
-| T-02 | Permission engine and profiles | Every call checked server-side regardless of model claims |
-| T-03 | Approvals bound to exact args, scope, expiry | Changed arguments require re-approval |
-| T-04 | Tool loop limits | Max iterations, wall-clock, output size enforced |
-| T-05 | Tools: Python, files, Git, web/HTTP, image, documents | Network off by default; per-tool allowlists |
-| T-06 | MCP client | MCP servers registered by admin only |
-| T-07 | Scheduled and background jobs | Monitor, cancel and recover; quotas enforced |
+| ID | Item | Status | Acceptance criteria |
+| --- | --- | --- | --- |
+| T-01 | ADR: sandbox technology | ✅ | [ADR 0008](adr/0008-sandbox-and-tools.md): a dedicated container (internal network, no secrets, no Docker socket, read-only, no capabilities), bubblewrap per run when the host allows it, rlimits and stray-process reaping always; gVisor/Firecracker rejected for now (need Proxmox host changes) |
+| T-02 | Permission engine and profiles | ✅ | Four built-in profiles plus custom ones (per-tool overrides); every call decided server-side; denied tools aren't offered and are refused if called anyway; unknown tools and invalid arguments refused |
+| T-03 | Approvals bound to exact args, scope, expiry | ✅ | Approval quotes the SHA-256 of the canonical arguments; a mismatch is refused and audited; "allow for this chat" is per conversation and tool and never overrides a deny; requests expire; runs pause without holding a worker and resume where they stopped |
+| T-04 | Tool loop limits | ✅ | Iterations, total tool time, per-call timeout and result size; at the limit the model is told to answer; a call is never run twice after a worker restart |
+| T-05 | Tools: Python, shell, files, Git, web, image, documents | ✅ | Code runs in the sandbox with no network; web tools run in the worker behind an SSRF guard (private/LAN addresses refused, DNS pinned, redirects re-checked, size-capped), optional host allowlist; workspace access never follows symlinks; results can be attached to the reply |
+| T-06 | MCP client | ✅ | Streamable HTTP; administrators only; credentials encrypted at rest and never returned; tools namespaced, `external` risk, same policy |
+| T-07 | Scheduled and background jobs | ✅ | Interval (≥15 min), daily and weekly in the user's time zone; fired once per occurrence by a conditional claim; per-user quota; activity panel lists runs and jobs with cancel |
+| T-08 | Run the sandbox image on the real host | ⬜ | `make up` on Proxmox; **Tools → Permissions** shows the sandbox running; Python and a document round-trip |
+| T-09 | Tool calling with the real model | ⬜ | Verify with `POST /models/{id}/verify-tools`; record which models and templates call tools reliably |
+| T-10 | Tool results in later turns | ⬜ | Only final text of earlier replies is replayed; consider summaries of tool results |
 
 ## Phase 6 — Memory and retrieval
 
@@ -135,5 +138,5 @@ Arbitrary shell stays disabled until T-01 is decided and validated.
 | Loaded model, quantisation, context | Discovered via `/v1/models` and `/props`; overrides in env |
 | Tool-calling support | Verified per model with `POST /api/v1/models/{id}/verify-tools` |
 | Parallel request limit | `MODEL_PARALLEL_REQUESTS=1` until benchmarked |
-| Sandbox technology | Phase 5 ADR (T-01) |
+| Sandbox isolation mode on the host | `SANDBOX_MODE` (auto: bubblewrap if allowed, else process limits) |
 | Backup destination | Phase 7 (H-01) |

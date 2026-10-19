@@ -463,3 +463,15 @@ async def test_workspace_download_is_contained_and_never_inline(client, auth_hea
         f"/api/v1/conversations/{conv['id']}/workspace", headers=auth_headers
     )
     assert {e["path"] for e in listing.json()["entries"]} == {"page.html", "link.txt"}
+
+
+async def test_settings_show_the_sandbox_as_the_worker_last_saw_it(client, auth_headers, settings):
+    from app.services.tools.sandbox_status import write_status
+
+    shown = (await client.get("/api/v1/tools/settings", headers=auth_headers)).json()
+    assert shown["sandbox"] is None  # not configured
+    settings.sandbox_url = "http://sandbox:8100"
+    settings.sandbox_token = settings.app_secret_key.__class__("t" * 20)
+    write_status(settings, {"status": "ok", "mode": "process"})
+    shown = (await client.get("/api/v1/tools/settings", headers=auth_headers)).json()
+    assert shown["sandbox"] == {"status": "ok", "mode": "process"}

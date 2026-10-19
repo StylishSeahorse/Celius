@@ -21,6 +21,8 @@ interface Props {
   onEditProject: (project: Project) => void;
   onDelete: (id: string) => void;
   onLogout: () => void;
+  pendingApprovals: number;
+  onOpenTools: () => void;
 }
 
 export function Sidebar(props: Props) {
@@ -131,6 +133,22 @@ export function Sidebar(props: Props) {
       </ul>
 
       <div className="space-y-2 border-t border-line pt-3 text-sm">
+        <button
+          onClick={props.onOpenTools}
+          disabled={!props.online}
+          className="flex w-full items-center gap-2 rounded-lg px-1 py-1 text-left hover:bg-canvas/60 disabled:opacity-40"
+        >
+          <span aria-hidden="true">🛠</span>
+          <span className="flex-1">Tools & activity</span>
+          {props.pendingApprovals > 0 && (
+            <span
+              className="rounded-full bg-amber-500 px-1.5 text-xs font-medium text-white"
+              aria-label={`${props.pendingApprovals} waiting for approval`}
+            >
+              {props.pendingApprovals}
+            </span>
+          )}
+        </button>
         <div className="flex items-center gap-2 px-1 text-muted" title={models?.health.detail ?? undefined}>
           <span
             className={`h-2 w-2 rounded-full ${

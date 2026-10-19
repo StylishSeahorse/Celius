@@ -42,6 +42,7 @@ from app.services.tools.policy import (
 )
 from app.services.tools.registry import BUILTIN
 from app.services.tools.sandbox_client import SandboxClient
+from app.services.tools.sandbox_status import read_status
 from app.services.tools.toolset import available_tools
 
 router = APIRouter(tags=["tools"])
@@ -90,10 +91,14 @@ async def _user_settings(db: AsyncSession, user_id: uuid.UUID) -> UserSettings:
 async def get_tool_settings(auth: CurrentAuth, db: DB, settings: AppSettings) -> ToolSettingsOut:
     prefs = tool_preferences(await db.get(UserSettings, auth.user.id))
     health = None
-    client = SandboxClient.from_settings(settings)
-    if client is not None:
-        health = await client.health() or {"status": "unreachable"}
-        await client.aclose()
+    if _sandbox_configured(settings):
+        # The worker's view (the API itself has no route to the sandbox in production).
+        health = await anyio.to_thread.run_sync(read_status, settings)
+        if health is None:
+            client = SandboxClient.from_settings(settings)
+            health = (await client.health() if client else None) or {"status": "unreachable"}
+            if client:
+                await client.aclose()
     return ToolSettingsOut(
         default_profile=prefs.get("default_profile") or settings.tool_default_profile,
         disabled_tools=prefs.get("disabled_tools") or [],
