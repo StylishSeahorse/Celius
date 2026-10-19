@@ -67,6 +67,25 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 50 * 1024 * 1024
     max_user_storage_bytes: int = 10 * 1024 * 1024 * 1024
 
+    # Files
+    upload_session_ttl_minutes: int = Field(default=60, ge=1)
+    max_extracted_text_chars: int = Field(default=500_000, ge=1000)
+    # How much of one attachment's text goes into a prompt (the rest is cut with a note).
+    max_attachment_prompt_chars: int = Field(default=60_000, ge=1000)
+    # Share of the context budget that project knowledge files may use.
+    project_files_context_share: float = Field(default=0.3, ge=0, le=0.9)
+    archive_max_entries: int = Field(default=10_000, ge=1)
+    archive_max_total_bytes: int = Field(default=1024 * 1024 * 1024, ge=1)
+    archive_max_ratio: int = Field(default=100, ge=1)
+    image_max_pixels: int = Field(default=50_000_000, ge=1)
+    vision_max_side: int = Field(default=1024, ge=64)
+    # Optional malware scanning with clamd (ClamAV). Unset = no scanning.
+    clamav_host: str | None = None
+    clamav_port: int = 3310
+    job_parallel: int = Field(default=2, ge=1)
+    job_lease_seconds: int = Field(default=600, ge=30)
+    job_max_attempts: int = Field(default=2, ge=1)
+
     # Memory
     memory_enabled: bool = True
     memory_auto_extraction: bool = True

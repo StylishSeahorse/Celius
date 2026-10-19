@@ -42,6 +42,8 @@ class Conversation(UUIDPrimaryKey, Timestamps, Base):
     title: Mapped[str | None] = mapped_column(String(300))
     model_override: Mapped[str | None] = mapped_column(String(255))
     memory_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Model "thinking": None = model default, True = on, False = off.
+    reasoning: Mapped[bool | None] = mapped_column(Boolean)
     active_branch_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
     # Optimistic concurrency: bumped on every durable change, checked on writes.
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)

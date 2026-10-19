@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
-import type { ConversationSummary, Me, ModelList, Project } from "../../lib/types";
+import type { ConversationSummary, Me, ModelList, Project, StorageUsage } from "../../lib/types";
+import { formatBytes } from "../../lib/uploads";
 
 interface Props {
   me: Me;
@@ -11,6 +12,7 @@ interface Props {
   models: ModelList | null;
   online: boolean;
   queued: number;
+  storage: StorageUsage | null;
   search: string;
   onSearch: (q: string) => void;
   onSelect: (id: string | null) => void;
@@ -87,7 +89,8 @@ export function Sidebar(props: Props) {
               <button
                 onClick={() => props.onEditProject(p)}
                 aria-label={`Project settings for ${p.name}`}
-                className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded px-1.5 text-xs text-muted hover:text-ink md:hidden md:group-hover:block"
+                // Shown on hover, but always focusable (display:none would hide it from keyboards).
+                className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded px-1.5 text-xs text-muted hover:text-ink focus:opacity-100 md:opacity-0 md:group-hover:opacity-100"
               >
                 ⋯
               </button>
@@ -114,7 +117,7 @@ export function Sidebar(props: Props) {
               }}
               disabled={!props.online}
               aria-label={`Delete ${c.title || "conversation"}`}
-              className="absolute top-1/2 right-1.5 hidden -translate-y-1/2 rounded px-1.5 text-muted group-hover:block hover:text-ink"
+              className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded px-1.5 text-muted hover:text-ink focus:opacity-100 md:opacity-0 md:group-hover:opacity-100"
             >
               ×
             </button>
@@ -142,6 +145,11 @@ export function Sidebar(props: Props) {
                 ? "Model server online"
                 : "Model server offline"}
         </div>
+        {props.storage && (
+          <div className="px-1 text-xs text-muted" title="Storage used by your files and exports">
+            Storage: {formatBytes(props.storage.used_bytes)} of {formatBytes(props.storage.limit_bytes)}
+          </div>
+        )}
         <div className="flex items-center justify-between px-1">
           <span className="truncate">{props.me.display_name ?? props.me.username}</span>
           <button onClick={props.onLogout} className="text-muted hover:text-ink">

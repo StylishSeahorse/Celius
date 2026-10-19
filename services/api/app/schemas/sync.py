@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 class SyncChange(BaseModel):
     cursor: int
-    entity_type: Literal["conversation", "message", "project"]
+    entity_type: Literal["conversation", "message", "project", "file"]
     entity_id: uuid.UUID
     operation: Literal["upsert", "delete"]
     payload: dict[str, Any] | None

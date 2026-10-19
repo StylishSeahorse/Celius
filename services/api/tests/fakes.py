@@ -5,6 +5,9 @@ from typing import Any
 
 import httpx
 
+import app.services.exports  # noqa: F401 - registers job handlers
+import app.services.files.processing  # noqa: F401 - registers job handlers
+from app.services.jobs import claim_next_job, run_job
 from app.worker.executor import claim_next_run, execute_run
 
 
@@ -15,6 +18,8 @@ class FakeLlama:
         self.reply = "Hello there, world"
         self.reasoning: str | None = None
         self.context_tokens: int | None = None
+        self.vision = False
+        self.chat_template: str | None = None
         self.chunk_delay = 0.0
         self.fail_status: int | None = None
         self.fail_after_chunks: int | None = None
@@ -28,11 +33,14 @@ class FakeLlama:
         if path == "/v1/models":
             return httpx.Response(200, json={"data": [{"id": "local-model"}]})
         if path == "/props":
-            if self.context_tokens is None:
+            if self.context_tokens is None and not self.vision and self.chat_template is None:
                 return httpx.Response(404)
-            return httpx.Response(
-                200, json={"default_generation_settings": {"n_ctx": self.context_tokens}}
-            )
+            props: dict = {"modalities": {"vision": self.vision}}
+            if self.context_tokens:
+                props["default_generation_settings"] = {"n_ctx": self.context_tokens}
+            if self.chat_template is not None:
+                props["chat_template"] = self.chat_template
+            return httpx.Response(200, json=props)
         if path == "/v1/chat/completions":
             self.requests.append(json.loads(request.content))
             if self.fail_status:
@@ -45,7 +53,8 @@ class FakeLlama:
         return httpx.Response(404)
 
     async def _stream(self):
-        if self.reasoning:
+        kwargs = (self.requests[-1].get("chat_template_kwargs") or {}) if self.requests else {}
+        if self.reasoning and kwargs.get("enable_thinking") is not False:
             yield _sse({"choices": [{"delta": {"reasoning_content": self.reasoning}}]})
         for piece in re.findall(r"\S+\s*", self.reply):
             if self.fail_after_chunks is not None and self.chunks_sent >= self.fail_after_chunks:
@@ -58,6 +67,15 @@ class FakeLlama:
         yield _sse({"choices": [{"delta": {}, "finish_reason": "stop"}]})
         yield _sse({"choices": [], "usage": {"prompt_tokens": 7, "completion_tokens": 3}})
         yield b"data: [DONE]\n\n"
+
+
+async def drain_jobs(sessionmaker, settings, worker_id: str = "test-worker") -> int:
+    """Run queued background jobs (file processing, exports) synchronously."""
+    count = 0
+    while (job_id := await claim_next_job(sessionmaker, worker_id, settings)) is not None:
+        await run_job(job_id, factory=sessionmaker, settings=settings, worker_id=worker_id)
+        count += 1
+    return count
 
 
 def _sse(payload: dict) -> bytes:

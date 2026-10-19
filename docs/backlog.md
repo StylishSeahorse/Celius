@@ -71,14 +71,21 @@ Status key: ✅ done in repo · 🔶 partially done · ⬜ not started
 
 **Exit gate:** upload/download integrity, path security and quota tests pass.
 
-| ID | Item | Acceptance criteria |
-| --- | --- | --- |
-| U-01 | Upload sessions with quarantine and signature checks | Rejects mismatched MIME/signature, oversized files |
-| U-02 | Archive/folder handling | Path traversal, symlinks, zip bombs rejected |
-| U-03 | Text extraction (PDF, Office, code) and thumbnails | Runs in the worker; status visible on the attachment |
-| U-04 | Authorised downloads, exports (Markdown/JSON/ZIP) | No permanent public URLs; ownership checked per request |
-| U-05 | Atomic storage quotas | Concurrent uploads cannot exceed the quota |
-| U-06 | Approved desktop roots via Tauri | Path containment enforced server-side |
+| ID | Item | Status | Acceptance criteria |
+| --- | --- | --- | --- |
+| U-01 | Upload sessions with quarantine and signature checks | ✅ | Type decided from the bytes and must match the extension; oversized and over-long uploads refused; optional ClamAV; retry-safe |
+| U-02 | Archive and folder handling | ✅ | Traversal, absolute paths, symlinks, bombs (ratio), entry count and total size rejected, including in .docx/.xlsx/.pptx; folder paths normalised |
+| U-03 | Text extraction (text, PDF, DOCX, XLSX, PPTX, ZIP) and thumbnails | ✅ | Runs as durable worker jobs; status visible on the attachment; bounded readers |
+| U-04 | Authorised downloads, exports (Markdown/JSON/ZIP) | ✅ | Ownership checked per request; nosniff + CSP sandbox; only images and PDFs inline; conversation and project exports |
+| U-05 | Atomic storage quotas | ✅ | Concurrent uploads can't overshoot; rejection, expiry and deletion release space |
+| U-06 | Approved desktop folders via Tauri | ✅ | Native picker; read-only; containment and symlink checks in Rust (unit-tested); granted only to the connected server's origin |
+| U-07 | Attachments and project files in prompts | ✅ | Tagged blocks, per-file and project budgets; images only to vision models; "data, not instructions" |
+| U-08 | Reasoning (thinking) on/off/auto per conversation | ✅ | `chat_template_kwargs.enable_thinking`; per-reply override; template support detected |
+| S-09 | Reply links open in the system browser from the desktop app | ✅ | `open_external`, http(s) only |
+| U-09 | Code-block Copy/Download | ✅ | Client-side, language → file extension |
+| U-10 | Previews for PDFs and Office files (page images) | ⬜ | Thumbnails exist for images only |
+| U-11 | Resumable chunked uploads | ⬜ | Large files over flaky mobile links currently restart from zero |
+| U-12 | Server-side project workspaces (extract archives to disk) | ⬜ | Needed by tools in phase 5; containment helper `resolve_within` already in place |
 
 ## Phase 5 — Tool execution and autonomy
 

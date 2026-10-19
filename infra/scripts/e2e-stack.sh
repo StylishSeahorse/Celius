@@ -19,6 +19,7 @@ export MODEL_DEFAULT_ID=fake-model
 export STATIC_ROOT="$ROOT/apps/web/dist"
 export BOOTSTRAP_USERNAME="${E2E_USERNAME:-e2e}"
 export BOOTSTRAP_PASSWORD="${E2E_PASSWORD:-e2e-password-123}"
+export STORAGE_ROOT="${STORAGE_ROOT:-$STATE/storage}"
 export RUN_LEASE_SECONDS="${RUN_LEASE_SECONDS:-6}"
 
 cd "$ROOT/services/api"

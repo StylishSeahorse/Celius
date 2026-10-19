@@ -4,6 +4,11 @@
 export type {
   ConversationDetail,
   ConversationSummary,
+  ExportJob,
+  FileKind,
+  StorageUsage,
+  StoredFile,
+  UploadSession,
   Me,
   Message,
   MessagePart,

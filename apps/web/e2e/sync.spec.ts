@@ -79,7 +79,7 @@ test("another device sees new messages and renames without reloading", async ({ 
     timeout: 20_000,
   });
   const sidebar = await openSidebar(other.page);
-  await expect(sidebar.getByRole("button", { name: `Renamed ${marker}` })).toBeVisible();
+  await expect(sidebar.getByRole("button", { name: `Renamed ${marker}`, exact: true })).toBeVisible();
   await other.context.close();
 });
 

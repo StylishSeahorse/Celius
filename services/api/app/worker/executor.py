@@ -39,9 +39,15 @@ from app.models import (
     RunStatus,
 )
 from app.schemas.events import RunEventType
-from app.services.context import HistoryItem, build_context, context_budget
+from app.services.context import CHARS_PER_TOKEN, HistoryItem, build_context, context_budget
 from app.services.conversations import load_parts, message_ancestry, message_text
 from app.services.model_gateway import ChatRequest, ModelGateway, ModelGatewayError
+from app.services.prompt_files import (
+    DATA_NOT_INSTRUCTIONS,
+    attachment_content,
+    load_attachments,
+    project_files_block,
+)
 from app.services.runs import append_event, finish_cancelled
 from app.services.sync import record_sync
 
@@ -306,29 +312,54 @@ async def _prepare(
         output = await db.get(Message, run.output_message_id)
         assert conversation is not None and output is not None
 
-        path = await message_ancestry(db, conversation.id, run.trigger_message_id)
-        parts = await load_parts(db, path)
-        history = [
-            HistoryItem(message.role.value, message_text(parts[message.id]))
-            for message in path
-            if message.role == MessageRole.user
-            or (message.role == MessageRole.assistant and message.status == MessageStatus.complete)
-        ]
-        system_prompt = settings.default_system_prompt
-        if conversation.project_id:
-            project = await db.get(Project, conversation.project_id)
-            if project and project.instructions:
-                system_prompt = f"{system_prompt}\n\n{project.instructions}".strip()
-
         max_tokens = run.params.get("max_tokens") or settings.model_max_output_tokens
         try:
             model = await gateway.find_model(run.model_id)
             context_tokens = (model.context_tokens if model else None) or (
                 settings.model_default_context_tokens
             )
+            vision = model.capabilities.vision if model else settings.model_enable_vision
             budget = context_budget(
                 context_tokens, max_tokens, settings.context_safety_margin_tokens
             )
+
+            path = await message_ancestry(db, conversation.id, run.trigger_message_id)
+            parts = await load_parts(db, path)
+            attachments = await load_attachments(db, path, parts)
+            latest_user = next((m for m in reversed(path) if m.role == MessageRole.user), None)
+            history: list[HistoryItem] = []
+            for message in path:
+                text = message_text(parts[message.id])
+                if message.role == MessageRole.user:
+                    prefix, images = await attachment_content(
+                        attachments.get(message.id, []),
+                        settings,
+                        send_images=message is latest_user,
+                        vision=vision,
+                    )
+                    history.append(HistoryItem("user", f"{prefix}\n\n{text}".strip(), images))
+                elif message.role == MessageRole.assistant and (
+                    message.status == MessageStatus.complete
+                ):
+                    history.append(HistoryItem("assistant", text))
+
+            system_prompt = settings.default_system_prompt
+            project_block = ""
+            if conversation.project_id:
+                project = await db.get(Project, conversation.project_id)
+                if project and project.instructions:
+                    system_prompt = f"{system_prompt}\n\n{project.instructions}".strip()
+                char_budget = (
+                    int(budget * settings.project_files_context_share * CHARS_PER_TOKEN)
+                    if budget
+                    else 120_000
+                )
+                project_block = await project_files_block(db, conversation.project_id, char_budget)
+                if project_block:
+                    system_prompt += "\n\nProject files:\n\n" + project_block
+            if attachments or project_block:
+                system_prompt += "\n\n" + DATA_NOT_INSTRUCTIONS
+
             built = build_context(system_prompt, history, budget)
         except (ModelGatewayError, AppError) as exc:
             await _mark_failed(
@@ -358,6 +389,7 @@ async def _prepare(
             temperature=run.params.get("temperature"),
             top_p=run.params.get("top_p"),
             max_tokens=max_tokens,
+            reasoning=run.params.get("reasoning"),
         )
 
 

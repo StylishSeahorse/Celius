@@ -7,13 +7,15 @@ an HTTP 400 from the model server, which is reported as `model_request_rejected`
 """
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from app.errors import AppError
 from app.services.model_gateway import ChatMessage
 
 CHARS_PER_TOKEN = 3
 MESSAGE_OVERHEAD_TOKENS = 4
+# Rough cost of one downscaled image for a vision model (varies by model and projector).
+IMAGE_TOKENS = 800
 
 
 def estimate_tokens(text: str) -> int:
@@ -24,6 +26,18 @@ def estimate_tokens(text: str) -> int:
 class HistoryItem:
     role: str  # "user" | "assistant"
     text: str
+    images: list[str] = field(default_factory=list)  # data URIs, vision models only
+
+    @property
+    def cost(self) -> int:
+        return estimate_tokens(self.text) + IMAGE_TOKENS * len(self.images)
+
+    def content(self) -> str | list[dict]:
+        if not self.images:
+            return self.text
+        return [{"type": "text", "text": self.text}] + [
+            {"type": "image_url", "image_url": {"url": uri}} for uri in self.images
+        ]
 
 
 @dataclass
@@ -48,10 +62,13 @@ def _merge_consecutive(history: list[HistoryItem]) -> list[HistoryItem]:
     # which happens when an assistant turn failed or was cancelled with no output.
     merged: list[HistoryItem] = []
     for item in history:
-        if not item.text:
+        if not item.text and not item.images:
             continue
         if merged and merged[-1].role == item.role:
-            merged[-1] = HistoryItem(item.role, f"{merged[-1].text}\n\n{item.text}")
+            previous = merged[-1]
+            merged[-1] = HistoryItem(
+                item.role, f"{previous.text}\n\n{item.text}", previous.images + item.images
+            )
         else:
             merged.append(item)
     return merged
@@ -69,7 +86,7 @@ def build_context(
     kept: list[HistoryItem] = []
     used = system_cost
     for index, item in enumerate(reversed(turns)):
-        cost = estimate_tokens(item.text)
+        cost = item.cost
         if budget is not None and used + cost > budget:
             if index == 0:
                 raise AppError(
@@ -86,10 +103,10 @@ def build_context(
 
     # A history that starts with an assistant turn confuses some templates; trim it.
     while len(kept) > 1 and kept[0].role != "user":
-        used -= estimate_tokens(kept.pop(0).text)
+        used -= kept.pop(0).cost
 
     messages = [ChatMessage(role="system", content=system_prompt)] if system_prompt else []
-    messages += [ChatMessage(role=item.role, content=item.text) for item in kept]  # type: ignore[arg-type]
+    messages += [ChatMessage(role=item.role, content=item.content()) for item in kept]  # type: ignore[arg-type]
     return BuiltContext(
         messages=messages, estimated_tokens=used, dropped_messages=len(turns) - len(kept)
     )

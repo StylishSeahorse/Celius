@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.models import MessageRole, MessageStatus, RunStatus
 
@@ -13,6 +13,8 @@ class ConversationCreate(BaseModel):
     title: str | None = Field(default=None, max_length=300)
     project_id: uuid.UUID | None = None
     model_override: str | None = Field(default=None, max_length=255)
+    # Model thinking: None = model default, True = on, False = off.
+    reasoning: bool | None = None
 
 
 class ConversationUpdate(BaseModel):
@@ -20,6 +22,7 @@ class ConversationUpdate(BaseModel):
     project_id: uuid.UUID | None = None
     model_override: str | None = Field(default=None, max_length=255)
     memory_enabled: bool | None = None
+    reasoning: bool | None = None
     archived: bool | None = None
     expected_version: int | None = None
 
@@ -30,6 +33,7 @@ class ConversationSummary(BaseModel):
     project_id: uuid.UUID | None
     model_override: str | None
     memory_enabled: bool
+    reasoning: bool | None
     active_branch_id: uuid.UUID | None
     version: int
     archived: bool
@@ -89,15 +93,24 @@ class GenerationParams(BaseModel):
     temperature: float | None = Field(default=None, ge=0, le=2)
     top_p: float | None = Field(default=None, gt=0, le=1)
     max_tokens: int | None = Field(default=None, ge=1)
+    # Overrides the conversation's reasoning setting for this reply only.
+    reasoning: bool | None = None
 
 
 class MessageSubmit(BaseModel):
     client_message_id: str = Field(min_length=1, max_length=64)
-    content: str = Field(min_length=1, max_length=200_000)
+    content: str = Field(default="", max_length=200_000)
+    # Uploaded files (see /files/uploads) to attach. They must have finished processing.
+    attachment_ids: list[uuid.UUID] = Field(default_factory=list, max_length=20)
     parent_message_id: uuid.UUID | None = None
     model: str | None = Field(default=None, max_length=255)
     params: GenerationParams = Field(default_factory=GenerationParams)
     expected_version: int | None = None
+
+    @model_validator(mode="after")
+    def _has_content(self) -> "MessageSubmit":
+        _needs_content(self.content, self.attachment_ids)
+        return self
 
 
 class MessageSubmitResponse(BaseModel):
@@ -112,9 +125,15 @@ class MessageEdit(BaseModel):
     """Edit a user message: creates an edited copy on a new branch; the original stays."""
 
     client_message_id: str = Field(min_length=1, max_length=64)
-    content: str = Field(min_length=1, max_length=200_000)
+    content: str = Field(default="", max_length=200_000)
+    attachment_ids: list[uuid.UUID] = Field(default_factory=list, max_length=20)
     model: str | None = Field(default=None, max_length=255)
     params: GenerationParams = Field(default_factory=GenerationParams)
+
+    @model_validator(mode="after")
+    def _has_content(self) -> "MessageEdit":
+        _needs_content(self.content, self.attachment_ids)
+        return self
 
 
 class Regenerate(BaseModel):
@@ -130,3 +149,8 @@ class RegenerateResponse(BaseModel):
     run: RunOut
     conversation_version: int
     duplicate: bool = False
+
+
+def _needs_content(content: str, attachment_ids: list) -> None:
+    if not content.strip() and not attachment_ids:
+        raise ValueError("A message needs text or at least one attachment")

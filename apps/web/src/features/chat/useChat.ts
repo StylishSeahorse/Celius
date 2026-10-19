@@ -24,7 +24,7 @@ export interface Conflict {
 interface Options {
   conversationId: string | null;
   /** For a conversation started from this view (new chat). */
-  draft: { modelOverride: string | null; projectId: string | null };
+  draft: { modelOverride: string | null; projectId: string | null; reasoning: boolean | null };
   onConversationCreated: (id: string) => void;
   onChanged: () => void;
 }
@@ -39,6 +39,7 @@ function placeholder(id: string, draft: Options["draft"], title: string): Conver
     project_id: draft.projectId,
     model_override: draft.modelOverride,
     memory_enabled: true,
+    reasoning: draft.reasoning,
     active_branch_id: null,
     version: 0,
     archived: false,
@@ -173,7 +174,17 @@ export function useChat({ conversationId, draft, onConversationCreated, onChange
         const queuedCreate = outbox.list(conversationId).find((i) => i.create_conversation);
         if (queuedCreate) {
           const created = queuedCreate.create_conversation!;
-          setDetailState(placeholder(conversationId, { modelOverride: created.model_override, projectId: created.project_id }, queuedCreate.content.slice(0, 80)));
+          setDetailState(
+            placeholder(
+              conversationId,
+              {
+                modelOverride: created.model_override,
+                projectId: created.project_id,
+                reasoning: created.reasoning ?? null,
+              },
+              queuedCreate.content.slice(0, 80) || queuedCreate.attachments?.[0]?.filename || "New chat",
+            ),
+          );
         } else if (isNetworkError(err)) {
           if (!cached) setError("You're offline and this conversation isn't saved on this device.");
         } else {
@@ -192,20 +203,25 @@ export function useChat({ conversationId, draft, onConversationCreated, onChange
   useEffect(() => () => streamAbort.current?.abort(), []);
 
   const send = useCallback(
-    async (content: string) => {
+    async (content: string, attachments: { id: string; filename: string }[] = []) => {
       setError(null);
       let id = detail?.id;
       let create: OutboxItem["create_conversation"];
       if (!id) {
         id = newId();
-        create = { model_override: draft.modelOverride, project_id: draft.projectId };
-        setDetailState(placeholder(id, draft, content.slice(0, 80)));
+        create = {
+          model_override: draft.modelOverride,
+          project_id: draft.projectId,
+          reasoning: draft.reasoning,
+        };
+        setDetailState(placeholder(id, draft, content.slice(0, 80) || attachments[0]?.filename || "New chat"));
         onConversationCreated(id);
       }
       await outbox.enqueue({
         client_message_id: newId(),
         conversation_id: id,
         content,
+        ...(attachments.length ? { attachments } : {}),
         ...(create ? { create_conversation: create } : {}),
       });
     },
@@ -247,8 +263,10 @@ export function useChat({ conversationId, draft, onConversationCreated, onChange
     [branchOp],
   );
   const edit = useCallback(
-    (messageId: string, content: string) =>
-      branchOp(() => api.editMessage(messageId, { client_message_id: newId(), content })),
+    (messageId: string, content: string, attachmentIds: string[] = []) =>
+      branchOp(() =>
+        api.editMessage(messageId, { client_message_id: newId(), content, attachment_ids: attachmentIds }),
+      ),
     [branchOp],
   );
   const selectSibling = useCallback(

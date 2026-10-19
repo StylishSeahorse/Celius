@@ -3,13 +3,18 @@
 A self-hosted, Claude-style AI workspace. It syncs conversations across Windows (Tauri),
 Android (PWA) and web clients, and talks to a remote llama.cpp inference server.
 
-**Status:** Phases 1–3 are implemented. You can:
+**Status:** Phases 1–4 are implemented. You can:
 - chat with streaming replies
 - edit messages, regenerate replies and switch between versions
 - group chats into projects with their own instructions
 - keep working offline (messages are queued and sent exactly once)
 - see changes from your other devices live
 - install the app on Android (PWA) or Windows (Tauri)
+- attach files, folders and images (text, code, PDF, Word, Excel, PowerPoint, ZIP), with
+  documents read for the model and images sent to vision models
+- give projects knowledge files, and export conversations (Markdown/JSON/ZIP) or projects (ZIP)
+- switch the model's thinking on, off or to its default
+- attach files from approved folders on your PC in the Windows app
 
 See [`docs/backlog.md`](docs/backlog.md) for the full plan and what is done.
 
@@ -92,3 +97,4 @@ Planned but not created yet: `services/tool-runner`.
 - [0004: Server-side sessions](docs/adr/0004-sessions-and-auth.md)
 - [0005: PostgreSQL run queue; API serves the web app](docs/adr/0005-postgres-run-queue.md)
 - [0006: Change feed, outbox and branches for multi-device use](docs/adr/0006-sync-and-offline.md)
+- [0007: File uploads, storage and processing](docs/adr/0007-file-storage.md)

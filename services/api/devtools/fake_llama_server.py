@@ -3,13 +3,17 @@
     uv run python -m devtools.fake_llama_server --port 8080 --delay 0.03
 
 Implements /health, /props, /v1/models and streaming /v1/chat/completions. The reply
-echoes the last user message so tests can assert on it. A message containing
-"[fail]" returns HTTP 400; "[slow]" streams very slowly (for cancellation tests).
+echoes the last user message so tests can assert on it, names any attachments and
+images it received, and "thinks" (reasoning_content) unless the request turns thinking
+off with chat_template_kwargs.enable_thinking=false. "[link]" adds a markdown link to the
+reply. A message containing "[fail]" returns
+HTTP 400; "[slow]" streams very slowly (for cancellation tests).
 """
 
 import argparse
 import asyncio
 import json
+import re
 import time
 
 import uvicorn
@@ -28,7 +32,11 @@ async def health():
 
 @app.get("/props")
 async def props():
-    return {"default_generation_settings": {"n_ctx": 8192}, "modalities": {"vision": False}}
+    return {
+        "default_generation_settings": {"n_ctx": 8192},
+        "modalities": {"vision": True},
+        "chat_template": "{%- if enable_thinking is defined and not enable_thinking %}{%- endif %}",
+    }
 
 
 @app.get("/v1/models")
@@ -36,12 +44,33 @@ async def models():
     return {"object": "list", "data": [{"id": MODEL_ID, "object": "model"}]}
 
 
+def _text_of(content) -> tuple[str, int]:
+    """(text, number of images) for string or multi-part content."""
+    if isinstance(content, list):
+        text = "\n\n".join(p.get("text", "") for p in content if p.get("type") == "text")
+        return text, sum(1 for p in content if p.get("type") == "image_url")
+    return content or "", 0
+
+
 def _reply_for(messages: list[dict]) -> str:
     last = next((m for m in reversed(messages) if m.get("role") == "user"), {})
-    content = (last.get("content") or "").split("\n\n")[-1]
+    full, images = _text_of(last.get("content"))
+    content = full.split("\n\n")[-1]
     turns = sum(1 for m in messages if m.get("role") == "user")
+    seen = re.findall(r'<attachment name="([^"]+)"', full)
+    system = next((m for m in messages if m.get("role") == "system"), {})
+    project_files = re.findall(r'<project_file name="([^"]+)"', _text_of(system.get("content"))[0])
+    extra = ""
+    if seen:
+        extra += f"I can see these attachments: {', '.join(seen)}.\n\n"
+    if "[link]" in content:
+        extra += "See [the Celius docs](https://example.com/celius-docs).\n\n"
+    if project_files:
+        extra += f"Project files I know: {', '.join(project_files)}.\n\n"
+    if images:
+        extra += f"I can see {images} image(s).\n\n"
     return (
-        f"You said: **{content.strip()[:200]}**\n\n"
+        extra + f"You said: **{content.strip()[:200]}**\n\n"
         f"This is turn {turns}. Here is a list:\n\n- one\n- two\n- three\n\n"
         "```python\nprint('hello from the fake model')\n```"
     )
@@ -52,7 +81,8 @@ async def chat(request: Request):
     body = await request.json()
     messages = body.get("messages", [])
     # Only the newest paragraph: the app merges a failed turn into the next user message.
-    last = (messages[-1].get("content", "") if messages else "").split("\n\n")[-1]
+    last = _text_of(messages[-1].get("content") if messages else "")[0].split("\n\n")[-1]
+    thinking = (body.get("chat_template_kwargs") or {}).get("enable_thinking") is not False
     if "[fail]" in last:
         return JSONResponse({"error": {"message": "fake failure requested"}}, status_code=400)
     delay = 0.5 if "[slow]" in last else DELAY
@@ -60,6 +90,11 @@ async def chat(request: Request):
 
     async def stream():
         created = int(time.time())
+        if thinking:
+            think = {
+                "choices": [{"index": 0, "delta": {"reasoning_content": "Thinking it through…"}}]
+            }
+            yield f"data: {json.dumps(think)}\n\n"
         for i, word in enumerate(words):
             await asyncio.sleep(delay)
             piece = word if i == len(words) - 1 else word + " "

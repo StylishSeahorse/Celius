@@ -113,6 +113,7 @@ export class Outbox {
         const response = await this.client.sendMessage(item.conversation_id, {
           client_message_id: item.client_message_id,
           content: item.content,
+          attachment_ids: item.attachments?.map((a) => a.id) ?? [],
         });
         this.items = this.items.filter((i) => i !== item);
         await cache.removeOutbox(item.client_message_id);

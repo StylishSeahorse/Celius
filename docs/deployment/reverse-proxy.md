@@ -18,7 +18,8 @@ Remove `BOOTSTRAP_PASSWORD` from `.env` once the first login works.
 
 - Forward `X-Forwarded-For` / `X-Forwarded-Proto` headers. Uvicorn runs with `--proxy-headers`.
 - **Disable buffering** on `/api/v1/runs/*/events` (SSE). Allow idle reads of at least 300 s.
-- Set the request body limit to at least `MAX_UPLOAD_BYTES`.
+- Set the request body limit to at least `MAX_UPLOAD_BYTES`, and stream uploads
+  (`PUT /api/v1/files/uploads/*/content`) rather than buffering them in the proxy.
 - Do not expose the llama.cpp server through the proxy.
 
 ### Caddy
@@ -46,6 +47,13 @@ location /api/v1/runs/ {
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
 }
+location /api/v1/files/uploads/ {
+    proxy_pass http://127.0.0.1:8000;
+    client_max_body_size 60m;
+    proxy_request_buffering off;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
 location / {
     proxy_pass http://127.0.0.1:8000;
     client_max_body_size 60m;
@@ -60,7 +68,11 @@ Docker host's private IP. Firewall that port so only the proxy can reach it.
 ## Model server (Windows / RTX 3060)
 
 - Start `llama-server` with `--host <private IP> --port 8080`. Add `--api-key` when it
-  is reachable from anything except the app host, and `--jinja` if you want tool calling.
+  is reachable from anything except the app host.
+- Add `--jinja` for tool calling and for the **Thinking on/off** switch (it is sent as the
+  template variable `enable_thinking`, which Qwen3 and DeepSeek-R1-style templates use).
+- For images, use a multimodal model and pass its projector with `--mmproj`; Celius
+  detects vision support from the server and sends images only when it's there.
 - Allow inbound 8080 in Windows Firewall **only** from the Docker host's IP.
 - Check from the Docker host: `curl http://MODEL_SERVER_HOST:8080/health`.
 - After login, `GET /api/v1/models` shows what the app detected. Run

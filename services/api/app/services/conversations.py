@@ -172,6 +172,7 @@ def conversation_summary(conversation: Conversation) -> ConversationSummary:
         project_id=conversation.project_id,
         model_override=conversation.model_override,
         memory_enabled=conversation.memory_enabled,
+        reasoning=conversation.reasoning,
         active_branch_id=conversation.active_branch_id,
         version=conversation.version,
         archived=conversation.archived_at is not None,
@@ -246,6 +247,7 @@ async def create_conversation(
         project_id=data.project_id,
         title=data.title,
         model_override=data.model_override,
+        reasoning=data.reasoning,
         version=1,
     )
     db.add(conversation)

@@ -51,7 +51,7 @@ test("projects group chats and carry their own instructions", async ({ page }) =
 
   await openSidebar(page);
   const chats = page.getByRole("list", { name: "Chats" });
-  await expect(chats.getByRole("button", { name: message })).toBeVisible();
+  await expect(chats.getByRole("button", { name: message, exact: true })).toBeVisible();
   await sidebar.getByRole("button", { name: "All chats" }).click();
-  await expect(chats.getByRole("button", { name: message })).toBeVisible();
+  await expect(chats.getByRole("button", { name: message, exact: true })).toBeVisible();
 });

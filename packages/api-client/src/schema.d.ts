@@ -109,6 +109,209 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Export
+         * @description Queue an export. Poll GET /exports/{id} until it's completed, then download the file.
+         */
+        post: operations["create_export_api_v1_exports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exports/{export_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Export */
+        get: operations["get_export_api_v1_exports__export_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Files */
+        get: operations["list_files_api_v1_files_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Upload
+         * @description Start an upload. The declared size is reserved against the storage quota.
+         */
+        post: operations["create_upload_api_v1_files_uploads_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/uploads/{upload_id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Complete Upload
+         * @description Verify the upload (size, real type, optional malware scan) and store it.
+         */
+        post: operations["complete_upload_api_v1_files_uploads__upload_id__complete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/uploads/{upload_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Upload Content
+         * @description The raw file bytes as the request body. Sending again replaces the previous attempt.
+         */
+        put: operations["upload_content_api_v1_files_uploads__upload_id__content_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Storage Usage */
+        get: operations["storage_usage_api_v1_files_usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{file_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get File */
+        get: operations["get_file_api_v1_files__file_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete */
+        delete: operations["delete_api_v1_files__file_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{file_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download
+         * @description Authenticated download. Never a public URL: every request checks ownership.
+         */
+        get: operations["download_api_v1_files__file_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{file_id}/text": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get File Text */
+        get: operations["get_file_text_api_v1_files__file_id__text_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/files/{file_id}/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Thumbnail */
+        get: operations["thumbnail_api_v1_files__file_id__thumbnail_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health/live": {
         parameters: {
             query?: never;
@@ -404,6 +607,8 @@ export interface components {
             model_override?: string | null;
             /** Project Id */
             project_id?: string | null;
+            /** Reasoning */
+            reasoning?: boolean | null;
             /** Title */
             title?: string | null;
         };
@@ -432,6 +637,8 @@ export interface components {
             model_override: string | null;
             /** Project Id */
             project_id: string | null;
+            /** Reasoning */
+            reasoning: boolean | null;
             /** Title */
             title: string | null;
             /**
@@ -471,6 +678,8 @@ export interface components {
             model_override: string | null;
             /** Project Id */
             project_id: string | null;
+            /** Reasoning */
+            reasoning: boolean | null;
             /** Title */
             title: string | null;
             /**
@@ -493,13 +702,103 @@ export interface components {
             model_override?: string | null;
             /** Project Id */
             project_id?: string | null;
+            /** Reasoning */
+            reasoning?: boolean | null;
             /** Title */
             title?: string | null;
+        };
+        /** ExportCreate */
+        ExportCreate: {
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "markdown" | "json" | "zip";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "conversation" | "project";
+        };
+        /** ExportOut */
+        ExportOut: {
+            /** Error */
+            error: string | null;
+            file: components["schemas"]["FileOut"] | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            status: components["schemas"]["JobStatus"];
+        };
+        /**
+         * FileKind
+         * @enum {string}
+         */
+        FileKind: "image" | "pdf" | "document" | "spreadsheet" | "presentation" | "text" | "archive" | "export";
+        /** FileOut */
+        FileOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Error */
+            error: string | null;
+            /** Filename */
+            filename: string;
+            /** Has Thumbnail */
+            has_thumbnail: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["FileKind"];
+            /** Media Type */
+            media_type: string;
+            /** Meta */
+            meta: {
+                [key: string]: unknown;
+            };
+            /** Project Id */
+            project_id: string | null;
+            /** Relative Path */
+            relative_path: string | null;
+            /** Sha256 */
+            sha256: string;
+            /** Size Bytes */
+            size_bytes: number;
+            status: components["schemas"]["FileStatus"];
+            /** Text Chars */
+            text_chars: number;
+            /** Text Truncated */
+            text_truncated: boolean;
+        };
+        /**
+         * FileStatus
+         * @enum {string}
+         */
+        FileStatus: "processing" | "ready" | "failed";
+        /** FileText */
+        FileText: {
+            /** Text */
+            text: string;
+            /** Truncated */
+            truncated: boolean;
         };
         /** GenerationParams */
         GenerationParams: {
             /** Max Tokens */
             max_tokens?: number | null;
+            /** Reasoning */
+            reasoning?: boolean | null;
             /** Temperature */
             temperature?: number | null;
             /** Top P */
@@ -510,6 +809,11 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /**
+         * JobStatus
+         * @enum {string}
+         */
+        JobStatus: "queued" | "running" | "completed" | "failed";
         /** LoginRequest */
         LoginRequest: {
             /** Device Id */
@@ -558,9 +862,14 @@ export interface components {
          * @description Edit a user message: creates an edited copy on a new branch; the original stays.
          */
         MessageEdit: {
+            /** Attachment Ids */
+            attachment_ids?: string[];
             /** Client Message Id */
             client_message_id: string;
-            /** Content */
+            /**
+             * Content
+             * @default
+             */
             content: string;
             /** Model */
             model?: string | null;
@@ -626,9 +935,14 @@ export interface components {
         MessageStatus: "pending" | "streaming" | "complete" | "failed" | "cancelled";
         /** MessageSubmit */
         MessageSubmit: {
+            /** Attachment Ids */
+            attachment_ids?: string[];
             /** Client Message Id */
             client_message_id: string;
-            /** Content */
+            /**
+             * Content
+             * @default
+             */
             content: string;
             /** Expected Version */
             expected_version?: number | null;
@@ -658,6 +972,11 @@ export interface components {
              * @default false
              */
             embeddings: boolean;
+            /**
+             * Reasoning Toggle
+             * @default false
+             */
+            reasoning_toggle: boolean;
             /**
              * Source
              * @default configured
@@ -830,6 +1149,15 @@ export interface components {
          * @enum {string}
          */
         RunStatus: "queued" | "running" | "awaiting_approval" | "completed" | "failed" | "cancelled";
+        /** StorageUsage */
+        StorageUsage: {
+            /** Limit Bytes */
+            limit_bytes: number;
+            /** Max Upload Bytes */
+            max_upload_bytes: number;
+            /** Used Bytes */
+            used_bytes: number;
+        };
         /** SyncAck */
         SyncAck: {
             /** Cursor */
@@ -855,7 +1183,7 @@ export interface components {
              * Entity Type
              * @enum {string}
              */
-            entity_type: "conversation" | "message" | "project";
+            entity_type: "conversation" | "message" | "project" | "file";
             /**
              * Operation
              * @enum {string}
@@ -879,6 +1207,32 @@ export interface components {
         SyncCursor: {
             /** Cursor */
             cursor: number;
+        };
+        /** UploadCreate */
+        UploadCreate: {
+            /** Filename */
+            filename: string;
+            /** Project Id */
+            project_id?: string | null;
+            /** Relative Path */
+            relative_path?: string | null;
+            /** Size */
+            size: number;
+        };
+        /** UploadOut */
+        UploadOut: {
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Upload Url */
+            upload_url: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -1173,6 +1527,369 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["MessageSubmitResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_export_api_v1_exports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExportCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_export_api_v1_exports__export_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                export_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_files_api_v1_files_get: {
+        parameters: {
+            query?: {
+                project_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_upload_api_v1_files_uploads_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UploadCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    complete_upload_api_v1_files_uploads__upload_id__complete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                upload_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_content_api_v1_files_uploads__upload_id__content_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                upload_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    storage_usage_api_v1_files_usage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageUsage"];
+                };
+            };
+        };
+    };
+    get_file_api_v1_files__file_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_api_v1_files__file_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_api_v1_files__file_id__download_get: {
+        parameters: {
+            query?: {
+                inline?: boolean;
+            };
+            header?: never;
+            path: {
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_file_text_api_v1_files__file_id__text_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileText"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    thumbnail_api_v1_files__file_id__thumbnail_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

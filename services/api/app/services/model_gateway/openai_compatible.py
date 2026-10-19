@@ -154,6 +154,8 @@ class OpenAICompatibleGateway:
         props = await self._get_json(f"{self.root_url}/props") if self._is_llama_cpp else None
         server_ctx = _props_context(props)
         server_vision = _props_vision(props)
+        template = (props or {}).get("chat_template") or ""
+        reasoning_toggle = isinstance(template, str) and "enable_thinking" in template
 
         models = []
         for entry in body.get("data", []):
@@ -161,6 +163,7 @@ class OpenAICompatibleGateway:
             if not model_id:
                 continue
             capabilities = self.configured.model_copy()
+            capabilities.reasoning_toggle = reasoning_toggle
             if server_vision is not None:
                 capabilities.vision = server_vision
                 capabilities.source = "reported"
@@ -330,6 +333,10 @@ def _chat_payload(request: ChatRequest) -> dict[str, Any]:
             payload[field] = value
     if request.tools:
         payload["tools"] = request.tools
+    if request.reasoning is not None:
+        # llama-server passes these to the Jinja chat template (needs --jinja). Templates
+        # without the variable ignore it, so this is safe to send to any model.
+        payload["chat_template_kwargs"] = {"enable_thinking": request.reasoning}
     return payload
 
 

@@ -24,6 +24,9 @@ class ModelCapabilities(BaseModel):
     tool_calling: bool = False
     vision: bool = False
     embeddings: bool = False
+    # The chat template accepts `enable_thinking` (e.g. Qwen3, DeepSeek-R1 distills), so
+    # reasoning can be switched on and off per request.
+    reasoning_toggle: bool = False
     # How the capability was established: "configured" (env flag), "reported" (server said so),
     # or "verified" (a live probe succeeded). Only "verified" should be trusted for tools.
     source: Literal["configured", "reported", "verified"] = "configured"
@@ -59,6 +62,8 @@ class ChatRequest(BaseModel):
     top_p: float | None = None
     max_tokens: int | None = None
     stop: list[str] | None = None
+    # None: the model's default. True/False: ask the template to think or not.
+    reasoning: bool | None = None
 
 
 class ToolCallDelta(BaseModel):

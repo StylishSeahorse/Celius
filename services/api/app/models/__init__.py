@@ -10,6 +10,17 @@ from app.models.conversation import (
     MessageStatus,
     Project,
 )
+from app.models.files import (
+    FileKind,
+    FileLink,
+    FileStatus,
+    Job,
+    JobStatus,
+    QuotaUsage,
+    StoredFile,
+    UploadSession,
+    UploadStatus,
+)
 from app.models.generation import (
     TERMINAL_RUN_STATUSES,
     ModelCatalogEntry,
@@ -32,6 +43,15 @@ __all__ = [
     "Branch",
     "Conversation",
     "DeviceSyncState",
+    "FileKind",
+    "FileLink",
+    "FileStatus",
+    "Job",
+    "JobStatus",
+    "QuotaUsage",
+    "StoredFile",
+    "UploadSession",
+    "UploadStatus",
     "Message",
     "MessagePart",
     "MessageRevision",

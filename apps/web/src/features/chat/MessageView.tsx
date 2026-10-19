@@ -1,8 +1,11 @@
-import { memo, useState } from "react";
+import { type ReactNode, memo, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+import { fileUrls } from "../../lib/api";
+import { desktop } from "../../lib/desktop";
 import type { Message } from "../../lib/types";
+import { formatBytes } from "../../lib/uploads";
 import type { OutboxItem } from "../../offline/outbox";
 import type { LiveRun } from "./useChat";
 
@@ -13,15 +16,130 @@ function partText(message: Message, type: string) {
     .join("");
 }
 
-// Links in replies never navigate the app itself away.
+// Links in replies never navigate the app itself away; the desktop app opens them in the
+// system browser.
 function ExternalLink({ node: _node, ...props }: React.ComponentProps<"a"> & { node?: unknown }) {
-  return <a {...props} target="_blank" rel="noopener noreferrer" />;
+  return (
+    <a
+      {...props}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(event) => {
+        if (desktop && props.href) {
+          event.preventDefault();
+          desktop.openExternal(props.href);
+        }
+      }}
+    />
+  );
+}
+
+const EXTENSIONS: Record<string, string> = {
+  python: "py", py: "py", javascript: "js", js: "js", typescript: "ts", ts: "ts", tsx: "tsx",
+  jsx: "jsx", json: "json", html: "html", css: "css", bash: "sh", sh: "sh", shell: "sh",
+  sql: "sql", yaml: "yaml", yml: "yaml", rust: "rs", go: "go", java: "java", c: "c",
+  cpp: "cpp", csharp: "cs", markdown: "md", md: "md", toml: "toml", xml: "xml",
+};
+
+function textOf(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(textOf).join("");
+  if (node && typeof node === "object" && "props" in node) {
+    return textOf((node as { props: { children?: ReactNode } }).props.children);
+  }
+  return "";
+}
+
+/** Code blocks get Copy and Download, so generated scripts and files are one click away. */
+function CodeBlock({ node: _node, children, ...props }: React.ComponentProps<"pre"> & { node?: unknown }) {
+  const [copied, setCopied] = useState(false);
+  const code = textOf(children);
+  const language = /language-(\w+)/.exec(
+    (children as { props?: { className?: string } } | undefined)?.props?.className ?? "",
+  )?.[1];
+  const download = () => {
+    const url = URL.createObjectURL(new Blob([code], { type: "text/plain" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `snippet.${EXTENSIONS[language ?? ""] ?? "txt"}`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+  return (
+    <div className="group/code relative">
+      <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-100 md:opacity-0 md:group-hover/code:opacity-100">
+        <button
+          className="rounded bg-canvas/90 px-1.5 py-0.5 text-xs text-muted hover:text-ink"
+          onClick={() => void navigator.clipboard?.writeText(code).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          })}
+        >
+          {copied ? "Copied" : "Copy"}
+        </button>
+        <button className="rounded bg-canvas/90 px-1.5 py-0.5 text-xs text-muted hover:text-ink" onClick={download}>
+          Download
+        </button>
+      </div>
+      <pre {...props}>{children}</pre>
+    </div>
+  );
+}
+
+interface FilePartData {
+  file_id: string;
+  filename: string;
+  relative_path?: string | null;
+  kind: string;
+  size_bytes: number;
+  has_thumbnail?: boolean;
+}
+
+export function AttachmentList({ message }: { message: Message }) {
+  const files = message.parts
+    .filter((p) => p.type === "file" && p.data)
+    .map((p) => p.data as unknown as FilePartData);
+  if (!files.length) return null;
+  return (
+    <ul className="flex flex-wrap justify-end gap-2" aria-label="Attached files">
+      {files.map((f) =>
+        f.kind === "image" ? (
+          <li key={f.file_id}>
+            <a href={fileUrls.inline(f.file_id)} target="_blank" rel="noopener noreferrer" title={f.filename}>
+              <img
+                src={fileUrls.thumbnail(f.file_id)}
+                alt={f.filename}
+                loading="lazy"
+                className="h-28 max-w-52 rounded-lg border border-line object-cover"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            </a>
+          </li>
+        ) : (
+          <li key={f.file_id}>
+            <a
+              href={fileUrls.download(f.file_id)}
+              download
+              className="flex max-w-64 items-center gap-2 rounded-lg border border-line bg-canvas px-3 py-1.5 text-sm hover:border-accent/60"
+              title={`Download ${f.relative_path ?? f.filename}`}
+            >
+              <span aria-hidden="true">📄</span>
+              <span className="truncate">{f.relative_path ?? f.filename}</span>
+              <span className="shrink-0 text-xs text-muted">{formatBytes(f.size_bytes)}</span>
+            </a>
+          </li>
+        ),
+      )}
+    </ul>
+  );
 }
 
 const AssistantMarkdown = memo(function AssistantMarkdown({ text }: { text: string }) {
   return (
     <div className="markdown">
-      <Markdown remarkPlugins={[remarkGfm]} components={{ a: ExternalLink }}>
+      <Markdown remarkPlugins={[remarkGfm]} components={{ a: ExternalLink, pre: CodeBlock }}>
         {text}
       </Markdown>
     </div>
@@ -32,7 +150,7 @@ export interface MessageActions {
   disabled: boolean;
   onSelect: (messageId: string) => void;
   onRegenerate: (messageId: string) => void;
-  onEdit: (messageId: string, content: string) => void;
+  onEdit: (messageId: string, content: string, attachmentIds: string[]) => void;
 }
 
 const actionButton =
@@ -90,9 +208,13 @@ function UserMessage({ message, actions }: { message: Message; actions: MessageA
             </button>
             <button
               className="rounded-md bg-accent px-3 py-1 text-sm text-white disabled:opacity-40"
-              disabled={!draft.trim() || draft.trim() === text.trim() || actions.disabled}
+              disabled={draft.trim() === text.trim() || actions.disabled}
               onClick={() => {
-                actions.onEdit(message.id, draft.trim());
+                // An edit keeps the original attachments.
+                const ids = message.parts
+                  .filter((p) => p.type === "file" && p.data)
+                  .map((p) => (p.data as unknown as FilePartData).file_id);
+                actions.onEdit(message.id, draft.trim(), ids);
                 setEditing(false);
               }}
             >
@@ -106,9 +228,12 @@ function UserMessage({ message, actions }: { message: Message; actions: MessageA
 
   return (
     <div className="group flex flex-col items-end gap-1">
-      <div data-testid="user-message" className="max-w-[85%] whitespace-pre-wrap rounded-2xl bg-panel px-4 py-2.5 leading-relaxed">
-        {text}
-      </div>
+      <AttachmentList message={message} />
+      {text && (
+        <div data-testid="user-message" className="max-w-[85%] whitespace-pre-wrap rounded-2xl bg-panel px-4 py-2.5 leading-relaxed">
+          {text}
+        </div>
+      )}
       <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100">
         <VersionSwitcher message={message} actions={actions} />
         <button
@@ -218,6 +343,11 @@ export function PendingMessage({
     <div className="flex flex-col items-end gap-1" data-testid="pending-message">
       <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl border border-dashed border-line bg-panel/60 px-4 py-2.5 leading-relaxed">
         {item.content}
+        {item.attachments?.length ? (
+          <span className="mt-1 block text-xs text-muted">
+            📎 {item.attachments.map((a) => a.filename).join(", ")}
+          </span>
+        ) : null}
       </div>
       <p className="text-xs text-muted">
         {item.status === "failed" ? (

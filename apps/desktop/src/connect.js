@@ -1,7 +1,8 @@
 // Bundled connect page. The chat UI itself is the web app served by your Celius server, so
 // the desktop app never needs its own copy of the UI or any API credentials: the window
-// simply navigates to the server, where the normal session cookie applies.
-const KEY = "celius.serverUrl";
+// simply navigates to the server, where the normal session cookie applies. The address is
+// stored by the native side, which also scopes the server's access to desktop features.
+const invoke = (cmd, args) => window.__TAURI_INTERNALS__.invoke(cmd, args);
 const params = new URLSearchParams(location.search);
 const form = document.getElementById("connect");
 const input = document.getElementById("url");
@@ -29,13 +30,14 @@ async function reachable(origin) {
   }
 }
 
-const saved = localStorage.getItem(KEY);
-if (saved && !params.has("change")) {
-  location.replace(saved);
-} else {
-  if (saved) input.value = saved;
-  input.focus();
-}
+invoke("get_server").then((saved) => {
+  if (saved && !params.has("change")) {
+    location.replace(saved);
+  } else {
+    if (saved) input.value = saved;
+    input.focus();
+  }
+});
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -57,6 +59,12 @@ form.addEventListener("submit", async (event) => {
     submit.textContent = "Connect";
     return;
   }
-  localStorage.setItem(KEY, origin);
-  location.replace(origin);
+  try {
+    location.replace(await invoke("set_server", { url: origin }));
+  } catch (err) {
+    error.textContent = String(err);
+    error.hidden = false;
+    submit.disabled = false;
+    submit.textContent = "Connect";
+  }
 });

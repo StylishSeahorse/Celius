@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 
-import type { ModelList } from "../../lib/types";
+import type { ModelList, StoredFile } from "../../lib/types";
 import { outbox } from "../../offline/outbox";
 import { Composer } from "./Composer";
+import { runExport } from "./exporting";
 import { MessageView, PendingMessage } from "./MessageView";
 import type { Conflict, useChat } from "./useChat";
 
@@ -11,12 +12,17 @@ interface Props {
   models: ModelList | null;
   online: boolean;
   draftModel: string | null;
+  draftReasoning: boolean | null;
   projectName: string | null;
+  extraAttach?: { label: string; pick: () => Promise<File[]> };
   onDraftModel: (model: string | null) => void;
+  onDraftReasoning: (value: boolean | null) => void;
   onOpenSidebar: () => void;
+  onStorageChanged: () => void;
 }
 
-export function ChatView({ chat, models, online, draftModel, projectName, onDraftModel, onOpenSidebar }: Props) {
+export function ChatView(props: Props) {
+  const { chat, models, online, draftModel, projectName, onDraftModel, onOpenSidebar } = props;
   const { detail, live } = chat;
   const scroller = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
@@ -42,6 +48,12 @@ export function ChatView({ chat, models, online, draftModel, projectName, onDraf
     setConflict(result);
   }
 
+  // Capabilities of the model this conversation will use.
+  const modelId = (detail ? detail.model_override : draftModel) ?? models?.default_model_id;
+  const model =
+    models?.models.find((m) => m.id === modelId) ?? (models?.models.length === 1 ? models.models[0] : undefined);
+  const reasoning = detail && savedOnServer ? detail.reasoning : props.draftReasoning;
+
   return (
     <main aria-label="Chat" className="flex h-full min-w-0 flex-1 flex-col">
       <header className="flex items-center gap-3 border-b border-line px-4 py-2.5">
@@ -65,6 +77,7 @@ export function ChatView({ chat, models, online, draftModel, projectName, onDraf
           value={detail ? detail.model_override : draftModel}
           onChange={(model) => (savedOnServer ? void save({ model_override: model }) : onDraftModel(model))}
         />
+        {savedOnServer && online && <ExportMenu conversationId={detail!.id} />}
       </header>
 
       {(!online || chat.fromCache) && (
@@ -109,7 +122,20 @@ export function ChatView({ chat, models, online, draftModel, projectName, onDraf
             {chat.error}
           </p>
         )}
-        <Composer busy={false} canStop={canStop} onSend={chat.send} onStop={() => void chat.cancel()} />
+        <Composer
+          canStop={canStop}
+          online={online}
+          vision={model?.capabilities?.vision ?? false}
+          reasoning={reasoning ?? null}
+          reasoningSupported={model?.capabilities?.reasoning_toggle ?? false}
+          extraAttach={props.extraAttach}
+          onSend={(content, files: StoredFile[]) =>
+            chat.send(content, files.map((f) => ({ id: f.id, filename: f.relative_path ?? f.filename })))
+          }
+          onStop={() => void chat.cancel()}
+          onReasoning={(value) => (savedOnServer ? void save({ reasoning: value }) : props.onDraftReasoning(value))}
+          onStorageChanged={props.onStorageChanged}
+        />
       </div>
 
       {conflict && (
@@ -123,6 +149,56 @@ export function ChatView({ chat, models, online, draftModel, projectName, onDraf
         />
       )}
     </main>
+  );
+}
+
+function ExportMenu({ conversationId }: { conversationId: string }) {
+  const [open, setOpen] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+
+  async function exportAs(format: "markdown" | "json" | "zip") {
+    setOpen(false);
+    setStatus("Preparing export…");
+    try {
+      await runExport({ scope: "conversation", id: conversationId, format });
+      setStatus(null);
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Export failed");
+      setTimeout(() => setStatus(null), 4000);
+    }
+  }
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="rounded-md border border-line px-2 py-1 text-sm hover:bg-panel"
+      >
+        {status ?? "Export"}
+      </button>
+      {open && (
+        <div role="menu" className="absolute right-0 z-20 mt-1 w-48 rounded-lg border border-line bg-canvas p-1 shadow-lg">
+          {(
+            [
+              ["markdown", "Markdown (.md)"],
+              ["json", "JSON (all versions)"],
+              ["zip", "ZIP with attachments"],
+            ] as const
+          ).map(([format, label]) => (
+            <button
+              key={format}
+              role="menuitem"
+              onClick={() => void exportAs(format)}
+              className="block w-full rounded-md px-3 py-1.5 text-left text-sm hover:bg-panel"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

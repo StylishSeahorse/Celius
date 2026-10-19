@@ -27,6 +27,12 @@ and messages you write offline are sent automatically when you reconnect.
 
 Change the server later from the **Celius → Change server…** menu.
 
+**Attaching files from your PC:** in the message box choose **From PC…**, then
+**Approve a folder…** and pick it in the Windows folder dialog. Celius can read only
+folders you approved there; it uploads only the files you tick. Folders are never
+shared automatically, and **Stop sharing this folder** removes the approval. Links in
+replies open in your normal browser.
+
 The installers aren't code-signed yet, so Windows SmartScreen will warn
 ("Windows protected your PC" → **More info** → **Run anyway**). Signing needs an
 Authenticode certificate (backlog S-08).

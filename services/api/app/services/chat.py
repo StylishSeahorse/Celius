@@ -17,6 +17,8 @@ from app.errors import AppError, not_found
 from app.models import (
     Branch,
     Conversation,
+    FileLink,
+    FileStatus,
     Message,
     MessagePart,
     MessageRevision,
@@ -24,6 +26,7 @@ from app.models import (
     MessageStatus,
     Run,
     RunStatus,
+    StoredFile,
     User,
     UserSettings,
 )
@@ -92,6 +95,31 @@ async def _parts_of(db: AsyncSession, message: Message) -> list[MessagePart]:
     )
 
 
+async def _attachments(db: AsyncSession, user: User, file_ids: list[uuid.UUID]) -> list[StoredFile]:
+    """Validate attachments: the caller's own, not deleted, finished processing."""
+    if not file_ids:
+        return []
+    if len(set(file_ids)) != len(file_ids):
+        raise AppError(422, "duplicate_attachment", "A file is attached more than once")
+    rows = (
+        await db.scalars(
+            select(StoredFile).where(
+                StoredFile.id.in_(file_ids),
+                StoredFile.owner_id == user.id,
+                StoredFile.deleted_at.is_(None),
+            )
+        )
+    ).all()
+    by_id = {f.id: f for f in rows}
+    if len(by_id) != len(file_ids):
+        raise not_found("Attachment")
+    files = [by_id[i] for i in file_ids]
+    for file in files:
+        if file.status == FileStatus.processing:
+            raise AppError(409, "attachment_not_ready", f"{file.filename} is still being processed")
+    return files
+
+
 async def _add_user_message(
     db: AsyncSession,
     user: User,
@@ -100,8 +128,9 @@ async def _add_user_message(
     parent_id: uuid.UUID | None,
     content: str,
     client_message_id: str,
+    files: list[StoredFile] = (),
     reason: str = "created",
-) -> tuple[Message, MessagePart]:
+) -> tuple[Message, list[MessagePart]]:
     message = Message(
         id=uuid.uuid4(),
         owner_id=user.id,
@@ -113,14 +142,36 @@ async def _add_user_message(
         client_message_id=client_message_id,
         current_revision=1,
     )
-    part = MessagePart(message_id=message.id, revision=1, position=0, type="text", text=content)
+    parts = [MessagePart(message_id=message.id, revision=1, position=0, type="text", text=content)]
+    for position, file in enumerate(files, start=1):
+        parts.append(
+            MessagePart(
+                message_id=message.id,
+                revision=1,
+                position=position,
+                type="file",
+                data={
+                    "file_id": str(file.id),
+                    "filename": file.filename,
+                    "relative_path": file.relative_path,
+                    "media_type": file.media_type,
+                    "kind": file.kind.value,
+                    "size_bytes": file.size_bytes,
+                    "has_thumbnail": file.has_thumbnail,
+                },
+            )
+        )
     db.add(message)
     await db.flush()
-    db.add_all([MessageRevision(message_id=message.id, revision=1, reason=reason), part])
+    db.add_all([MessageRevision(message_id=message.id, revision=1, reason=reason), *parts])
+    db.add_all(
+        FileLink(message_id=message.id, file_id=file.id, position=position)
+        for position, file in enumerate(files)
+    )
     record_sync(
         db, user.id, "message", message.id, payload={"conversation_id": str(conversation.id)}
     )
-    return message, part
+    return message, parts
 
 
 async def _enqueue_reply(
@@ -155,7 +206,7 @@ async def _enqueue_reply(
         output_message_id=assistant.id,
         status=RunStatus.queued,
         model_id=model_id,
-        params=params.model_dump(exclude_none=True),
+        params=_run_params(conversation, params),
     )
     db.add(assistant)
     await db.flush()
@@ -165,6 +216,13 @@ async def _enqueue_reply(
         db, user.id, "message", assistant.id, payload={"conversation_id": str(conversation.id)}
     )
     return assistant, run
+
+
+def _run_params(conversation: Conversation, params: GenerationParams) -> dict:
+    resolved = params.model_dump(exclude_none=True)
+    if "reasoning" not in resolved and conversation.reasoning is not None:
+        resolved["reasoning"] = conversation.reasoning
+    return resolved
 
 
 async def _new_branch(
@@ -260,7 +318,8 @@ async def submit_message(
         )
 
     model_id = await _resolve_model(db, user, body.model, conversation.model_override, settings)
-    message, part = await _add_user_message(
+    files = await _attachments(db, user, body.attachment_ids)
+    message, parts = await _add_user_message(
         db,
         user,
         conversation,
@@ -268,12 +327,14 @@ async def submit_message(
         branch.head_message_id,
         body.content,
         body.client_message_id,
+        files,
     )
     assistant, run = await _enqueue_reply(
         db, user, conversation, branch, message, model_id, body.params
     )
     if not conversation.title:
-        conversation.title = " ".join(body.content.split())[:TITLE_LENGTH]
+        title = " ".join(body.content.split()) or (files[0].filename if files else "")
+        conversation.title = title[:TITLE_LENGTH] or None
     touch(db, conversation)
 
     duplicate = await _commit_or_existing(
@@ -282,7 +343,7 @@ async def submit_message(
     if duplicate is not None:
         return duplicate
     return MessageSubmitResponse(
-        message=message_out(message, [part]),
+        message=message_out(message, parts),
         assistant_message=message_out(assistant, []),
         run=run_out(run),
         conversation_version=conversation.version,
@@ -305,7 +366,8 @@ async def edit_message(
     conversation = await _writable_conversation(db, user, original.conversation_id)
     branch = await _new_branch(db, conversation, original.parent_id)
     model_id = await _resolve_model(db, user, body.model, conversation.model_override, settings)
-    message, part = await _add_user_message(
+    files = await _attachments(db, user, body.attachment_ids)
+    message, parts = await _add_user_message(
         db,
         user,
         conversation,
@@ -313,6 +375,7 @@ async def edit_message(
         original.parent_id,
         body.content,
         body.client_message_id,
+        files,
         reason="edited",
     )
     assistant, run = await _enqueue_reply(
@@ -327,7 +390,7 @@ async def edit_message(
     if duplicate is not None:
         return duplicate
     return MessageSubmitResponse(
-        message=message_out(message, [part]),
+        message=message_out(message, parts),
         assistant_message=message_out(assistant, []),
         run=run_out(run),
         conversation_version=conversation.version,

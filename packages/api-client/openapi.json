@@ -39,6 +39,17 @@
             ],
             "title": "Project Id"
           },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning"
+          },
           "title": {
             "anyOf": [
               {
@@ -127,6 +138,17 @@
             ],
             "title": "Project Id"
           },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning"
+          },
           "title": {
             "anyOf": [
               {
@@ -154,6 +176,7 @@
           "project_id",
           "model_override",
           "memory_enabled",
+          "reasoning",
           "active_branch_id",
           "version",
           "archived",
@@ -246,6 +269,17 @@
             ],
             "title": "Project Id"
           },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning"
+          },
           "title": {
             "anyOf": [
               {
@@ -273,6 +307,7 @@
           "project_id",
           "model_override",
           "memory_enabled",
+          "reasoning",
           "active_branch_id",
           "version",
           "archived",
@@ -341,6 +376,17 @@
             ],
             "title": "Project Id"
           },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning"
+          },
           "title": {
             "anyOf": [
               {
@@ -357,6 +403,227 @@
         "title": "ConversationUpdate",
         "type": "object"
       },
+      "ExportCreate": {
+        "properties": {
+          "format": {
+            "enum": [
+              "markdown",
+              "json",
+              "zip"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "conversation",
+              "project"
+            ],
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope",
+          "id",
+          "format"
+        ],
+        "title": "ExportCreate",
+        "type": "object"
+      },
+      "ExportOut": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "file": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FileOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "error",
+          "file"
+        ],
+        "title": "ExportOut",
+        "type": "object"
+      },
+      "FileKind": {
+        "enum": [
+          "image",
+          "pdf",
+          "document",
+          "spreadsheet",
+          "presentation",
+          "text",
+          "archive",
+          "export"
+        ],
+        "title": "FileKind",
+        "type": "string"
+      },
+      "FileOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "has_thumbnail": {
+            "title": "Has Thumbnail",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/FileKind"
+          },
+          "media_type": {
+            "title": "Media Type",
+            "type": "string"
+          },
+          "meta": {
+            "additionalProperties": true,
+            "title": "Meta",
+            "type": "object"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "relative_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relative Path"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/FileStatus"
+          },
+          "text_chars": {
+            "title": "Text Chars",
+            "type": "integer"
+          },
+          "text_truncated": {
+            "title": "Text Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "filename",
+          "relative_path",
+          "media_type",
+          "kind",
+          "size_bytes",
+          "sha256",
+          "status",
+          "error",
+          "text_chars",
+          "text_truncated",
+          "has_thumbnail",
+          "meta",
+          "project_id",
+          "created_at"
+        ],
+        "title": "FileOut",
+        "type": "object"
+      },
+      "FileStatus": {
+        "enum": [
+          "processing",
+          "ready",
+          "failed"
+        ],
+        "title": "FileStatus",
+        "type": "string"
+      },
+      "FileText": {
+        "properties": {
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "text",
+          "truncated"
+        ],
+        "title": "FileText",
+        "type": "object"
+      },
       "GenerationParams": {
         "properties": {
           "max_tokens": {
@@ -370,6 +637,17 @@
               }
             ],
             "title": "Max Tokens"
+          },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning"
           },
           "temperature": {
             "anyOf": [
@@ -413,6 +691,16 @@
         },
         "title": "HTTPValidationError",
         "type": "object"
+      },
+      "JobStatus": {
+        "enum": [
+          "queued",
+          "running",
+          "completed",
+          "failed"
+        ],
+        "title": "JobStatus",
+        "type": "string"
       },
       "LoginRequest": {
         "properties": {
@@ -529,6 +817,15 @@
       "MessageEdit": {
         "description": "Edit a user message: creates an edited copy on a new branch; the original stays.",
         "properties": {
+          "attachment_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Attachment Ids",
+            "type": "array"
+          },
           "client_message_id": {
             "maxLength": 64,
             "minLength": 1,
@@ -536,8 +833,8 @@
             "type": "string"
           },
           "content": {
+            "default": "",
             "maxLength": 200000,
-            "minLength": 1,
             "title": "Content",
             "type": "string"
           },
@@ -558,8 +855,7 @@
           }
         },
         "required": [
-          "client_message_id",
-          "content"
+          "client_message_id"
         ],
         "title": "MessageEdit",
         "type": "object"
@@ -722,6 +1018,15 @@
       },
       "MessageSubmit": {
         "properties": {
+          "attachment_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Attachment Ids",
+            "type": "array"
+          },
           "client_message_id": {
             "maxLength": 64,
             "minLength": 1,
@@ -729,8 +1034,8 @@
             "type": "string"
           },
           "content": {
+            "default": "",
             "maxLength": 200000,
-            "minLength": 1,
             "title": "Content",
             "type": "string"
           },
@@ -774,8 +1079,7 @@
           }
         },
         "required": [
-          "client_message_id",
-          "content"
+          "client_message_id"
         ],
         "title": "MessageSubmit",
         "type": "object"
@@ -815,6 +1119,11 @@
           "embeddings": {
             "default": false,
             "title": "Embeddings",
+            "type": "boolean"
+          },
+          "reasoning_toggle": {
+            "default": false,
+            "title": "Reasoning Toggle",
             "type": "boolean"
           },
           "source": {
@@ -1303,6 +1612,29 @@
         "title": "RunStatus",
         "type": "string"
       },
+      "StorageUsage": {
+        "properties": {
+          "limit_bytes": {
+            "title": "Limit Bytes",
+            "type": "integer"
+          },
+          "max_upload_bytes": {
+            "title": "Max Upload Bytes",
+            "type": "integer"
+          },
+          "used_bytes": {
+            "title": "Used Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "used_bytes",
+          "limit_bytes",
+          "max_upload_bytes"
+        ],
+        "title": "StorageUsage",
+        "type": "object"
+      },
       "SyncAck": {
         "properties": {
           "cursor": {
@@ -1344,7 +1676,8 @@
             "enum": [
               "conversation",
               "message",
-              "project"
+              "project",
+              "file"
             ],
             "title": "Entity Type",
             "type": "string"
@@ -1418,6 +1751,76 @@
           "cursor"
         ],
         "title": "SyncCursor",
+        "type": "object"
+      },
+      "UploadCreate": {
+        "properties": {
+          "filename": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Filename",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "relative_path": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relative Path"
+          },
+          "size": {
+            "minimum": 0.0,
+            "title": "Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "filename",
+          "size"
+        ],
+        "title": "UploadCreate",
+        "type": "object"
+      },
+      "UploadOut": {
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "upload_url": {
+            "title": "Upload Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "upload_url",
+          "expires_at"
+        ],
+        "title": "UploadOut",
         "type": "object"
       },
       "ValidationError": {
@@ -1872,6 +2275,501 @@
         "summary": "Post Message",
         "tags": [
           "conversations"
+        ]
+      }
+    },
+    "/api/v1/exports": {
+      "post": {
+        "description": "Queue an export. Poll GET /exports/{id} until it's completed, then download the file.",
+        "operationId": "create_export_api_v1_exports_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Export",
+        "tags": [
+          "exports"
+        ]
+      }
+    },
+    "/api/v1/exports/{export_id}": {
+      "get": {
+        "operationId": "get_export_api_v1_exports__export_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "export_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Export Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Export",
+        "tags": [
+          "exports"
+        ]
+      }
+    },
+    "/api/v1/files": {
+      "get": {
+        "operationId": "list_files_api_v1_files_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "project_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FileOut"
+                  },
+                  "title": "Response List Files Api V1 Files Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Files",
+        "tags": [
+          "files"
+        ]
+      }
+    },
+    "/api/v1/files/uploads": {
+      "post": {
+        "description": "Start an upload. The declared size is reserved against the storage quota.",
+        "operationId": "create_upload_api_v1_files_uploads_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Upload",
+        "tags": [
+          "files"
+        ]
+      }
+    },
+    "/api/v1/files/uploads/{upload_id}/complete": {
+      "post": {
+        "description": "Verify the upload (size, real type, optional malware scan) and store it.",
+        "operationId": "complete_upload_api_v1_files_uploads__upload_id__complete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "upload_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Upload Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Complete Upload",
+        "tags": [
+          "files"
+        ]
+      }
+    },
+    "/api/v1/files/uploads/{upload_id}/content": {
+      "put": {
+        "description": "The raw file bytes as the request body. Sending again replaces the previous attempt.",
+        "operationId": "upload_content_api_v1_files_uploads__upload_id__content_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "upload_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Upload Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Upload Content Api V1 Files Uploads  Upload Id  Content Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Content",
+        "tags": [
+          "files"
+        ]
+      }
+    },
+    "/api/v1/files/usage": {
+      "get": {
+        "operationId": "storage_usage_api_v1_files_usage_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageUsage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Storage Usage",
+        "tags": [
+          "files"
+        ]
+      }
+    },
+    "/api/v1/files/{file_id}": {
+      "delete": {
+        "operationId": "delete_api_v1_files__file_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "file_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "File Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete",
+        "tags": [
+          "files"
+        ]
+      },
+      "get": {
+        "operationId": "get_file_api_v1_files__file_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "file_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "File Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get File",
+        "tags": [
+          "files"
+        ]
+      }
+    },
+    "/api/v1/files/{file_id}/download": {
+      "get": {
+        "description": "Authenticated download. Never a public URL: every request checks ownership.",
+        "operationId": "download_api_v1_files__file_id__download_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "file_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "File Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "inline",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Inline",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download",
+        "tags": [
+          "files"
+        ]
+      }
+    },
+    "/api/v1/files/{file_id}/text": {
+      "get": {
+        "operationId": "get_file_text_api_v1_files__file_id__text_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "file_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "File Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileText"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get File Text",
+        "tags": [
+          "files"
+        ]
+      }
+    },
+    "/api/v1/files/{file_id}/thumbnail": {
+      "get": {
+        "operationId": "thumbnail_api_v1_files__file_id__thumbnail_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "file_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "File Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Thumbnail",
+        "tags": [
+          "files"
         ]
       }
     },

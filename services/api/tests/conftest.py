@@ -25,9 +25,10 @@ TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 
 
 @pytest.fixture
-def settings() -> Settings:
+def settings(tmp_path) -> Settings:
     return Settings(
         app_env="test",
+        storage_root=str(tmp_path / "storage"),
         database_url="sqlite+aiosqlite:///:memory:",
         model_base_url="http://model.test:8080/v1",
         model_max_retries=1,

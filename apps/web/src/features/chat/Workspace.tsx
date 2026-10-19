@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api, isNetworkError } from "../../lib/api";
-import type { ConversationSummary, Me, ModelList, Project, SyncChange } from "../../lib/types";
+import type { ConversationSummary, Me, ModelList, Project, StorageUsage, SyncChange } from "../../lib/types";
 import { cache } from "../../offline/db";
 import { outbox } from "../../offline/outbox";
 import { startSync } from "../../offline/sync";
 import { useOnline } from "../../offline/useOnline";
+import { desktop } from "../../lib/desktop";
 import { ChatView } from "./ChatView";
+import { FolderBrowser } from "./FolderBrowser";
 import { ProjectDialog } from "./ProjectDialog";
 import { Sidebar } from "./Sidebar";
 import { useChat } from "./useChat";
@@ -29,9 +31,16 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const [search, setSearch] = useState("");
   const [models, setModels] = useState<ModelList | null>(null);
   const [draftModel, setDraftModel] = useState<string | null>(null);
+  const [draftReasoning, setDraftReasoning] = useState<boolean | null>(null);
+  const [storage, setStorage] = useState<StorageUsage | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [queued, setQueued] = useState(outbox.size);
   const [projectDialog, setProjectDialog] = useState<{ project: Project | null } | null>(null);
+  // Desktop app only: a folder browser that resolves with the files the user picked.
+  const [folderPick, setFolderPick] = useState<((files: File[]) => void) | null>(null);
+  const extraAttach = desktop
+    ? { label: "From PC…", pick: () => new Promise<File[]>((resolve) => setFolderPick(() => resolve)) }
+    : undefined;
 
   const refreshList = useCallback(async () => {
     try {
@@ -52,6 +61,11 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
       );
     }
   }, [search, projectId]);
+
+  const refreshStorage = useCallback(() => {
+    api.storageUsage().then(setStorage).catch(() => undefined);
+  }, []);
+  useEffect(refreshStorage, [refreshStorage]);
 
   const refreshProjects = useCallback(async () => {
     try {
@@ -101,7 +115,7 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
 
   const chat = useChat({
     conversationId: selectedId,
-    draft: { modelOverride: draftModel, projectId },
+    draft: { modelOverride: draftModel, projectId, reasoning: draftReasoning },
     onConversationCreated: (id) => select(id),
     onChanged: () => void refreshList(),
   });
@@ -119,13 +133,17 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
   }, []);
 
   // Changes from other devices.
-  const latest = useRef({ refreshList, refreshProjects, chat, selectedId, select });
-  latest.current = { refreshList, refreshProjects, chat, selectedId, select };
+  const latest = useRef({ refreshList, refreshProjects, refreshStorage, chat, selectedId, select });
+  latest.current = { refreshList, refreshProjects, refreshStorage, chat, selectedId, select };
   useEffect(
     () =>
       startSync((changes: SyncChange[], resync: boolean) => {
-        const { refreshList, refreshProjects, chat, selectedId, select } = latest.current;
+        const { refreshList, refreshProjects, refreshStorage, chat, selectedId, select } = latest.current;
         void refreshList();
+        if (changes.some((c) => c.entity_type === "file")) {
+          refreshStorage();
+          window.dispatchEvent(new Event("celius:files-changed"));
+        }
         if (resync || changes.some((c) => c.entity_type === "project")) void refreshProjects();
         for (const change of changes) {
           if (change.entity_type === "conversation" && change.operation === "delete") {
@@ -177,6 +195,7 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
           models={models}
           online={online}
           queued={queued}
+          storage={storage}
           search={search}
           onSearch={setSearch}
           onSelect={select}
@@ -199,13 +218,28 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
         models={models}
         online={online}
         draftModel={draftModel}
+        draftReasoning={draftReasoning}
         projectName={projectName}
         onDraftModel={setDraftModel}
+        onDraftReasoning={setDraftReasoning}
         onOpenSidebar={() => setSidebarOpen(true)}
+        onStorageChanged={refreshStorage}
+        extraAttach={extraAttach}
       />
+      {folderPick && (
+        <FolderBrowser
+          onPick={folderPick}
+          onClose={() => {
+            folderPick([]);
+            setFolderPick(null);
+          }}
+        />
+      )}
       {projectDialog && (
         <ProjectDialog
           project={projectDialog.project}
+          online={online}
+          onStorageChanged={refreshStorage}
           onClose={() => setProjectDialog(null)}
           onSave={async (fields) => {
             if (projectDialog.project) {

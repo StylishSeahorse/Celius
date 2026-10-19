@@ -15,8 +15,14 @@ export interface OutboxItem {
   conversation_id: string;
   content: string;
   created_at: number;
+  /** Already-uploaded files (uploads need a connection; sending the message doesn't). */
+  attachments?: { id: string; filename: string }[];
   /** Set when the conversation was started offline and doesn't exist on the server yet. */
-  create_conversation?: { model_override: string | null; project_id: string | null };
+  create_conversation?: {
+    model_override: string | null;
+    project_id: string | null;
+    reasoning?: boolean | null;
+  };
   status: "queued" | "failed";
   error?: string;
 }
