@@ -141,7 +141,7 @@ class McpServer(UUIDPrimaryKey, Timestamps, Base):
     # Allow private/LAN addresses (e.g. an MCP server on the same network).
     allow_private_network: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # Fernet token of a JSON object of HTTP headers (e.g. Authorization).
-    credentials: Mapped[str | None] = deferred(mapped_column(Text))
+    credentials: Mapped[str | None] = mapped_column(Text)
     # Last discovered tools: [{name, description, input_schema}]
     tools: Mapped[list] = mapped_column(JSONType, default=list, nullable=False)
     last_error: Mapped[str | None] = mapped_column(String(500))

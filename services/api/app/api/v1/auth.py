@@ -93,7 +93,8 @@ async def me(auth: CurrentAuth, settings: Annotated[Settings, Depends(get_settin
         single_user_mode=settings.app_single_user_mode,
         capabilities={
             "memory": settings.memory_enabled,
-            "tools": False,  # enabled in phase 5 once the sandbox is validated
-            "files": False,  # enabled in phase 4
+            "tools": True,
+            "sandbox": bool(settings.sandbox_url and settings.sandbox_token),
+            "files": True,
         },
     )

@@ -51,5 +51,5 @@ build-backend = "hatchling.build"
 packages = ["app"]
 
 [tool.ruff.lint.per-file-ignores]
-# Tests poll fakes and the API with sleep loops on purpose.
-"tests/**" = ["ASYNC110"]
+# Tests poll fakes with sleep loops, and set up files with blocking calls, on purpose.
+"tests/**" = ["ASYNC110", "ASYNC230", "ASYNC240"]

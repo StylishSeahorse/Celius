@@ -12,6 +12,8 @@ from app.db import SessionFactory
 from app.services.files.service import cleanup_expired_uploads
 from app.services.jobs import claim_next_job, recover_stale_jobs, run_job
 from app.services.model_gateway import ModelGateway
+from app.services.schedules import fire_due
+from app.services.tools.calls import expire_approvals
 from app.worker.executor import claim_next_run, execute_run, recover_stale_runs
 
 log = logging.getLogger(__name__)
@@ -65,6 +67,10 @@ async def run_worker(
                     log.info("Recovered %d stale run(s)", recovered)
                 if recovered := await recover_stale_jobs(factory, settings):
                     log.info("Recovered %d stale job(s)", recovered)
+                if expired := await expire_approvals(factory):
+                    log.info("Expired %d unanswered approval request(s)", expired)
+                if fired := await fire_due(factory, settings):
+                    log.info("Started %d scheduled task(s)", fired)
                 last_recovery = now
             if now - last_maintenance >= MAINTENANCE_INTERVAL_SECONDS:
                 if expired := await cleanup_expired_uploads(factory, settings):

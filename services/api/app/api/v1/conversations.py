@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.dependencies import CurrentAuth
 from app.config import Settings, get_settings
 from app.db import get_db
+from app.models import MessageRole
 from app.schemas.conversations import (
     ConversationCreate,
     ConversationDetail,
@@ -18,6 +19,7 @@ from app.schemas.conversations import (
 )
 from app.services import conversations as svc
 from app.services.chat import submit_message
+from app.services.tools.calls import calls_for_messages
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
@@ -28,9 +30,15 @@ async def conversation_detail(db: AsyncSession, conversation) -> ConversationDet
     path, siblings = await svc.path_with_siblings(db, conversation)
     parts = await svc.load_parts(db, path)
     run = await svc.active_run(db, conversation.id)
+    calls = await calls_for_messages(db, [m.id for m in path if m.role == MessageRole.assistant])
+    messages = []
+    for m in path:
+        out = svc.message_out(m, parts[m.id], siblings[m.id])
+        out.tool_calls = calls.get(m.id, [])
+        messages.append(out)
     return ConversationDetail(
         **svc.conversation_summary(conversation).model_dump(),
-        messages=[svc.message_out(m, parts[m.id], siblings[m.id]) for m in path],
+        messages=messages,
         active_run=svc.run_out(run) if run else None,
     )
 

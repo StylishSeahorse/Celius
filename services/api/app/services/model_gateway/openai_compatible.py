@@ -258,7 +258,9 @@ class OpenAICompatibleGateway:
     # ------------------------------------------------------------------ generation
 
     async def stream_chat(self, request: ChatRequest) -> AsyncIterator[StreamChunk]:
-        if request.tools and not self.configured.tool_calling:
+        if request.tools and not (
+            self.configured.tool_calling or self._verified_tools.get(request.model)
+        ):
             raise ModelGatewayError("tools_unsupported", "Tool calling is disabled for this model")
         payload = _chat_payload(request)
         url = f"{self.base_url}/chat/completions"

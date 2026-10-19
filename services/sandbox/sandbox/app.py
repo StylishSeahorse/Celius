@@ -87,6 +87,9 @@ def create_app(config: SandboxConfig | None = None) -> FastAPI:
             except InvalidRequest as exc:
                 raise HTTPException(422, str(exc)) from exc
             except asyncio.CancelledError:
+                current = asyncio.current_task()
+                if current is not None and current.cancelling():
+                    raise  # this handler itself is being cancelled (shutdown): propagate
                 raise HTTPException(499, "Cancelled") from None
             finally:
                 watcher.cancel()

@@ -7,7 +7,7 @@ picks it up where it stopped.
 """
 
 import uuid
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -106,12 +106,17 @@ async def _owned_call(db: AsyncSession, owner_id: uuid.UUID, call_id: uuid.UUID)
     return call
 
 
+def _aware(moment: datetime) -> datetime:
+    # SQLite returns naive datetimes (stored as UTC).
+    return moment if moment.tzinfo else moment.replace(tzinfo=UTC)
+
+
 def _require_pending(call: ToolCall) -> None:
     if call.status != ToolCallStatus.pending_approval:
         raise AppError(
             409, "not_pending", f"This call is already {call.status.value}", status=call.status
         )
-    if call.expires_at is not None and call.expires_at < utcnow():
+    if call.expires_at is not None and _aware(call.expires_at) < utcnow():
         raise AppError(409, "approval_expired", "This approval request has expired")
 
 

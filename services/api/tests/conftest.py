@@ -29,6 +29,7 @@ def settings(tmp_path) -> Settings:
     return Settings(
         app_env="test",
         storage_root=str(tmp_path / "storage"),
+        workspace_root=str(tmp_path / "workspaces"),
         database_url="sqlite+aiosqlite:///:memory:",
         model_base_url="http://model.test:8080/v1",
         model_max_retries=1,

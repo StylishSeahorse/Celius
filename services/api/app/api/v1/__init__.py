@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     auth,
+    automation,
     conversations,
     exports,
     files,
@@ -11,6 +12,7 @@ from app.api.v1 import (
     projects,
     runs,
     sync,
+    tools,
 )
 
 router = APIRouter(prefix="/api/v1")
@@ -24,3 +26,5 @@ router.include_router(files.router)
 router.include_router(exports.router)
 router.include_router(runs.router)
 router.include_router(sync.router)
+router.include_router(tools.router)
+router.include_router(automation.router)

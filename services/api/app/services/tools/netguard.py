@@ -54,6 +54,8 @@ def check_url(url: str, allowlist: list[str] | None = None) -> str:
         raise BlockedDestination("The URL has no host")
     if parts.username or parts.password:
         raise BlockedDestination("URLs with credentials are not allowed")
+    if _is_ip(host) and not is_public(host.strip("[]")):
+        raise BlockedDestination(f"{host} is a private or reserved address")
     if port is not None and port != ALLOWED_PORTS[parts.scheme]:
         raise BlockedDestination("Only the standard ports (80, 443) are allowed")
     if allowlist and not any(host == h or host.endswith("." + h) for h in allowlist):

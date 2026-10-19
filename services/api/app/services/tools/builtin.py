@@ -551,7 +551,7 @@ class _TextExtractor(HTMLParser):
     def handle_data(self, data):
         if self._in_title:
             self.title += data
-        if not self.skipping:
+        elif not self.skipping:
             self.parts.append(data)
 
     def text(self) -> str:

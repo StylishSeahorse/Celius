@@ -25,6 +25,9 @@ class FakeLlama:
         self.fail_after_chunks: int | None = None
         self.requests: list[dict[str, Any]] = []
         self.chunks_sent = 0
+        # Scripted turns: each is a reply text, or a list of tool calls
+        # ({"name": ..., "arguments": {...} or "raw json"}). Used in order, then `reply`.
+        self.turns: list[str | list[dict[str, Any]]] = []
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         path = request.url.path
@@ -53,10 +56,63 @@ class FakeLlama:
         return httpx.Response(404)
 
     async def _stream(self):
+        if self.turns:
+            turn = self.turns.pop(0)
+            if isinstance(turn, list):
+                for index, call in enumerate(turn):
+                    arguments = call.get("arguments", {})
+                    if not isinstance(arguments, str):
+                        arguments = json.dumps(arguments)
+                    # Split the arguments to exercise delta assembly.
+                    head, tail = arguments[: len(arguments) // 2], arguments[len(arguments) // 2 :]
+                    yield _sse(
+                        {
+                            "choices": [
+                                {
+                                    "delta": {
+                                        "tool_calls": [
+                                            {
+                                                "index": index,
+                                                "id": f"call_{index}_{len(self.requests)}",
+                                                "type": "function",
+                                                "function": {
+                                                    "name": call["name"],
+                                                    "arguments": head,
+                                                },
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    )
+                    yield _sse(
+                        {
+                            "choices": [
+                                {
+                                    "delta": {
+                                        "tool_calls": [
+                                            {
+                                                "index": index,
+                                                "function": {"arguments": tail},
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    )
+                yield _sse({"choices": [{"delta": {}, "finish_reason": "tool_calls"}]})
+                yield _sse({"choices": [], "usage": {"prompt_tokens": 5, "completion_tokens": 2}})
+                yield b"data: [DONE]\n\n"
+                return
+            reply = turn
+        else:
+            reply = self.reply
         kwargs = (self.requests[-1].get("chat_template_kwargs") or {}) if self.requests else {}
         if self.reasoning and kwargs.get("enable_thinking") is not False:
             yield _sse({"choices": [{"delta": {"reasoning_content": self.reasoning}}]})
-        for piece in re.findall(r"\S+\s*", self.reply):
+        for piece in re.findall(r"\S+\s*", reply):
             if self.fail_after_chunks is not None and self.chunks_sent >= self.fail_after_chunks:
                 yield _sse({"error": {"message": "slot crashed"}})
                 return
@@ -82,12 +138,20 @@ def _sse(payload: dict) -> bytes:
     return f"data: {json.dumps(payload)}\n\n".encode()
 
 
-async def drain_runs(sessionmaker, gateway, settings, worker_id: str = "test-worker") -> int:
-    """Execute queued runs synchronously, like one worker would."""
+async def drain_runs(
+    sessionmaker, gateway, settings, worker_id: str = "test-worker", **tools
+) -> int:
+    """Execute queued runs synchronously, like one worker would. `tools` passes `sandbox`
+    and `tool_overrides` through to the executor."""
     count = 0
     while (run_id := await claim_next_run(sessionmaker, worker_id, settings)) is not None:
         await execute_run(
-            run_id, factory=sessionmaker, gateway=gateway, settings=settings, worker_id=worker_id
+            run_id,
+            factory=sessionmaker,
+            gateway=gateway,
+            settings=settings,
+            worker_id=worker_id,
+            **tools,
         )
         count += 1
     return count

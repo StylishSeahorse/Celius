@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import BaseModel, Field, model_validator
 
 from app.models import MessageRole, MessageStatus, RunStatus
+from app.schemas.tools import ToolCallOut
 
 
 class ConversationCreate(BaseModel):
@@ -15,6 +16,8 @@ class ConversationCreate(BaseModel):
     model_override: str | None = Field(default=None, max_length=255)
     # Model thinking: None = model default, True = on, False = off.
     reasoning: bool | None = None
+    # Tool profile (built-in name or "custom:<id>"); None = the user's default.
+    tool_profile: str | None = Field(default=None, max_length=80)
 
 
 class ConversationUpdate(BaseModel):
@@ -23,6 +26,7 @@ class ConversationUpdate(BaseModel):
     model_override: str | None = Field(default=None, max_length=255)
     memory_enabled: bool | None = None
     reasoning: bool | None = None
+    tool_profile: str | None = Field(default=None, max_length=80)
     archived: bool | None = None
     expected_version: int | None = None
 
@@ -34,6 +38,7 @@ class ConversationSummary(BaseModel):
     model_override: str | None
     memory_enabled: bool
     reasoning: bool | None
+    tool_profile: str | None = None
     active_branch_id: uuid.UUID | None
     version: int
     archived: bool
@@ -63,6 +68,8 @@ class MessageOut(BaseModel):
     revision: int
     model_id: str | None
     parts: list[MessagePartOut]
+    # Tool calls made while writing this reply, in order (assistant messages only).
+    tool_calls: list[ToolCallOut] = Field(default_factory=list)
     # Messages sharing this message's parent (edits / regenerations), oldest first.
     # Includes this message; length 1 means there are no alternatives.
     sibling_ids: list[uuid.UUID]

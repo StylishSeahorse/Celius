@@ -30,8 +30,10 @@ from app.schemas.conversations import (
     MessagePartOut,
     RunOut,
 )
+from app.services.audit import audit
 from app.services.runs import request_cancel
 from app.services.sync import record_sync
+from app.services.tools.policy import validate_profile_key
 
 ACTIVE_RUN_STATUSES = (RunStatus.queued, RunStatus.running, RunStatus.awaiting_approval)
 
@@ -173,6 +175,7 @@ def conversation_summary(conversation: Conversation) -> ConversationSummary:
         model_override=conversation.model_override,
         memory_enabled=conversation.memory_enabled,
         reasoning=conversation.reasoning,
+        tool_profile=conversation.tool_profile,
         active_branch_id=conversation.active_branch_id,
         version=conversation.version,
         archived=conversation.archived_at is not None,
@@ -241,6 +244,7 @@ async def create_conversation(
             return existing, False
     if data.project_id:
         await _check_project(db, owner_id, data.project_id)
+    await validate_profile_key(db, owner_id, data.tool_profile)
     conversation = Conversation(
         id=data.id or uuid.uuid4(),
         owner_id=owner_id,
@@ -248,6 +252,7 @@ async def create_conversation(
         title=data.title,
         model_override=data.model_override,
         reasoning=data.reasoning,
+        tool_profile=data.tool_profile,
         version=1,
     )
     db.add(conversation)
@@ -267,6 +272,17 @@ async def update_conversation(
     fields = data.model_dump(exclude_unset=True, exclude={"expected_version", "archived"})
     if fields.get("project_id"):
         await _check_project(db, conversation.owner_id, fields["project_id"])
+    if "tool_profile" in fields and fields["tool_profile"] != conversation.tool_profile:
+        await validate_profile_key(db, conversation.owner_id, fields["tool_profile"])
+        audit(
+            db,
+            conversation.owner_id,
+            "conversation.tool_profile",
+            "conversation",
+            conversation.id,
+            previous=conversation.tool_profile,
+            profile=fields["tool_profile"],
+        )
     for key, value in fields.items():
         setattr(conversation, key, value)
     if data.archived is not None:
