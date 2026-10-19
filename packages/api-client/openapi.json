@@ -142,6 +142,11 @@
             "default": false,
             "title": "Remember",
             "type": "boolean"
+          },
+          "remember_all": {
+            "default": false,
+            "title": "Remember All",
+            "type": "boolean"
           }
         },
         "required": [
@@ -320,6 +325,13 @@
               }
             ],
             "title": "Title"
+          },
+          "tool_grants": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tool Grants",
+            "type": "array"
           },
           "tool_profile": {
             "anyOf": [

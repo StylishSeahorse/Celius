@@ -1027,6 +1027,11 @@ export interface components {
              * @default false
              */
             remember: boolean;
+            /**
+             * Remember All
+             * @default false
+             */
+            remember_all: boolean;
         };
         /** ConversationCreate */
         ConversationCreate: {
@@ -1072,6 +1077,8 @@ export interface components {
             reasoning: boolean | null;
             /** Title */
             title: string | null;
+            /** Tool Grants */
+            tool_grants?: string[];
             /** Tool Profile */
             tool_profile?: string | null;
             /**

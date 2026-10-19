@@ -22,6 +22,7 @@ from app.schemas.tools import PendingApproval, ToolCallOut
 from app.services.audit import audit
 from app.services.runs import append_event
 from app.services.sync import record_sync
+from app.services.tools.policy import ALL_TOOLS
 
 
 def tool_call_out(call: ToolCall) -> ToolCallOut:
@@ -161,6 +162,7 @@ async def approve(
     args_hash: str,
     *,
     remember: bool = False,
+    remember_all: bool = False,
     ip_address: str | None = None,
 ) -> ToolCall:
     call = await _owned_call(db, user.id, call_id)
@@ -185,14 +187,17 @@ async def approve(
         )
     call.status = ToolCallStatus.approved
     call.decision_source = "user"
-    call.decision_reason = "Approved for this conversation" if remember else "Approved once"
+    call.decision_reason = (
+        "All tools approved for this conversation"
+        if remember_all
+        else "Approved for this conversation"
+        if remember
+        else "Approved once"
+    )
     call.decided_at = utcnow()
-    if remember and await db.get(ToolGrant, (call.conversation_id, call.tool_name)) is None:
-        db.add(
-            ToolGrant(
-                conversation_id=call.conversation_id, tool_name=call.tool_name, owner_id=user.id
-            )
-        )
+    grant = ALL_TOOLS if remember_all else call.tool_name if remember else None
+    if grant and await db.get(ToolGrant, (call.conversation_id, grant)) is None:
+        db.add(ToolGrant(conversation_id=call.conversation_id, tool_name=grant, owner_id=user.id))
     audit(
         db,
         user.id,
@@ -203,9 +208,48 @@ async def approve(
         tool=call.tool_name,
         args_hash=call.args_hash,
         remember=remember,
+        remember_all=remember_all,
     )
     await _decided(db, call)
+    if remember_all:
+        await _approve_waiting(db, user, call.conversation_id, ip_address)
     return call
+
+
+async def _approve_waiting(
+    db: AsyncSession, user: User, conversation_id: uuid.UUID, ip_address: str | None
+) -> None:
+    """After "allow all": the other calls already waiting in this chat go ahead too."""
+    waiting = (
+        await db.scalars(
+            select(ToolCall)
+            .where(
+                ToolCall.conversation_id == conversation_id,
+                ToolCall.owner_id == user.id,
+                ToolCall.status == ToolCallStatus.pending_approval,
+            )
+            .with_for_update()
+        )
+    ).all()
+    for other in waiting:
+        if other.expires_at is not None and _aware(other.expires_at) < utcnow():
+            continue  # left for expiry, which tells the model
+        other.status = ToolCallStatus.approved
+        other.decision_source = "grant"
+        other.decision_reason = "All tools approved for this conversation"
+        other.decided_at = utcnow()
+        audit(
+            db,
+            user.id,
+            "tool_call.approved",
+            "tool_call",
+            other.id,
+            ip_address,
+            tool=other.tool_name,
+            args_hash=other.args_hash,
+            via="allow_all",
+        )
+        await _decided(db, other)
 
 
 async def deny(

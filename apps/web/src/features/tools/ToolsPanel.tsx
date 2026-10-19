@@ -384,7 +384,7 @@ function Permissions() {
     reload();
   };
   const save = (body: { default_profile?: string; disabled_tools?: string[] }) =>
-    void api.updateToolSettings(body).then(reload, (err) => setError(message(err)));
+    void api.updateToolSettings(body).then(changed, (err) => setError(message(err)));
 
   return (
     <div className="space-y-6 text-sm">

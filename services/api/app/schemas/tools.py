@@ -44,6 +44,9 @@ class ApproveToolCall(BaseModel):
     args_hash: str = Field(min_length=64, max_length=64)
     # Skip asking again for this tool in this conversation (never overrides a deny).
     remember: bool = False
+    # Skip asking for every tool in this conversation, and approve the other calls that
+    # are waiting in it now. Profile denials still apply.
+    remember_all: bool = False
 
 
 class DenyToolCall(BaseModel):

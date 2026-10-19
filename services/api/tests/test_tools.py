@@ -475,3 +475,72 @@ async def test_settings_show_the_sandbox_as_the_worker_last_saw_it(client, auth_
     write_status(settings, {"status": "ok", "mode": "process"})
     shown = (await client.get("/api/v1/tools/settings", headers=auth_headers)).json()
     assert shown["sandbox"] == {"status": "ok", "mode": "process"}
+
+
+async def test_allow_all_approves_everything_waiting_and_later_calls(
+    client, auth_headers, sessionmaker, gateway, settings, fake
+):
+    a = {"name": "write_file", "arguments": {"path": "a.txt", "content": "a"}}
+    b = {"name": "write_file", "arguments": {"path": "b.txt", "content": "b"}}
+    fake.turns = [
+        [a, b],
+        "both",
+        [{"name": "write_file", "arguments": {"path": "c.txt", "content": "c"}}],
+        "three",
+    ]
+    conv, sent = await start(client, auth_headers, tool_profile="standard")
+    await drain_runs(sessionmaker, gateway, settings)
+    pending = (await client.get("/api/v1/tool-calls/pending", headers=auth_headers)).json()
+    assert len(pending) == 2
+    await client.post(
+        f"/api/v1/tool-calls/{pending[0]['id']}/approve",
+        json={"args_hash": pending[0]["args_hash"], "remember_all": True},
+        headers=auth_headers,
+    )
+    assert (await client.get("/api/v1/tool-calls/pending", headers=auth_headers)).json() == []
+    await drain_runs(sessionmaker, gateway, settings)
+    root = f"{settings.workspace_root}/{conv['id']}"
+    assert os.path.exists(f"{root}/a.txt") and os.path.exists(f"{root}/b.txt")
+    assert (await detail(client, auth_headers, conv["id"]))["tool_grants"] == ["*"]
+
+    second = await client.post(
+        f"/api/v1/conversations/{conv['id']}/messages",
+        json={"client_message_id": "next", "content": "again"},
+        headers=auth_headers,
+    )
+    await drain_runs(sessionmaker, gateway, settings)
+    assert await run_status(sessionmaker, second.json()["run"]["id"]) == RunStatus.completed
+    assert os.path.exists(f"{root}/c.txt")
+    # "Ask again" removes it.
+    await client.delete(f"/api/v1/conversations/{conv['id']}/tool-grants", headers=auth_headers)
+    assert (await detail(client, auth_headers, conv["id"]))["tool_grants"] == []
+
+
+def test_allow_all_never_overrides_a_deny():
+    read_only = Profile("read_only", "Read only", "read_only")
+    assert decide(read_only, "write_file", "write", {"*"}).decision == "deny"
+    standard = Profile("standard", "Standard", "standard")
+    assert decide(standard, "run_python", "execute", {"*"}).source == "grant"
+
+
+async def test_identical_failing_call_is_not_repeated(
+    client, auth_headers, sessionmaker, gateway, settings, fake
+):
+    read = {"name": "read_file", "arguments": {"path": "index.html"}}
+    write = {"name": "write_file", "arguments": {"path": "index.html", "content": "<p>"}}
+    fake.turns = [[read], [read], [write], [read], "done"]
+    conv, sent = await start(client, auth_headers, tool_profile="developer")
+    await drain_runs(sessionmaker, gateway, settings)
+    calls = (await detail(client, auth_headers, conv["id"]))["messages"][-1]["tool_calls"]
+    assert [c["status"] for c in calls] == ["failed", "refused", "completed", "completed"]
+    assert "already failed" in calls[1]["decision_reason"]
+
+
+async def test_model_is_told_which_tools_this_chat_lacks(
+    client, auth_headers, sessionmaker, gateway, settings, fake
+):
+    await start(client, auth_headers, tool_profile="read_only")
+    await drain_runs(sessionmaker, gateway, settings)
+    system = fake.requests[0]["messages"][0]["content"]
+    assert "Not available in this chat:" in system and "write_file" in system
+    assert "Read only" in system

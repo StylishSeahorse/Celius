@@ -85,3 +85,27 @@ test("create a scheduled task", async ({ page }) => {
   await row.getByRole("button", { name: "Delete" }).click();
   await expect(row).toHaveCount(0);
 });
+
+test("allow all for this chat stops asking until you say otherwise", async ({ page }) => {
+  await page.getByLabel("Tool permissions").selectOption("standard");
+  await send(page, "[tool:write] first");
+  const first = chat(page).getByTestId("tool-call").first();
+  await expect(first).toHaveAttribute("data-status", "pending_approval");
+  await first.getByRole("button", { name: "Allow all for this chat" }).click();
+  await expect(first).toHaveAttribute("data-status", "completed");
+  await expect(chat(page).getByText("Tools run without asking in this chat.")).toBeVisible();
+
+  await send(page, "[tool:write] second");
+  const second = chat(page).getByTestId("tool-call").nth(1);
+  await expect(second).toHaveAttribute("data-status", "completed"); // no question this time
+  await expect(chat(page).getByText("Waiting for your approval above.")).toHaveCount(0);
+
+  await chat(page).getByRole("button", { name: "Ask again" }).click();
+  await expect(chat(page).getByText("Tools run without asking in this chat.")).toHaveCount(0);
+});
+
+test("the default profile is named in the picker", async ({ page }) => {
+  await expect(page.getByLabel("Tool permissions").locator("option").first()).toHaveText(
+    /Tools: default \(.+\)/,
+  );
+});

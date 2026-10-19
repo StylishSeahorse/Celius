@@ -65,13 +65,13 @@ export function ToolCallCard({
   const result = (call.result ?? {}) as Record<string, unknown>;
   const changed = (result.changed_files as ChangedFile[] | undefined) ?? [];
 
-  async function decide(kind: "once" | "always" | "deny") {
+  async function decide(kind: "once" | "tool" | "all" | "deny") {
     setBusy(true);
     setError(null);
     try {
       if (kind === "deny") await api.denyToolCall(call.id);
       // The hash proves the approval is for exactly the arguments shown here.
-      else await api.approveToolCall(call.id, call.args_hash, kind === "always");
+      else await api.approveToolCall(call.id, call.args_hash, kind);
       onDecided?.();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not send the decision");
@@ -131,11 +131,19 @@ export function ToolCallCard({
                 </button>
                 <button
                   disabled={busy}
-                  onClick={() => void decide("always")}
+                  onClick={() => void decide("tool")}
                   className="rounded-md border border-line px-3 py-1 hover:bg-panel disabled:opacity-40"
-                  title="Don't ask again for this tool in this conversation"
+                  title="Don't ask again for this tool in this chat"
                 >
-                  Allow for this chat
+                  Always allow {toolLabel(call.tool_name)}
+                </button>
+                <button
+                  disabled={busy}
+                  onClick={() => void decide("all")}
+                  className="rounded-md border border-line px-3 py-1 hover:bg-panel disabled:opacity-40"
+                  title="Run every tool in this chat without asking (what the permission profile forbids stays forbidden)"
+                >
+                  Allow all for this chat
                 </button>
                 <button
                   disabled={busy}

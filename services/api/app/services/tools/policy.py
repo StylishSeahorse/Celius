@@ -71,6 +71,9 @@ BUILTIN_PROFILES: dict[str, dict[str, Any]] = {
 }
 
 CUSTOM_PREFIX = "custom:"
+# A grant for every tool in a conversation ("Allow all for this chat"). Like any grant it
+# only skips the question for tools that ask; a tool the profile denies stays denied.
+ALL_TOOLS = "*"
 
 
 @dataclass
@@ -166,6 +169,8 @@ def decide(profile: Profile, tool_name: str, risk: Risk, grants: set[str]) -> Ve
         return Verdict("deny", "policy", f"Not allowed by the {profile.label} profile")
     if decision == "ask" and tool_name in grants:
         return Verdict("allow", "grant", "Allowed for this conversation")
+    if decision == "ask" and ALL_TOOLS in grants:
+        return Verdict("allow", "grant", "All tools allowed for this conversation")
     if decision == "ask":
         return Verdict("ask", "policy", f"The {profile.label} profile asks first")
     return Verdict("allow", "policy", f"Allowed by the {profile.label} profile")

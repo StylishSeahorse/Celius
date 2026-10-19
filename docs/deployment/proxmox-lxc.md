@@ -127,6 +127,10 @@ echo "SANDBOX_URL=http://sandbox:8100" >> .env
 echo "SANDBOX_TOKEN=$(openssl rand -hex 32)" >> .env
 ```
 
+A `.env` from before phase 5 also has `TOOL_DEFAULT_PROFILE=read_only`. With it, chats on
+"Tools: default" can only read files. Change it to `standard`, or pick a default under
+**Tools & activity → Permissions** (your choice there wins over `.env`).
+
 ## Troubleshooting
 
 | Symptom | Fix |

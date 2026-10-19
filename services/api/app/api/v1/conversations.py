@@ -20,6 +20,7 @@ from app.schemas.conversations import (
 from app.services import conversations as svc
 from app.services.chat import submit_message
 from app.services.tools.calls import calls_for_messages
+from app.services.tools.policy import conversation_grants
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
@@ -39,6 +40,7 @@ async def conversation_detail(db: AsyncSession, conversation) -> ConversationDet
     return ConversationDetail(
         **svc.conversation_summary(conversation).model_dump(),
         messages=messages,
+        tool_grants=sorted(await conversation_grants(db, conversation.id)),
         active_run=svc.run_out(run) if run else None,
     )
 

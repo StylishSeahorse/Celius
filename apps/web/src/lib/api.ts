@@ -146,8 +146,12 @@ export const api = {
     request<ToolProfile>(`/tool-profiles/${id}`, json("PATCH", body)),
   deleteToolProfile: (id: string) => request<void>(`/tool-profiles/${id}`, json("DELETE")),
   pendingApprovals: () => request<PendingApproval[]>("/tool-calls/pending"),
-  approveToolCall: (id: string, args_hash: string, remember = false) =>
-    request<ToolCall>(`/tool-calls/${id}/approve`, json("POST", { args_hash, remember })),
+  /** scope: this call only, this tool for the rest of the chat, or every tool in the chat. */
+  approveToolCall: (id: string, args_hash: string, scope: "once" | "tool" | "all" = "once") =>
+    request<ToolCall>(
+      `/tool-calls/${id}/approve`,
+      json("POST", { args_hash, remember: scope === "tool", remember_all: scope === "all" }),
+    ),
   denyToolCall: (id: string, reason?: string) =>
     request<ToolCall>(`/tool-calls/${id}/deny`, json("POST", { reason: reason ?? null })),
   clearGrants: (conversationId: string) =>

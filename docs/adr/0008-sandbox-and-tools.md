@@ -92,8 +92,16 @@ slot. The pending call stores the canonical JSON of its arguments and their SHA-
 Approving requires that hash. A client that shows the user one thing and approves
 another fails, and any change to the arguments means a new approval. Approvals expire
 (`TOOL_APPROVAL_TTL_MINUTES`). An expired or denied call is reported to the model as
-refused, and the run continues. "Allow for this conversation" stores a grant scoped to
-the conversation and that tool, never wider.
+refused, and the run continues. "Always allow <tool>" stores a grant scoped to
+the conversation and that tool. "Allow all for this chat" stores a grant for every tool
+in that conversation and approves the calls already waiting there. Neither crosses
+conversations, and neither overrides a profile's deny. The chat shows a banner while
+"allow all" is on, with "Ask again" to remove it.
+
+A call identical to one that already failed in the same reply is refused without running,
+until something changes (a successful call that writes, runs code or uses the network).
+The model is also told which tools the chat's profile leaves out, so it asks the user to
+change the setting instead of working around it.
 
 ### Limits on the loop
 Per run: tool iterations (`TOOL_MAX_ITERATIONS`), total tool wall-clock

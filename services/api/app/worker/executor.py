@@ -213,6 +213,9 @@ class _Prepared:
     tool_ms: int = 0
     # Calls of the latest step without a final outcome (resuming after approval).
     unresolved: list[ToolCall] = field(default_factory=list)
+    # (tool, args_hash) of calls in this run that failed or were refused: an identical
+    # retry is refused at once, so a stuck model can't burn every iteration on it.
+    failed: set[tuple[str, str]] = field(default_factory=set)
     usage: dict[str, int] = field(default_factory=dict)
 
 
@@ -575,6 +578,7 @@ class _Loop:
             if not row.arguments:
                 row.arguments = {"_raw": raw["arguments"][:20_000]}
             row.args_hash = args_hash(row.arguments)
+            p.failed.add((row.tool_name, row.args_hash))
             return row
 
         if spec is None:
@@ -585,6 +589,12 @@ class _Loop:
             row.status = ToolCallStatus.failed
             return refuse(str(exc), "system")
         row.args_hash = args_hash(row.arguments)
+        if (name, row.args_hash) in p.failed:
+            return refuse(
+                "This exact call already failed in this reply. Don't repeat it: change the "
+                "arguments, use another tool, or tell the user what is blocking you",
+                "system",
+            )
         if name in toolset.unavailable:
             return refuse(toolset.unavailable[name], "system")
         verdict = decide(toolset.profile, name, spec.risk, toolset.grants)
@@ -756,6 +766,11 @@ class _Loop:
             await db.commit()
         row.status, row.model_content = status, content
         self.p.tool_ms += elapsed
+        if is_error:
+            self.p.failed.add((row.tool_name, row.args_hash))
+        elif row.risk != "read":
+            # Something may have changed (a file written, code run): retries can succeed now.
+            self.p.failed.clear()
 
     async def _pause(self) -> str:
         async with self.factory() as db:
@@ -799,6 +814,19 @@ class _Loop:
         # One model turn: its usage as reported. Several: the sum of their token counts.
         usage = self.p.usage if self.p.step else state.usage
         await _finish(self.factory, self.p.run_id, self.worker_id, state, usage=usage, error=error)
+
+
+def _missing_tools_note(toolset: Toolset) -> str:
+    """Tell the model what it can't do here, so it asks the user instead of flailing."""
+    missing = sorted(name for name in toolset.known if name not in toolset.offered)
+    if not missing:
+        return ""
+    return (
+        f"\n\nNot available in this chat: {', '.join(missing)} (tool permissions: "
+        f"{toolset.profile.label}). If the task needs one of them, say which and ask the "
+        "user to change the Tools setting at the top of the chat; don't try to work "
+        "around it with other tools."
+    )
 
 
 def _cap(text: str, limit: int) -> str:
@@ -901,7 +929,7 @@ async def _prepare(
                 if not toolset.offered:
                     toolset = None
             if toolset is not None:
-                system_prompt += "\n\n" + TOOL_GUIDANCE
+                system_prompt += "\n\n" + TOOL_GUIDANCE + _missing_tools_note(toolset)
                 await _copy_attachments(settings, conversation.id, attachments)
 
             built = build_context(system_prompt, history, budget)
@@ -989,6 +1017,8 @@ async def _restore_steps(db, prepared: _Prepared, output: Message) -> bool:
     by_step: dict[int, list[ToolCall]] = {}
     for call in calls:
         by_step.setdefault(call.step, []).append(call)
+        if call.is_error:
+            prepared.failed.add((call.tool_name, call.args_hash))
     last = max(by_step)
     for step in sorted(by_step):
         rows = by_step[step]

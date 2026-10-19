@@ -94,6 +94,8 @@ class RunOut(BaseModel):
 class ConversationDetail(ConversationSummary):
     messages: list[MessageOut]
     active_run: RunOut | None = None
+    # Tools allowed without asking in this chat; "*" means all of them.
+    tool_grants: list[str] = Field(default_factory=list)
 
 
 class GenerationParams(BaseModel):

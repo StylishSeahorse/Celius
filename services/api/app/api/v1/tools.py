@@ -309,6 +309,7 @@ async def approve_call(
         call_id,
         body.args_hash,
         remember=body.remember,
+        remember_all=body.remember_all,
         ip_address=request.client.host if request.client else None,
     )
     await db.commit()

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { api } from "../../lib/api";
 import type { ModelList, StoredFile } from "../../lib/types";
 import { outbox } from "../../offline/outbox";
 import { ToolProfilePicker } from "../tools/ToolProfilePicker";
@@ -94,6 +95,18 @@ export function ChatView(props: Props) {
         {savedOnServer && online && <ExportMenu conversationId={detail!.id} />}
       </header>
 
+      {savedOnServer && detail!.tool_grants?.includes("*") && (
+        <div role="status" className="flex items-center justify-center gap-2 border-b border-line bg-amber-50/60 px-4 py-1.5 text-xs dark:bg-amber-950/20">
+          <span>Tools run without asking in this chat.</span>
+          <button
+            className="underline"
+            disabled={!online}
+            onClick={() => void api.clearGrants(detail!.id).then(() => chat.refresh())}
+          >
+            Ask again
+          </button>
+        </div>
+      )}
       {(!online || chat.fromCache) && (
         <div role="status" className="border-b border-line bg-panel px-4 py-1.5 text-center text-xs text-muted">
           {online
