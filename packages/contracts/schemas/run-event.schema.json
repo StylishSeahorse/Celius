@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://celius.local/contracts/run-event.schema.json",
+  "title": "RunEventEnvelope",
+  "description": "Envelope for every event streamed over GET /api/v1/runs/{id}/events (SSE). The SSE `id:` field equals event_id; clients resume with Last-Event-ID.",
+  "type": "object",
+  "required": ["event_id", "run_id", "type", "created_at", "data"],
+  "additionalProperties": false,
+  "properties": {
+    "event_id": { "type": "integer", "minimum": 1, "description": "Monotonic per deployment; persisted in run_events.id." },
+    "run_id": { "type": "string", "format": "uuid" },
+    "type": {
+      "type": "string",
+      "enum": [
+        "run.started",
+        "message.delta",
+        "tool_call.proposed",
+        "tool_call.awaiting_approval",
+        "tool_call.started",
+        "tool_call.completed",
+        "run.progress",
+        "run.completed",
+        "run.failed",
+        "run.cancelled"
+      ]
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "data": { "type": "object" }
+  }
+}

@@ -1,0 +1,84 @@
+# Production stack. Inference runs on a separate machine (llama.cpp on the RTX 3060)
+# and is reached through MODEL_BASE_URL; it is deliberately not part of this stack.
+#
+#   docker compose -f infra/compose.yaml --env-file .env up -d
+#
+name: celius
+
+x-api-env: &api-env
+  env_file: ../.env
+  environment:
+    DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-celius}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-celius}
+    REDIS_URL: redis://redis:6379/0
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.0-pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-celius}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-celius}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  # One-shot migration step; the api waits for it to finish successfully.
+  migrate:
+    image: ${CELIUS_API_IMAGE:-celius-api:local}
+    build:
+      context: ..
+      dockerfile: infra/docker/Dockerfile.api
+    <<: *api-env
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [backend]
+    restart: "no"
+
+  api:
+    image: ${CELIUS_API_IMAGE:-celius-api:local}
+    restart: unless-stopped
+    <<: *api-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    volumes:
+      - app-data:/data/app
+      - workspaces:/data/workspaces
+    # Bound to loopback only: the existing reverse proxy terminates TLS and forwards here.
+    ports:
+      - "${API_BIND_ADDRESS:-127.0.0.1}:${API_PORT:-8000}:8000"
+    networks: [backend, egress]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: [/tmp]
+
+networks:
+  # No outbound route: postgres and redis are reachable only from inside the stack.
+  backend:
+    internal: true
+  # The api needs egress to reach the model server on the LAN.
+  egress: {}
+
+volumes:
+  postgres-data:
+  app-data:
+  workspaces:
