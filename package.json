@@ -1,0 +1,11 @@
+{
+  "name": "celius",
+  "private": true,
+  "packageManager": "pnpm@10.28.0",
+  "scripts": {
+    "dev": "pnpm --filter @celius/web dev",
+    "build": "pnpm --filter @celius/web build",
+    "test": "pnpm --filter @celius/web test",
+    "typecheck": "pnpm --filter @celius/web typecheck"
+  }
+}

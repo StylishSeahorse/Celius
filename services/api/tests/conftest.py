@@ -8,18 +8,20 @@ from collections.abc import AsyncIterator
 import httpx
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.pool import NullPool
 
 import app.models  # noqa: F401
 from app.auth.passwords import hash_password
 from app.config import Settings, get_settings
-from app.db import get_db
+from app.db import get_session_factory
 from app.db.base import Base
 from app.main import create_app
 from app.models import User
 from app.services.model_gateway import OpenAICompatibleGateway, get_model_gateway
 
 PASSWORD = "correct horse battery staple"
+# Must be a different database from TEST_POSTGRES_URL: tables are dropped per test.
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 
 
 @pytest.fixture
@@ -29,18 +31,33 @@ def settings() -> Settings:
         database_url="sqlite+aiosqlite:///:memory:",
         model_base_url="http://model.test:8080/v1",
         model_max_retries=1,
+        run_delta_flush_ms=10,
+        run_lease_seconds=5,
+        worker_poll_interval_seconds=0.02,
+        sse_poll_interval_seconds=0.02,
     )
 
 
 @pytest.fixture
-async def sessionmaker() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
-    engine = create_async_engine(
-        "sqlite+aiosqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+async def sessionmaker(tmp_path) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
+    """SQLite file per test by default; set TEST_DATABASE_URL to run on PostgreSQL.
+
+    A file, not :memory:, so concurrent sessions (worker heartbeat, API cancel) get
+    separate connections and real transaction isolation.
+    """
+    if TEST_DATABASE_URL:
+        engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+            await conn.run_sync(Base.metadata.create_all)
+    else:
+        engine = create_async_engine(
+            f"sqlite+aiosqlite:///{tmp_path / 'test.db'}",
+            connect_args={"timeout": 30},
+            poolclass=NullPool,
+        )
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
     yield async_sessionmaker(engine, expire_on_commit=False)
     await engine.dispose()
 
@@ -71,11 +88,7 @@ def gateway(settings, model_handler) -> OpenAICompatibleGateway:
 async def client(settings, sessionmaker, gateway) -> AsyncIterator[httpx.AsyncClient]:
     app = create_app()
 
-    async def _db():
-        async with sessionmaker() as db:
-            yield db
-
-    app.dependency_overrides[get_db] = _db
+    app.dependency_overrides[get_session_factory] = lambda: sessionmaker
     app.dependency_overrides[get_settings] = lambda: settings
     app.dependency_overrides[get_model_gateway] = lambda: gateway
     # No lifespan: the bootstrap step is tested directly.

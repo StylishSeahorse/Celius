@@ -47,6 +47,19 @@ class Settings(BaseSettings):
     model_enable_vision: bool = False
     model_enable_embeddings: bool = False
 
+    # Chat and runs
+    default_system_prompt: str = "You are a helpful assistant."
+    context_safety_margin_tokens: int = Field(default=256, ge=0)
+    run_lease_seconds: int = Field(default=30, ge=5)
+    run_max_attempts: int = Field(default=2, ge=1)
+    run_delta_flush_ms: int = Field(default=100, ge=10)
+    worker_poll_interval_seconds: float = Field(default=0.5, gt=0)
+    sse_poll_interval_seconds: float = Field(default=0.25, gt=0)
+    sse_keepalive_seconds: float = Field(default=15, gt=0)
+
+    # Built web UI (apps/web/dist); served by the API when the directory exists.
+    static_root: str | None = None
+
     # Limits
     max_upload_bytes: int = 50 * 1024 * 1024
     max_user_storage_bytes: int = 10 * 1024 * 1024 * 1024

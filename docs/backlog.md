@@ -21,8 +21,8 @@ Status key: ✅ done in repo · 🔶 partially done · ⬜ not started
 | F-04 | Single-user auth: argon2 hashes, server-side sessions, cookie + bearer | ✅ | Tokens stored hashed; login failures audited; no username enumeration; revoked/expired/inactive sessions rejected |
 | F-05 | Bootstrap account from env | ✅ | Created only when the users table is empty; never overwrites |
 | F-06 | Health endpoints | ✅ | `/health/live` for the container; `/health/ready` gates on DB, reports model server without gating |
-| F-07 | Dockerfile (non-root, read-only rootfs) and production Compose | 🔶 | Compose validates in CI; **image build and a full `up` on Proxmox not yet run** |
-| F-08 | CI: lint, tests, migration round-trip, image build | ✅ | `.github/workflows/api.yml` |
+| F-07 | Dockerfile (non-root, read-only rootfs) and production Compose | 🔶 | One image for API, worker and web; Compose validates and CI builds the image; **a full `up` on Proxmox has not been run yet** |
+| F-08 | CI: lint, tests (SQLite + PostgreSQL), migrations, web, e2e, image build | ✅ | `.github/workflows/ci.yml` |
 | F-09 | Reverse-proxy guide (TLS, SSE buffering, timeouts) | ✅ | `docs/deployment/reverse-proxy.md` |
 | F-10 | Deploy on Proxmox, restart stack, confirm data persists | ⬜ | Data survives `down`/`up` and host reboot |
 | F-11 | Login rate limiting | ⬜ | Repeated failures from one IP/username are throttled |
@@ -39,13 +39,16 @@ Status key: ✅ done in repo · 🔶 partially done · ⬜ not started
 | M-03 | Capability detection | ✅ | Context and vision from `/props`; tool calling only marked `verified` after a live probe |
 | M-04 | `GET /models`, `POST /models/{id}/verify-tools` | ✅ | Model list still returns (empty, with health) when inference is offline |
 | M-05 | Verify against the real RTX 3060 server | ⬜ | Record model, quant, `n_ctx`, `--jinja`, measured tokens/s and safe `MODEL_PARALLEL_REQUESTS` in `docs/operations/model-server.md` |
-| C-01 | Conversation CRUD (`/conversations`) | ⬜ | Owner-scoped; soft delete; optimistic `version` checks |
-| C-02 | Message submission with idempotent `client_message_id` | ⬜ | Message + run committed in one transaction; duplicate submission returns the original IDs |
-| C-03 | Run executor (worker) | ⬜ | Picks up `queued` runs, including after an API/worker restart |
-| C-04 | `GET /runs/{id}/events` SSE with `Last-Event-ID` resume | ⬜ | Events persisted in `run_events`; reconnect replays missed events |
-| C-05 | Cancellation | ⬜ | `POST /runs/{id}/cancel` stops generation within one chunk and marks the run `cancelled` |
-| C-06 | Context assembly with token budget | ⬜ | Truncation never drops the system prompt or the latest user message |
-| C-07 | Minimal chat UI (React + Vite) | ⬜ | Send, stream, cancel, model override per conversation |
+| C-01 | Conversation CRUD (`/conversations`) | ✅ | Owner-scoped; soft delete; optimistic `version` checks (409 `version_conflict`); cursor pagination; search over titles and message text |
+| C-02 | Message submission with idempotent `client_message_id` | ✅ | User message, assistant placeholder and run committed in one transaction; a retry returns the original IDs (200, `duplicate: true`), including under a concurrent race; one active run per conversation |
+| C-03 | Run executor (`python -m app.worker`) | ✅ | Claims from PostgreSQL (ADR 0005); leases and heartbeat; requeues runs from dead workers up to `RUN_MAX_ATTEMPTS`; a stale worker can't overwrite a recovered run |
+| C-04 | `GET /runs/{id}/events` SSE with `Last-Event-ID` resume | ✅ | Events persisted in `run_events`; replay plus live tail; the stream closes after the terminal event; keep-alives |
+| C-05 | Cancellation | ✅ | Queued runs are cancelled immediately; streaming runs stop within one flush (~100 ms), during prompt processing within ~1 s; partial text kept |
+| C-06 | Context assembly with token budget | ✅ | Oldest turns dropped first; system prompt and latest user message always kept; `context_overflow` before calling the model; consecutive same-role turns merged |
+| C-07 | Minimal chat UI (React + Vite + Tailwind) | ✅ | Login, sidebar, search, new/delete chat, streaming markdown, reasoning disclosure, stop, model override per conversation, resume after reload, mobile layout |
+| C-08 | Verify the end-to-end flow on the real deployment | ⬜ | `docs/acceptance-tests/phase-2.md`, manual section |
+| C-09 | Prune `message.delta` events after completion | ⬜ | Keeps `run_events` small; clients that reconnect late fall back to the message state |
+| C-10 | `LISTEN/NOTIFY` wake-ups (optional) | ⬜ | Only if polling latency or load is noticeable |
 
 ## Phase 3 — Client experience and sync
 

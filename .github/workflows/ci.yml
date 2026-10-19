@@ -1,0 +1,103 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.0-pg16
+        env:
+          POSTGRES_USER: celius
+          POSTGRES_PASSWORD: celius
+          POSTGRES_DB: celius
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U celius" --health-interval 5s --health-retries 10
+    defaults:
+      run:
+        working-directory: services/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - name: Tests on SQLite
+        run: uv run pytest -q
+      - name: Tests on PostgreSQL + migration round-trip
+        run: |
+          PGPASSWORD=celius psql -h localhost -U celius -c "create database celius_test"
+          uv run pytest -q
+        env:
+          TEST_POSTGRES_URL: postgresql+asyncpg://celius:celius@localhost:5432/celius
+          TEST_DATABASE_URL: postgresql+asyncpg://celius:celius@localhost:5432/celius_test
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [api, web]
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.0-pg16
+        env:
+          POSTGRES_USER: celius
+          POSTGRES_PASSWORD: celius
+          POSTGRES_DB: celius
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U celius" --health-interval 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://celius:celius@localhost:5432/celius
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile && pnpm build
+      - run: cd services/api && uv sync --frozen && uv run alembic upgrade head
+      - run: cd apps/web && npx playwright install --with-deps chromium
+      - run: infra/scripts/e2e-stack.sh
+      - run: cd apps/web && npx playwright test
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: |
+            apps/web/test-results
+            .e2e/*.log
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate compose files
+        run: |
+          cp .env.example .env
+          docker compose -f infra/compose.yaml --env-file .env config -q
+          docker compose -f infra/compose.dev.yaml config -q
+      - name: Build image (API + worker + web)
+        run: docker build -f infra/docker/Dockerfile.api -t celius-api:ci .

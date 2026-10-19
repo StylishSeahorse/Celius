@@ -71,6 +71,27 @@ services:
     read_only: true
     tmpfs: [/tmp]
 
+  # Executes generation runs. Scale with MODEL_PARALLEL_REQUESTS, not replicas, so the
+  # GPU is never asked for more concurrent requests than llama-server has slots.
+  worker:
+    image: ${CELIUS_API_IMAGE:-celius-api:local}
+    restart: unless-stopped
+    <<: *api-env
+    command: ["python", "-m", "app.worker"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    volumes:
+      - app-data:/data/app
+      - workspaces:/data/workspaces
+    networks: [backend, egress]
+    stop_grace_period: 30s
+    healthcheck:
+      disable: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: [/tmp]
+
 networks:
   # No outbound route: postgres and redis are reachable only from inside the stack.
   backend:

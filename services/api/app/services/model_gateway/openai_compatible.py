@@ -65,6 +65,7 @@ class OpenAICompatibleGateway:
         self.configured = configured
         self.default_context_tokens = default_context_tokens
         self._verified_tools: dict[str, bool] = {}
+        self._models_cache: tuple[float, list[ModelInfo]] | None = None
         headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
         self._client = httpx.AsyncClient(
             headers=headers,
@@ -142,7 +143,13 @@ class OpenAICompatibleGateway:
 
     # ------------------------------------------------------------------ discovery
 
-    async def list_models(self) -> list[ModelInfo]:
+    async def list_models(self, *, max_age_seconds: float = 0) -> list[ModelInfo]:
+        """List served models. Callers on hot paths pass `max_age_seconds` to reuse a
+        recent result instead of querying the server again."""
+        if self._models_cache and max_age_seconds > 0:
+            fetched_at, cached = self._models_cache
+            if time.monotonic() - fetched_at < max_age_seconds:
+                return cached
         body = (await self._request("GET", f"{self.base_url}/models")).json()
         props = await self._get_json(f"{self.root_url}/props") if self._is_llama_cpp else None
         server_ctx = _props_context(props)
@@ -169,7 +176,16 @@ class OpenAICompatibleGateway:
                     raw=entry,
                 )
             )
+        self._models_cache = (time.monotonic(), models)
         return models
+
+    async def find_model(self, model_id: str, *, max_age_seconds: float = 60) -> ModelInfo | None:
+        """The named model, or the only served model (llama-server ignores the name)."""
+        models = await self.list_models(max_age_seconds=max_age_seconds)
+        for model in models:
+            if model.id == model_id:
+                return model
+        return models[0] if len(models) == 1 else None
 
     async def get_capabilities(self, model_id: str) -> ModelCapabilities:
         for model in await self.list_models():
@@ -201,6 +217,7 @@ class OpenAICompatibleGateway:
                 raise
             supported = False
         self._verified_tools[model_id] = supported
+        self._models_cache = None
         return supported
 
     async def health_check(self) -> ModelHealth:
@@ -244,28 +261,31 @@ class OpenAICompatibleGateway:
         url = f"{self.base_url}/chat/completions"
 
         attempt = 0
+        yielded = False
         while True:
-            # Retries are only safe before the first byte has been yielded to the caller.
+            # Retries are only safe before anything has been yielded to the caller;
+            # after that, a retry would duplicate the text already delivered.
             try:
                 async with self._client.stream("POST", url, json=payload) as response:
                     if response.status_code >= 400:
                         await response.aread()
                         raise _http_error(response)
                     async for chunk in _parse_sse(response):
+                        yielded = True
                         yield chunk
                     return
             except ModelGatewayError as exc:
-                if not exc.retryable or attempt >= self.max_retries:
+                if yielded or not exc.retryable or attempt >= self.max_retries:
                     raise
             except httpx.TimeoutException as exc:
-                if attempt >= self.max_retries:
+                if yielded or attempt >= self.max_retries:
                     raise ModelGatewayError(
                         "model_timeout", "Model server timed out", retryable=True
                     ) from exc
             except httpx.TransportError as exc:
-                if attempt >= self.max_retries:
+                if yielded or attempt >= self.max_retries:
                     raise ModelGatewayError(
-                        "model_unreachable", "Model server is unreachable", retryable=True
+                        "model_unreachable", "Model server connection lost", retryable=True
                     ) from exc
             attempt += 1
 

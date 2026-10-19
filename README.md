@@ -3,39 +3,58 @@
 A self-hosted, Claude-style AI workspace. It syncs conversations across Windows (Tauri),
 Android (PWA) and web clients, and talks to a remote llama.cpp inference server.
 
-**Status:** Phase 1 (foundation) plus the model gateway from Phase 2. There is no
-chat UI yet. See [`docs/backlog.md`](docs/backlog.md) for the full plan and what is done.
+**Status:** Phases 1 (foundation) and 2 (model gateway and chat) are implemented.
+You can sign in, chat with streaming replies, stop a reply, resume after a reload, and
+switch models per conversation. See [`docs/backlog.md`](docs/backlog.md) for the full
+plan and what is done.
 
 ## What exists today
 
-- `services/api`: FastAPI service with typed settings, a PostgreSQL schema
-  (users, sessions, projects, conversations, branches, messages, revisions, runs,
-  run events, sync log, audit log) and Alembic migrations.
-- Single-user auth: argon2id passwords, revocable server-side sessions, cookie or bearer token.
-- Model gateway for llama.cpp / OpenAI-compatible servers: streaming, error mapping,
-  safe retries, capability detection via `/props`, live tool-calling probe.
-- Health endpoints, a non-root Docker image and a production Compose stack.
-- `packages/contracts`: the run-event JSON Schema.
+- `services/api`: FastAPI service. It contains:
+  - PostgreSQL schema and Alembic migrations
+  - Single-user auth (argon2id, revocable sessions)
+  - Conversations, idempotent message submission and runs
+  - Resumable SSE run streams (`Last-Event-ID`)
+  - The llama.cpp / OpenAI-compatible model gateway
+- `python -m app.worker`: the generation worker. It claims runs from PostgreSQL with
+  leases, so a crashed worker's run is picked up again. It also handles cancellation
+  and context budgeting.
+- `apps/web`: React + Vite + Tailwind chat UI, served by the API in production.
+- `packages/contracts`: run-event JSON Schema and payload reference.
+- `infra/`: one Docker image (API, worker and web) and Compose files.
+- `devtools/fake_llama_server.py`: a stand-in llama-server for development and e2e tests without a GPU.
 
 ## Quick start (development)
 
-Requirements: Python 3.12+, [uv](https://docs.astral.sh/uv/), Docker.
+Requirements: Python 3.12+, [uv](https://docs.astral.sh/uv/), Node 22 + pnpm, Docker.
 
 ```sh
-make install          # API dependencies
+make install          # API + web dependencies
 make dev-deps         # local Postgres + Redis
 make migrate
+make fake-llama       # or point MODEL_BASE_URL at your real llama-server
+
+# in separate terminals:
 BOOTSTRAP_USERNAME=admin BOOTSTRAP_PASSWORD='choose-a-long-password' \
-  MODEL_BASE_URL=http://YOUR_LLAMA_HOST:8080/v1 make dev-api
+  MODEL_BASE_URL=http://127.0.0.1:8080/v1 make dev-api
+MODEL_BASE_URL=http://127.0.0.1:8080/v1 make dev-worker
+make dev-web          # http://localhost:5173
 ```
 
 API docs: http://localhost:8000/api/docs (disabled in production).
 
+## Tests
+
 ```sh
-make test             # unit tests (SQLite, mocked model server)
-make test-api-pg      # + migration round-trip on the dev Postgres
+make test             # API tests (SQLite, mocked model server)
+make test-api-pg      # same suite on PostgreSQL + migration round-trip
+make test-web         # web unit tests + typecheck
+make e2e              # Playwright against a full local stack, desktop + mobile viewports
 make lint
 ```
+
+See [`docs/acceptance-tests/phase-2.md`](docs/acceptance-tests/phase-2.md) for the
+Phase 2 exit-gate checks, including manual worker-restart and real-GPU checks.
 
 ## Deployment
 
@@ -44,14 +63,14 @@ See [`docs/deployment/reverse-proxy.md`](docs/deployment/reverse-proxy.md).
 ## Layout
 
 ```
-services/api/         FastAPI app, migrations, tests
+apps/web/             React chat UI (PWA in phase 3)
+services/api/         API, worker, migrations, tests, dev tools
 packages/contracts/   JSON Schemas shared with clients
-infra/                Dockerfiles and Compose files
-docs/                 Backlog, ADRs, deployment guides
+infra/                Dockerfile, Compose files, scripts
+docs/                 Backlog, ADRs, deployment, acceptance tests
 ```
 
-Planned but not created yet: `apps/web` (React/Vite PWA), `apps/desktop` (Tauri),
-`services/worker`, `services/tool-runner`, `packages/api-client`.
+Planned but not created yet: `apps/desktop` (Tauri), `services/tool-runner`, `packages/api-client`.
 
 ## Architecture decisions
 
@@ -59,3 +78,4 @@ Planned but not created yet: `apps/web` (React/Vite PWA), `apps/desktop` (Tauri)
 - [0002: Python + FastAPI backend](docs/adr/0002-python-fastapi-backend.md)
 - [0003: SSE with persisted run events](docs/adr/0003-sse-with-persisted-run-events.md)
 - [0004: Server-side sessions](docs/adr/0004-sessions-and-auth.md)
+- [0005: PostgreSQL run queue; API serves the web app](docs/adr/0005-postgres-run-queue.md)

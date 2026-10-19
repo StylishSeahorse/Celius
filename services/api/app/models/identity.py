@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Uuid
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Index, Integer, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, JSONType, Timestamps, UUIDPrimaryKey
@@ -63,6 +63,7 @@ class SyncEvent(Base):
     """Monotonic per-deployment change log; clients page through it by cursor (id)."""
 
     __tablename__ = "sync_events"
+    __table_args__ = (Index("ix_sync_events_user_id_id", "user_id", "id"),)
 
     id: Mapped[int] = mapped_column(BigIntPK, primary_key=True, autoincrement=True)
     user_id: Mapped[uuid.UUID] = mapped_column(

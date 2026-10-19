@@ -2,7 +2,18 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Enum, ForeignKey, Integer, String, Text, Uuid
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    Uuid,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, JSONType, Timestamps, UUIDPrimaryKey
@@ -26,6 +37,7 @@ class Run(UUIDPrimaryKey, Timestamps, Base):
     """Durable record of one assistant generation."""
 
     __tablename__ = "runs"
+    __table_args__ = (Index("ix_runs_status_created_at", "status", "created_at"),)
 
     owner_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
@@ -46,6 +58,10 @@ class Run(UUIDPrimaryKey, Timestamps, Base):
     params: Mapped[dict] = mapped_column(JSONType, default=dict, nullable=False)
     cancel_requested: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     tool_iterations: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Worker lease: a run whose lease expires while `running` is recovered by another worker.
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    worker_id: Mapped[str | None] = mapped_column(String(128))
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     error_code: Mapped[str | None] = mapped_column(String(64))
     error_message: Mapped[str | None] = mapped_column(Text)
     usage: Mapped[dict | None] = mapped_column(JSONType)

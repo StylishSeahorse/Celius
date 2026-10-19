@@ -43,3 +43,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests poll fakes and the API with sleep loops on purpose.
+"tests/**" = ["ASYNC110"]

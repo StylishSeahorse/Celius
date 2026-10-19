@@ -6,9 +6,11 @@ from fastapi import FastAPI
 
 from app.api.v1 import router as v1_router
 from app.auth.bootstrap import ensure_bootstrap_user
-from app.config import get_settings
+from app.config import Settings, get_settings
 from app.db import get_sessionmaker
+from app.errors import install_error_handlers
 from app.services.model_gateway import get_model_gateway
+from app.static import mount_web_app
 
 logging.basicConfig(level=logging.INFO)
 
@@ -22,8 +24,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await get_model_gateway().aclose()
 
 
-def create_app() -> FastAPI:
-    settings = get_settings()
+def create_app(settings: Settings | None = None) -> FastAPI:
+    settings = settings or get_settings()
     app = FastAPI(
         title="Celius API",
         version="0.1.0",
@@ -31,7 +33,9 @@ def create_app() -> FastAPI:
         docs_url=None if settings.app_env == "production" else "/api/docs",
         openapi_url=None if settings.app_env == "production" else "/api/openapi.json",
     )
+    install_error_handlers(app)
     app.include_router(v1_router)
+    mount_web_app(app, settings.static_root)  # last: it catches every other path
     return app
 
 
