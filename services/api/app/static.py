@@ -3,6 +3,7 @@
 One origin keeps the session cookie SameSite=Strict, and SSE then needs no CORS rules.
 """
 
+import mimetypes
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -10,6 +11,8 @@ from starlette.exceptions import HTTPException
 from starlette.responses import Response
 from starlette.staticfiles import StaticFiles
 from starlette.types import Scope
+
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 
 class SpaStaticFiles(StaticFiles):
@@ -26,7 +29,10 @@ class SpaStaticFiles(StaticFiles):
             response = None
         if response is None or response.status_code == 404:
             response = await super().get_response("index.html", scope)
-        if path.startswith("assets/"):
+        if path == "sw.js":
+            # Browsers check for a new worker on navigation; it must never be cached.
+            response.headers["Cache-Control"] = "no-cache, no-store"
+        elif path.startswith("assets/"):
             # Vite fingerprints asset filenames, so they can be cached forever.
             response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         else:

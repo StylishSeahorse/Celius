@@ -8,6 +8,7 @@ from app.db.base import utcnow
 from app.errors import not_found
 from app.models import TERMINAL_RUN_STATUSES, Message, MessageStatus, Run, RunEvent, RunStatus
 from app.schemas.events import RunEventType
+from app.services.sync import record_sync
 
 
 async def append_event(
@@ -44,6 +45,13 @@ async def finish_cancelled(db: AsyncSession, run: Run) -> None:
         message = await db.get(Message, run.output_message_id)
         if message is not None:
             message.status = MessageStatus.cancelled
+            record_sync(
+                db,
+                run.owner_id,
+                "message",
+                message.id,
+                payload={"conversation_id": str(run.conversation_id)},
+            )
     await append_event(
         db, run.id, RunEventType.run_cancelled, {"message_id": str(run.output_message_id)}
     )

@@ -3,10 +3,15 @@
 A self-hosted, Claude-style AI workspace. It syncs conversations across Windows (Tauri),
 Android (PWA) and web clients, and talks to a remote llama.cpp inference server.
 
-**Status:** Phases 1 (foundation) and 2 (model gateway and chat) are implemented.
-You can sign in, chat with streaming replies, stop a reply, resume after a reload, and
-switch models per conversation. See [`docs/backlog.md`](docs/backlog.md) for the full
-plan and what is done.
+**Status:** Phases 1–3 are implemented. You can:
+- chat with streaming replies
+- edit messages, regenerate replies and switch between versions
+- group chats into projects with their own instructions
+- keep working offline (messages are queued and sent exactly once)
+- see changes from your other devices live
+- install the app on Android (PWA) or Windows (Tauri)
+
+See [`docs/backlog.md`](docs/backlog.md) for the full plan and what is done.
 
 ## What exists today
 
@@ -19,7 +24,10 @@ plan and what is done.
 - `python -m app.worker`: the generation worker. It claims runs from PostgreSQL with
   leases, so a crashed worker's run is picked up again. It also handles cancellation
   and context budgeting.
-- `apps/web`: React + Vite + Tailwind chat UI, served by the API in production.
+- `apps/web`: React + Vite + Tailwind chat UI, served by the API in production. It is an
+  installable PWA with an IndexedDB cache and an offline outbox.
+- `apps/desktop`: Tauri v2 Windows app that connects to your server.
+- `packages/api-client`: TypeScript types generated from the API (`pnpm gen:api`).
 - `packages/contracts`: run-event JSON Schema and payload reference.
 - `infra/`: one Docker image (API, worker and web) and Compose files.
 - `devtools/fake_llama_server.py`: a stand-in llama-server for development and e2e tests without a GPU.
@@ -58,19 +66,23 @@ Phase 2 exit-gate checks, including manual worker-restart and real-GPU checks.
 
 ## Deployment
 
-See [`docs/deployment/reverse-proxy.md`](docs/deployment/reverse-proxy.md).
+- Server: [`docs/deployment/proxmox-lxc.md`](docs/deployment/proxmox-lxc.md) and
+  [`docs/deployment/reverse-proxy.md`](docs/deployment/reverse-proxy.md)
+- Phone and desktop apps: [`docs/deployment/clients.md`](docs/deployment/clients.md)
 
 ## Layout
 
 ```
-apps/web/             React chat UI (PWA in phase 3)
+apps/web/             React chat UI and PWA
+apps/desktop/         Tauri v2 Windows app
+packages/api-client/  Generated TypeScript API types
 services/api/         API, worker, migrations, tests, dev tools
 packages/contracts/   JSON Schemas shared with clients
 infra/                Dockerfile, Compose files, scripts
 docs/                 Backlog, ADRs, deployment, acceptance tests
 ```
 
-Planned but not created yet: `apps/desktop` (Tauri), `services/tool-runner`, `packages/api-client`.
+Planned but not created yet: `services/tool-runner`.
 
 ## Architecture decisions
 
@@ -79,3 +91,4 @@ Planned but not created yet: `apps/desktop` (Tauri), `services/tool-runner`, `pa
 - [0003: SSE with persisted run events](docs/adr/0003-sse-with-persisted-run-events.md)
 - [0004: Server-side sessions](docs/adr/0004-sessions-and-auth.md)
 - [0005: PostgreSQL run queue; API serves the web app](docs/adr/0005-postgres-run-queue.md)
+- [0006: Change feed, outbox and branches for multi-device use](docs/adr/0006-sync-and-offline.md)

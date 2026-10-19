@@ -6,8 +6,13 @@ ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH
 RUN corepack enable
 WORKDIR /src
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+# Every workspace manifest, so the frozen lockfile matches the workspace.
 COPY apps/web/package.json apps/web/
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile --filter @celius/web
+COPY apps/desktop/package.json apps/desktop/
+COPY packages/api-client/package.json packages/api-client/
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile --filter "@celius/web..."
+COPY packages/api-client/ packages/api-client/
 COPY apps/web/ apps/web/
 RUN pnpm --filter @celius/web build
 

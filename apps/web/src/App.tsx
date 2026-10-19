@@ -2,23 +2,45 @@ import { useEffect, useState } from "react";
 
 import { LoginPage } from "./features/auth/LoginPage";
 import { Workspace } from "./features/chat/Workspace";
-import { api } from "./lib/api";
+import { ApiError, api, isNetworkError } from "./lib/api";
 import type { Me } from "./lib/types";
+import { cache } from "./offline/db";
 
 export function App() {
   const [me, setMe] = useState<Me | null | undefined>(undefined);
 
   useEffect(() => {
-    // Any failure (401, server down) shows the login page; signing in reports the real error.
     api
       .me()
-      .then(setMe)
-      .catch(() => setMe(null));
+      .then((user) => {
+        setMe(user);
+        void cache.set("me", user);
+      })
+      .catch(async (error) => {
+        // Offline (or server unreachable): open the saved workspace instead of the login page.
+        if (isNetworkError(error) || (error instanceof ApiError && error.status >= 500)) {
+          setMe((await cache.get<Me>("me")) ?? null);
+        } else {
+          setMe(null);
+        }
+      });
   }, []);
 
   if (me === undefined) {
     return <div className="flex h-full items-center justify-center text-muted">Loading…</div>;
   }
-  if (me === null) return <LoginPage onLogin={setMe} />;
+  if (me === null) {
+    return (
+      <LoginPage
+        onLogin={async (user) => {
+          // A different account on this device: drop the previous account's saved data.
+          const previous = await cache.get<Me>("me");
+          if (previous && previous.user_id !== user.user_id) await cache.clearAll();
+          await cache.set("me", user);
+          setMe(user);
+        }}
+      />
+    );
+  }
   return <Workspace me={me} onLogout={() => setMe(null)} />;
 }

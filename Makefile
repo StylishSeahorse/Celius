@@ -3,7 +3,7 @@ COMPOSE_PROD := docker compose -f infra/compose.yaml --env-file .env
 COMPOSE_DEV := docker compose -f infra/compose.dev.yaml
 DEV_DB := postgresql+asyncpg://celius:celius@localhost:5432/celius
 
-.PHONY: install dev-deps dev-api dev-worker dev-web fake-llama migrate migration test test-api-pg \
+.PHONY: gen-api desktop install dev-deps dev-api dev-worker dev-web fake-llama migrate migration test test-api-pg \
 	test-web lint format e2e up down logs
 
 install:            ## Install API and web dependencies
@@ -47,6 +47,12 @@ e2e:                ## Browser tests against a full local stack (fake model serv
 	cd $(API) && DATABASE_URL=$(DEV_DB) uv run alembic upgrade head
 	DATABASE_URL=$(DEV_DB) infra/scripts/e2e-stack.sh
 	cd apps/web && npx playwright test; status=$$?; kill $$(cat ../../.e2e/pids); exit $$status
+
+gen-api:            ## Regenerate packages/api-client from the API's OpenAPI document
+	pnpm gen:api
+
+desktop:            ## Build the desktop app for this OS (Windows installers on Windows)
+	pnpm --filter @celius/desktop build
 
 lint:
 	cd $(API) && uv run ruff check . && uv run ruff format --check .

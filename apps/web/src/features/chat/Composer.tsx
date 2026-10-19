@@ -41,6 +41,8 @@ export function Composer({ busy, canStop, onSend, onStop }: Props) {
     <div className="rounded-2xl border border-line bg-canvas p-2 shadow-sm focus-within:border-accent/60">
       <textarea
         ref={ref}
+        // Ready to type on desktop; not on touch screens, where it would pop the keyboard.
+        autoFocus={window.matchMedia?.("(pointer: fine)").matches}
         rows={1}
         value={text}
         onChange={(e) => setText(e.target.value)}

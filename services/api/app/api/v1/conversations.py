@@ -2,6 +2,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Response, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import CurrentAuth
@@ -23,13 +24,13 @@ router = APIRouter(prefix="/conversations", tags=["conversations"])
 DB = Annotated[AsyncSession, Depends(get_db)]
 
 
-async def _detail(db: AsyncSession, conversation) -> ConversationDetail:
-    path = await svc.branch_path(db, conversation)
+async def conversation_detail(db: AsyncSession, conversation) -> ConversationDetail:
+    path, siblings = await svc.path_with_siblings(db, conversation)
     parts = await svc.load_parts(db, path)
     run = await svc.active_run(db, conversation.id)
     return ConversationDetail(
         **svc.conversation_summary(conversation).model_dump(),
-        messages=[svc.message_out(m, parts[m.id]) for m in path],
+        messages=[svc.message_out(m, parts[m.id], siblings[m.id]) for m in path],
         active_run=svc.run_out(run) if run else None,
     )
 
@@ -58,13 +59,27 @@ async def list_conversations(
     )
 
 
-@router.post("", response_model=ConversationDetail, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=ConversationDetail,
+    status_code=status.HTTP_201_CREATED,
+    responses={200: {"description": "A conversation with this client-chosen id already exists"}},
+)
 async def create_conversation(
-    body: ConversationCreate, auth: CurrentAuth, db: DB
+    body: ConversationCreate, response: Response, auth: CurrentAuth, db: DB
 ) -> ConversationDetail:
-    conversation = await svc.create_conversation(db, auth.user.id, body)
-    await db.commit()
-    return await _detail(db, conversation)
+    try:
+        conversation, created = await svc.create_conversation(db, auth.user.id, body)
+        await db.commit()
+    except IntegrityError:
+        # A concurrent retry with the same client id won the race; return that one.
+        await db.rollback()
+        if body.id is None:
+            raise
+        conversation, created = await svc.create_conversation(db, auth.user.id, body)
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return await conversation_detail(db, conversation)
 
 
 @router.get("/{conversation_id}", response_model=ConversationDetail)
@@ -72,7 +87,7 @@ async def get_conversation(
     conversation_id: uuid.UUID, auth: CurrentAuth, db: DB
 ) -> ConversationDetail:
     conversation = await svc.get_owned_conversation(db, auth.user.id, conversation_id)
-    return await _detail(db, conversation)
+    return await conversation_detail(db, conversation)
 
 
 @router.patch("/{conversation_id}", response_model=ConversationDetail)
@@ -84,7 +99,7 @@ async def update_conversation(
     )
     await svc.update_conversation(db, conversation, body)
     await db.commit()
-    return await _detail(db, conversation)
+    return await conversation_detail(db, conversation)
 
 
 @router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)

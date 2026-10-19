@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Celius — connect</title>
+    <link rel="stylesheet" href="connect.css" />
+  </head>
+  <body>
+    <main>
+      <form id="connect" novalidate>
+        <div class="brand"><img src="icon.png" alt="" width="32" height="32" /> <h1>Celius</h1></div>
+        <p class="muted">Enter the address of your Celius server.</p>
+        <label for="url">Server address</label>
+        <input id="url" name="url" type="url" required placeholder="https://ai.example.com" autocomplete="url" />
+        <p id="error" role="alert" hidden></p>
+        <button id="submit" type="submit">Connect</button>
+        <p class="hint">Change it later from the Celius menu → Change server…</p>
+      </form>
+    </main>
+    <script src="connect.js"></script>
+  </body>
+</html>

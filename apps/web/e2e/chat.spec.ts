@@ -1,39 +1,13 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
-const USER = process.env.E2E_USERNAME ?? "e2e";
-const PASSWORD = process.env.E2E_PASSWORD ?? "e2e-password-123";
-
-async function login(page: Page) {
-  await page.goto("/");
-  await page.getByLabel("Username").fill(USER);
-  await page.getByLabel("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByLabel("Message")).toBeVisible();
-}
-
-async function newChat(page: Page) {
-  const sidebar = page.getByRole("navigation", { name: "Conversations" });
-  if (!(await sidebar.isVisible())) await page.getByLabel("Open conversations").click();
-  await sidebar.getByRole("button", { name: "+ New chat" }).click();
-}
-
-async function send(page: Page, text: string) {
-  await page.getByLabel("Message").fill(text);
-  await page.getByLabel("Message").press("Enter");
-}
+import { cancelActiveRun, login, newChat, send } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   await login(page);
   await newChat(page);
 });
 
-// A failed test can leave a slow run going, which would hold the single worker slot.
-test.afterEach(async ({ page }) => {
-  const match = page.url().match(/#\/c\/([0-9a-f-]{36})/);
-  if (!match) return;
-  const detail = await (await page.request.get(`/api/v1/conversations/${match[1]}`)).json();
-  if (detail.active_run) await page.request.post(`/api/v1/runs/${detail.active_run.id}/cancel`);
-});
+test.afterEach(async ({ page }) => cancelActiveRun(page));
 
 test("streams a markdown reply and lists the conversation", async ({ page }) => {
   const marker = `pelicans-${Date.now()}`;

@@ -74,11 +74,10 @@ async def test_conversation_crud_and_versioning(client, auth_headers):
         headers=auth_headers,
     )
     assert stale.status_code == 409
-    assert stale.json()["error"] == {
-        "code": "version_conflict",
-        "message": "The conversation changed on another device",
-        "current_version": 2,
-    }
+    error = stale.json()["error"]
+    assert error["code"] == "version_conflict" and error["current_version"] == 2
+    # The server's state comes back so the client can offer "keep theirs / use mine".
+    assert error["current"]["title"] == "Renamed" and error["current"]["version"] == 2
 
     archived = await client.patch(
         f"/api/v1/conversations/{conv['id']}", json={"archived": True}, headers=auth_headers

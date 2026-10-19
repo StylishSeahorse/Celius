@@ -54,16 +54,18 @@ Status key: ✅ done in repo · 🔶 partially done · ⬜ not started
 
 **Exit gate:** synchronisation, reconnect and duplicate-submission tests pass.
 
-| ID | Item | Acceptance criteria |
-| --- | --- | --- |
-| S-01 | Generated TS client in `packages/api-client` | CI fails if the client is stale relative to OpenAPI |
-| S-02 | Sync change feed (`/sync/changes`, `/sync/ack`) over `sync_events` | Every durable write emits a sync event in the same transaction |
-| S-03 | IndexedDB cache + outgoing queue | Offline sends are queued in order and delivered exactly once |
-| S-04 | Conflict handling on concurrent edits | Stale `version` returns 409 with server state; UI offers resolution |
-| S-05 | Revisions, regenerate, branches UI | Alternate responses never overwrite the original |
-| S-06 | Sidebar, search, projects | Search covers titles and message text |
-| S-07 | PWA (manifest, service worker) | Installable on Android; app shell loads offline |
-| S-08 | Tauri v2 Windows wrapper | Scoped capabilities only; signed installer build |
+| ID | Item | Status | Acceptance criteria |
+| --- | --- | --- | --- |
+| S-01 | Generated TS client in `packages/api-client` | ✅ | `pnpm gen:api` (openapi-typescript); CI fails if stale |
+| S-02 | Sync change feed (`/sync/changes`, `/sync/cursor`, `/sync/ack`) over `sync_events` | ✅ | Every durable write, including run completion, cancel and failure, emits an event in the same transaction; tested on SQLite and PostgreSQL |
+| S-03 | IndexedDB cache + outgoing queue | ✅ | Offline sends are queued in order and delivered exactly once; a lost response doesn't duplicate; conversations can be started offline |
+| S-04 | Conflict handling on concurrent edits | ✅ | A stale `version` returns 409 with server state; dialog offers "Keep theirs / Use mine"; `parent_not_head` reports the current head |
+| S-05 | Revisions, regenerate, branches | ✅ | Edits and regenerations fork branches; "‹ n / m ›" switching; originals never overwritten |
+| S-06 | Sidebar, search, projects | ✅ | Projects CRUD with instructions in the system prompt; project filter; search over titles and message text |
+| S-07 | PWA (manifest, icons, service worker) | ✅ | Installable; app shell and saved conversations open offline (needs HTTPS or localhost) |
+| S-08 | Tauri v2 Windows wrapper | 🔶 | Connect page, menu, no IPC for remote pages; compiles on Linux; CI builds NSIS + MSI on Windows. **Authenticode signing not set up** (needs a certificate); Windows build not yet run |
+| S-09 | Open reply links in the system browser from the desktop app | ⬜ | Needs a narrowly scoped opener command (phase 4, with folder access) |
+| S-10 | Push notifications for finished replies | ⬜ | Optional; Web Push needs HTTPS and a VAPID key |
 
 ## Phase 4 — Files and workspaces
 

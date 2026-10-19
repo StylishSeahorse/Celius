@@ -7,7 +7,6 @@ same transaction, so other devices can catch up from their last cursor.
 import base64
 import uuid
 from datetime import datetime
-from typing import Any
 
 from sqlalchemy import and_, exists, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,7 +21,6 @@ from app.models import (
     Project,
     Run,
     RunStatus,
-    SyncEvent,
 )
 from app.schemas.conversations import (
     ConversationCreate,
@@ -33,28 +31,9 @@ from app.schemas.conversations import (
     RunOut,
 )
 from app.services.runs import request_cancel
+from app.services.sync import record_sync
 
 ACTIVE_RUN_STATUSES = (RunStatus.queued, RunStatus.running, RunStatus.awaiting_approval)
-
-
-def record_sync(
-    db: AsyncSession,
-    user_id: uuid.UUID,
-    entity_type: str,
-    entity_id: uuid.UUID,
-    operation: str = "upsert",
-    payload: dict[str, Any] | None = None,
-) -> None:
-    db.add(
-        SyncEvent(
-            user_id=user_id,
-            entity_type=entity_type,
-            entity_id=entity_id,
-            operation=operation,
-            payload=payload,
-            created_at=utcnow(),
-        )
-    )
 
 
 def touch(db: AsyncSession, conversation: Conversation) -> None:
@@ -76,6 +55,8 @@ def check_version(conversation: Conversation, expected: int | None) -> None:
             "version_conflict",
             "The conversation changed on another device",
             current_version=conversation.version,
+            # The server's state, so the client can offer "keep theirs / use mine".
+            current=conversation_summary(conversation).model_dump(mode="json"),
         )
 
 
@@ -113,6 +94,32 @@ async def branch_path(db: AsyncSession, conversation: Conversation) -> list[Mess
     if branch is None or branch.head_message_id is None:
         return []
     return await message_ancestry(db, conversation.id, branch.head_message_id)
+
+
+async def path_with_siblings(
+    db: AsyncSession, conversation: Conversation
+) -> tuple[list[Message], dict[uuid.UUID, list[uuid.UUID]]]:
+    """The active path plus, for each message on it, its siblings (alternative edits or
+    regenerated replies sharing the same parent), oldest first."""
+    rows = (
+        await db.scalars(
+            select(Message)
+            .where(Message.conversation_id == conversation.id)
+            .order_by(Message.created_at, Message.id)
+        )
+    ).all()
+    children: dict[uuid.UUID | None, list[uuid.UUID]] = {}
+    for message in rows:
+        children.setdefault(message.parent_id, []).append(message.id)
+    branch = await db.get(Branch, conversation.active_branch_id)
+    by_id = {m.id: m for m in rows}
+    path: list[Message] = []
+    current = by_id.get(branch.head_message_id) if branch and branch.head_message_id else None
+    while current is not None:
+        path.append(current)
+        current = by_id.get(current.parent_id) if current.parent_id else None
+    path.reverse()
+    return path, {m.id: children.get(m.parent_id, [m.id]) for m in path}
 
 
 async def message_ancestry(
@@ -173,7 +180,9 @@ def conversation_summary(conversation: Conversation) -> ConversationSummary:
     )
 
 
-def message_out(message: Message, parts: list[MessagePart]) -> MessageOut:
+def message_out(
+    message: Message, parts: list[MessagePart], sibling_ids: list[uuid.UUID] | None = None
+) -> MessageOut:
     return MessageOut(
         id=message.id,
         conversation_id=message.conversation_id,
@@ -185,6 +194,7 @@ def message_out(message: Message, parts: list[MessagePart]) -> MessageOut:
         revision=message.current_revision,
         model_id=message.model_id,
         parts=[MessagePartOut(type=p.type, text=p.text, data=p.data) for p in parts],
+        sibling_ids=sibling_ids or [message.id],
         created_at=message.created_at,
     )
 
@@ -219,11 +229,19 @@ async def _check_project(db: AsyncSession, owner_id: uuid.UUID, project_id: uuid
 
 async def create_conversation(
     db: AsyncSession, owner_id: uuid.UUID, data: ConversationCreate
-) -> Conversation:
+) -> tuple[Conversation, bool]:
+    """Create a conversation. A client-chosen `id` makes this idempotent, so a device can
+    create conversations offline and retry the request safely. Returns (conversation, created)."""
+    if data.id is not None:
+        existing = await db.get(Conversation, data.id)
+        if existing is not None:
+            if existing.owner_id != owner_id or existing.deleted_at is not None:
+                raise AppError(409, "id_conflict", "That conversation id is not available")
+            return existing, False
     if data.project_id:
         await _check_project(db, owner_id, data.project_id)
     conversation = Conversation(
-        id=uuid.uuid4(),
+        id=data.id or uuid.uuid4(),
         owner_id=owner_id,
         project_id=data.project_id,
         title=data.title,
@@ -237,7 +255,7 @@ async def create_conversation(
     await db.flush()
     conversation.active_branch_id = branch.id
     record_sync(db, owner_id, "conversation", conversation.id, payload={"version": 1})
-    return conversation
+    return conversation, True
 
 
 async def update_conversation(

@@ -3,7 +3,7 @@ import { type FormEvent, useState } from "react";
 import { ApiError, api } from "../../lib/api";
 import type { Me } from "../../lib/types";
 
-export function LoginPage({ onLogin }: { onLogin: (me: Me) => void }) {
+export function LoginPage({ onLogin }: { onLogin: (me: Me) => void | Promise<void> }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -15,7 +15,7 @@ export function LoginPage({ onLogin }: { onLogin: (me: Me) => void }) {
     setError(null);
     try {
       await api.login(username, password);
-      onLogin(await api.me());
+      await onLogin(await api.me());
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not reach the server");
     } finally {

@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { ApiError, api } from "../../lib/api";
+import { ApiError, api, isNetworkError } from "../../lib/api";
 import { newId } from "../../lib/ids";
 import { followRun } from "../../lib/sse";
-import type { ConversationDetail, Message, Run, RunEvent } from "../../lib/types";
+import type { ConversationDetail, ConversationSummary, Run, RunEvent } from "../../lib/types";
+import { cache } from "../../offline/db";
+import { type OutboxItem, outbox } from "../../offline/outbox";
 
 export interface LiveRun {
   runId: string;
@@ -14,135 +16,295 @@ export interface LiveRun {
   error: string | null;
 }
 
+export interface Conflict {
+  current: ConversationSummary;
+  fields: Record<string, unknown>;
+}
+
 interface Options {
   conversationId: string | null;
-  modelOverride: string | null;
+  /** For a conversation started from this view (new chat). */
+  draft: { modelOverride: string | null; projectId: string | null };
   onConversationCreated: (id: string) => void;
   onChanged: () => void;
 }
 
-export function useChat({ conversationId, modelOverride, onConversationCreated, onChanged }: Options) {
-  const [detail, setDetail] = useState<ConversationDetail | null>(null);
+const LIVE_STATUSES = ["queued", "running", "reconnecting"];
+
+function placeholder(id: string, draft: Options["draft"], title: string): ConversationDetail {
+  const now = new Date().toISOString();
+  return {
+    id,
+    title,
+    project_id: draft.projectId,
+    model_override: draft.modelOverride,
+    memory_enabled: true,
+    active_branch_id: null,
+    version: 0,
+    archived: false,
+    created_at: now,
+    updated_at: now,
+    messages: [],
+    active_run: null,
+  };
+}
+
+export function useChat({ conversationId, draft, onConversationCreated, onChanged }: Options) {
+  const [detail, setDetailState] = useState<ConversationDetail | null>(null);
   const [live, setLive] = useState<LiveRun | null>(null);
+  const [pending, setPending] = useState<OutboxItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [sending, setSending] = useState(false);
+  const [fromCache, setFromCache] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const streamAbort = useRef<AbortController | null>(null);
+  const liveRef = useRef<LiveRun | null>(null);
+  liveRef.current = live;
+  const idRef = useRef(conversationId);
+  idRef.current = conversationId;
   const callbacks = useRef({ onChanged });
   callbacks.current = { onChanged };
 
-  const reload = useCallback(async (id: string) => {
-    const fresh = await api.getConversation(id);
-    setDetail(fresh);
-    return fresh;
-  }, []);
+  const setDetail = setDetailState;
 
-  const follow = useCallback(
-    (run: Run, conversation: string) => {
-      streamAbort.current?.abort();
-      const controller = new AbortController();
-      streamAbort.current = controller;
-      setLive({
-        runId: run.id,
-        messageId: run.output_message_id,
-        text: "",
-        reasoning: "",
-        status: run.status === "queued" ? "queued" : "running",
-        error: null,
-      });
-      const onEvent = (event: RunEvent) => setLive((current) => applyEvent(current, event));
-      followRun(run.id, {
-        signal: controller.signal,
-        onEvent,
-        onReconnecting: () =>
-          setLive((current) => (current ? { ...current, status: "reconnecting" } : current)),
-      })
-        .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
-        .finally(async () => {
-          if (controller.signal.aborted) return;
-          await reload(conversation).catch(() => undefined);
-          setLive((current) =>
-            current && current.runId === run.id && current.status !== "failed" ? null : current,
-          );
-          callbacks.current.onChanged();
-        });
-    },
-    [reload],
-  );
-
-  // Load the selected conversation and attach to its in-progress run, if any.
+  // Keep the device copy current, so the conversation opens instantly and offline.
+  // Placeholders for conversations not yet on the server (version 0) aren't saved.
   useEffect(() => {
+    if (detail && detail.version > 0 && !fromCache) void cache.putDetail(detail);
+  }, [detail, fromCache]);
+
+  const follow = useCallback((run: Run, conversation: string) => {
+    if (liveRef.current?.runId === run.id && LIVE_STATUSES.includes(liveRef.current.status)) return;
+    streamAbort.current?.abort();
+    const controller = new AbortController();
+    streamAbort.current = controller;
+    setLive({
+      runId: run.id,
+      messageId: run.output_message_id,
+      text: "",
+      reasoning: "",
+      status: run.status === "queued" ? "queued" : "running",
+      error: null,
+    });
+    followRun(run.id, {
+      signal: controller.signal,
+      onEvent: (event) => setLive((current) => applyEvent(current, event)),
+      onReconnecting: () =>
+        setLive((current) => (current ? { ...current, status: "reconnecting" } : current)),
+    })
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
+      .finally(async () => {
+        if (controller.signal.aborted) return;
+        if (idRef.current === conversation) {
+          const fresh = await api.getConversation(conversation).catch(() => null);
+          if (fresh && idRef.current === conversation) setDetail(fresh);
+        }
+        setLive((current) =>
+          current && current.runId === run.id && current.status !== "failed" ? null : current,
+        );
+        callbacks.current.onChanged();
+        void outbox.flush(); // queued messages for this conversation can go now
+      });
+  }, [setDetail]);
+
+  /** Re-read the conversation from the server (sync, reconnect). Keeps a live stream. */
+  const refresh = useCallback(async () => {
+    const id = idRef.current;
+    if (!id) return;
+    try {
+      const fresh = await api.getConversation(id);
+      if (idRef.current !== id) return;
+      setDetail(fresh);
+      setFromCache(false);
+      if (fresh.active_run) follow(fresh.active_run, id);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404 && !outbox.list(id).some((i) => i.create_conversation)) {
+        setError("This conversation was deleted on another device.");
+      }
+    }
+  }, [follow, setDetail]);
+
+  // Pending (queued or failed) messages for this conversation.
+  useEffect(() => {
+    const update = () => setPending(conversationId ? outbox.list(conversationId) : []);
+    update();
+    return outbox.subscribe((event) => {
+      update();
+      if (event.type === "sent" && event.item.conversation_id === idRef.current) {
+        const id = event.item.conversation_id;
+        void api.getConversation(id).then((fresh) => {
+          if (idRef.current === id) setDetail(fresh);
+        }).catch(() => undefined);
+        follow(event.response.run, id);
+        callbacks.current.onChanged();
+      }
+    });
+  }, [conversationId, follow, setDetail]);
+
+  // Load the selected conversation: cached copy first, then the server.
+  useEffect(() => {
+    setError(null);
     if (conversationId === null) {
       streamAbort.current?.abort();
-      setDetail(null);
+      setDetailState(null);
       setLive(null);
-      setError(null);
       return;
     }
-    if (detail?.id === conversationId) return; // just created locally
+    if (detail?.id === conversationId) return; // just created on this device
     streamAbort.current?.abort();
     setLive(null);
-    setError(null);
+    setDetailState(null);
     setLoading(true);
-    reload(conversationId)
-      .then((fresh) => {
+    let cancelled = false;
+    void (async () => {
+      const cached = await cache.detail(conversationId);
+      if (cached && !cancelled) {
+        setDetailState(cached);
+        setFromCache(true);
+        setLoading(false);
+      }
+      try {
+        const fresh = await api.getConversation(conversationId);
+        if (cancelled) return;
+        setDetail(fresh);
+        setFromCache(false);
         if (fresh.active_run) follow(fresh.active_run, fresh.id);
-      })
-      .catch((err: unknown) => setError(err instanceof ApiError ? err.message : String(err)))
-      .finally(() => setLoading(false));
+      } catch (err) {
+        if (cancelled) return;
+        const queuedCreate = outbox.list(conversationId).find((i) => i.create_conversation);
+        if (queuedCreate) {
+          const created = queuedCreate.create_conversation!;
+          setDetailState(placeholder(conversationId, { modelOverride: created.model_override, projectId: created.project_id }, queuedCreate.content.slice(0, 80)));
+        } else if (isNetworkError(err)) {
+          if (!cached) setError("You're offline and this conversation isn't saved on this device.");
+        } else {
+          setError(err instanceof ApiError ? err.message : String(err));
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Deliberately keyed on the id only: reload when another conversation is opened.
   }, [conversationId]);
 
   useEffect(() => () => streamAbort.current?.abort(), []);
 
   const send = useCallback(
     async (content: string) => {
-      setSending(true);
       setError(null);
-      try {
-        let conversation = detail;
-        if (conversation === null) {
-          conversation = await api.createConversation({ model_override: modelOverride });
-          setDetail(conversation);
-          onConversationCreated(conversation.id);
-        }
-        const result = await api.sendMessage(conversation.id, {
-          client_message_id: newId(),
-          content,
-        });
-        setDetail((current) =>
-          current
-            ? {
-                ...current,
-                title: current.title ?? content.slice(0, 80),
-                version: result.conversation_version,
-                messages: appendUnique(current.messages, result.message, result.assistant_message),
-                active_run: result.run,
-              }
-            : current,
-        );
-        follow(result.run, conversation.id);
-        callbacks.current.onChanged();
-      } catch (err) {
-        setError(err instanceof ApiError ? err.message : "Could not send the message");
-        throw err;
-      } finally {
-        setSending(false);
+      let id = detail?.id;
+      let create: OutboxItem["create_conversation"];
+      if (!id) {
+        id = newId();
+        create = { model_override: draft.modelOverride, project_id: draft.projectId };
+        setDetailState(placeholder(id, draft, content.slice(0, 80)));
+        onConversationCreated(id);
       }
+      await outbox.enqueue({
+        client_message_id: newId(),
+        conversation_id: id,
+        content,
+        ...(create ? { create_conversation: create } : {}),
+      });
     },
-    [detail, follow, modelOverride, onConversationCreated],
+    [detail?.id, draft, onConversationCreated],
   );
 
   const cancel = useCallback(async () => {
     if (live) await api.cancelRun(live.runId).catch(() => undefined);
   }, [live]);
 
-  const busy = sending || (live !== null && !["completed", "failed", "cancelled"].includes(live.status));
-  return { detail, setDetail, live, loading, sending, busy, error, send, cancel };
+  /** Run a branch operation (online only) and show its result. */
+  const branchOp = useCallback(
+    async (op: () => Promise<{ run?: Run } | ConversationDetail>) => {
+      if (!detail) return;
+      setError(null);
+      try {
+        const result = await op();
+        if ("messages" in result) {
+          setDetail(result);
+        } else {
+          const fresh = await api.getConversation(detail.id);
+          setDetail(fresh);
+          if (result.run) follow(result.run, detail.id);
+        }
+        callbacks.current.onChanged();
+      } catch (err) {
+        setError(
+          isNetworkError(err)
+            ? "You're offline. Editing, regenerating and switching versions need a connection."
+            : err instanceof ApiError ? err.message : String(err),
+        );
+      }
+    },
+    [detail, follow, setDetail],
+  );
+
+  const regenerate = useCallback(
+    (messageId: string) => branchOp(() => api.regenerate(messageId, { client_request_id: newId() })),
+    [branchOp],
+  );
+  const edit = useCallback(
+    (messageId: string, content: string) =>
+      branchOp(() => api.editMessage(messageId, { client_message_id: newId(), content })),
+    [branchOp],
+  );
+  const selectSibling = useCallback(
+    (messageId: string) => branchOp(() => api.selectMessage(messageId)),
+    [branchOp],
+  );
+
+  /**
+   * Change conversation settings without silently overwriting another device's change.
+   * Returns a conflict for the UI to resolve ("keep theirs" / "use mine").
+   */
+  const update = useCallback(
+    async (fields: Record<string, unknown>, expectedVersion?: number): Promise<Conflict | null> => {
+      if (!detail) return null;
+      try {
+        const updated = await api.updateConversation(detail.id, {
+          ...fields,
+          expected_version: expectedVersion ?? detail.version,
+        });
+        setDetail((current) => (current ? { ...current, ...summaryOf(updated) } : current));
+        callbacks.current.onChanged();
+        return null;
+      } catch (err) {
+        if (err instanceof ApiError && err.code === "version_conflict") {
+          return { current: err.details.current as ConversationSummary, fields };
+        }
+        setError(err instanceof ApiError ? err.message : "Could not save the change");
+        return null;
+      }
+    },
+    [detail, setDetail],
+  );
+
+  const busy = live !== null && LIVE_STATUSES.includes(live.status);
+  return {
+    detail,
+    setDetail,
+    live,
+    pending,
+    loading,
+    fromCache,
+    busy,
+    error,
+    send,
+    cancel,
+    regenerate,
+    edit,
+    selectSibling,
+    update,
+    refresh,
+  };
 }
 
-function appendUnique(messages: Message[], ...added: Message[]): Message[] {
-  const ids = new Set(messages.map((m) => m.id));
-  return [...messages, ...added.filter((m) => !ids.has(m.id))];
+function summaryOf(detail: ConversationDetail): Partial<ConversationDetail> {
+  const { messages: _m, active_run: _r, ...summary } = detail;
+  return summary;
 }
 
 export function applyEvent(current: LiveRun | null, event: RunEvent): LiveRun | null {
@@ -160,7 +322,9 @@ export function applyEvent(current: LiveRun | null, event: RunEvent): LiveRun | 
       };
     case "run.progress":
       // The worker restarted generation from scratch; discard the partial output.
-      return data.stage === "restarted" ? { ...current, text: "", reasoning: "", status: "queued" } : current;
+      return data.stage === "restarted"
+        ? { ...current, text: "", reasoning: "", status: "queued" }
+        : current;
     case "run.completed":
       return { ...current, status: "completed" };
     case "run.cancelled":

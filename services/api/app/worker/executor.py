@@ -40,9 +40,10 @@ from app.models import (
 )
 from app.schemas.events import RunEventType
 from app.services.context import HistoryItem, build_context, context_budget
-from app.services.conversations import load_parts, message_ancestry, message_text, record_sync
+from app.services.conversations import load_parts, message_ancestry, message_text
 from app.services.model_gateway import ChatRequest, ModelGateway, ModelGatewayError
 from app.services.runs import append_event, finish_cancelled
+from app.services.sync import record_sync
 
 log = logging.getLogger(__name__)
 
@@ -427,7 +428,14 @@ async def _finish(
                     "finish_reason": state.finish_reason,
                 },
             )
-        record_sync(db, run.owner_id, "message", message.id)
+        if error is None and not (state.cancel_requested or run.cancel_requested):
+            record_sync(
+                db,
+                run.owner_id,
+                "message",
+                message.id,
+                payload={"conversation_id": str(run.conversation_id)},
+            )
         await db.commit()
 
 
@@ -453,6 +461,13 @@ async def _mark_failed(
     run.lease_expires_at = None
     if message is not None:
         message.status = MessageStatus.failed
+        record_sync(
+            db,
+            run.owner_id,
+            "message",
+            message.id,
+            payload={"conversation_id": str(run.conversation_id)},
+        )
     await append_event(
         db,
         run.id,

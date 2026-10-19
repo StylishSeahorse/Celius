@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "The bundled connect page only. No remote URL is granted any IPC access.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

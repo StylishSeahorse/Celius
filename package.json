@@ -6,6 +6,8 @@
     "dev": "pnpm --filter @celius/web dev",
     "build": "pnpm --filter @celius/web build",
     "test": "pnpm --filter @celius/web test",
-    "typecheck": "pnpm --filter @celius/web typecheck"
+    "typecheck": "pnpm --filter @celius/web typecheck",
+    "gen:api": "pnpm --filter @celius/api-client generate",
+    "check:api": "pnpm --filter @celius/api-client check"
   }
 }

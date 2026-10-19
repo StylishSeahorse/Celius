@@ -8,6 +8,8 @@ from app.models import MessageRole, MessageStatus, RunStatus
 
 
 class ConversationCreate(BaseModel):
+    # Optional client-generated id: makes creation idempotent (offline queue, retries).
+    id: uuid.UUID | None = None
     title: str | None = Field(default=None, max_length=300)
     project_id: uuid.UUID | None = None
     model_override: str | None = Field(default=None, max_length=255)
@@ -57,6 +59,9 @@ class MessageOut(BaseModel):
     revision: int
     model_id: str | None
     parts: list[MessagePartOut]
+    # Messages sharing this message's parent (edits / regenerations), oldest first.
+    # Includes this message; length 1 means there are no alternatives.
+    sibling_ids: list[uuid.UUID]
     created_at: datetime
 
 
@@ -97,6 +102,30 @@ class MessageSubmit(BaseModel):
 
 class MessageSubmitResponse(BaseModel):
     message: MessageOut
+    assistant_message: MessageOut
+    run: RunOut
+    conversation_version: int
+    duplicate: bool = False
+
+
+class MessageEdit(BaseModel):
+    """Edit a user message: creates an edited copy on a new branch; the original stays."""
+
+    client_message_id: str = Field(min_length=1, max_length=64)
+    content: str = Field(min_length=1, max_length=200_000)
+    model: str | None = Field(default=None, max_length=255)
+    params: GenerationParams = Field(default_factory=GenerationParams)
+
+
+class Regenerate(BaseModel):
+    """Generate an alternative reply on a new branch; the original reply stays."""
+
+    client_request_id: str | None = Field(default=None, min_length=1, max_length=64)
+    model: str | None = Field(default=None, max_length=255)
+    params: GenerationParams = Field(default_factory=GenerationParams)
+
+
+class RegenerateResponse(BaseModel):
     assistant_message: MessageOut
     run: RunOut
     conversation_version: int

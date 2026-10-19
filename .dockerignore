@@ -12,3 +12,4 @@ backups
 .e2e
 **/test-results
 **/playwright-report
+**/target
