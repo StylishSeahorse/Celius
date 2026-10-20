@@ -24,6 +24,7 @@ from app.db.base import utcnow
 from app.errors import AppError, not_found
 from app.models import FileKind, FileStatus, StoredFile, UploadSession, UploadStatus, User
 from app.schemas.files import FileOut, UploadCreate
+from app.services import limits
 from app.services.access import require_project
 from app.services.files import quota
 from app.services.files.archives import ArchiveLimits, inspect_zip
@@ -142,7 +143,7 @@ async def create_upload(
     if data.project_id is not None:
         await require_project(db, user.id, data.project_id, "write")
 
-    await quota.reserve(db, user.id, data.size, settings.max_user_storage_bytes)
+    await quota.reserve(db, user.id, data.size, limits.storage_limit(user, settings))
     session = UploadSession(
         id=uuid.uuid4(),
         owner_id=user.id,

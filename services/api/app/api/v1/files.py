@@ -22,6 +22,7 @@ from app.schemas.files import (
 from app.services.access import deletable_file, readable_file, require_project
 from app.services.files import quota
 from app.services.files import service as svc
+from app.services.limits import storage_limit
 
 router = APIRouter(prefix="/files", tags=["files"])
 
@@ -116,7 +117,7 @@ async def list_files(
 async def storage_usage(auth: CurrentAuth, db: DB, settings: AppSettings) -> StorageUsage:
     return StorageUsage(
         used_bytes=await quota.usage(db, auth.user.id),
-        limit_bytes=settings.max_user_storage_bytes,
+        limit_bytes=storage_limit(auth.user, settings),
         max_upload_bytes=settings.max_upload_bytes,
     )
 

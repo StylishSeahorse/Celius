@@ -16,6 +16,8 @@ PUBLIC = {
     "/api/v1/health/live",
     "/api/v1/health/ready",
     "/api/v1/auth/login",
+    "/api/v1/auth/register",  # needs a valid invitation token
+    "/api/v1/auth/invitations/{token}",
     "/api/v1/metrics",  # its own bearer token (METRICS_TOKEN); 404 without it
 }
 FAKE_ID = "00000000-0000-4000-8000-000000000000"

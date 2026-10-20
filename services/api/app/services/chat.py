@@ -38,6 +38,7 @@ from app.schemas.conversations import (
     Regenerate,
     RegenerateResponse,
 )
+from app.services import limits
 from app.services.conversations import (
     active_run,
     check_version,
@@ -59,13 +60,18 @@ async def _resolve_model(
     settings: Settings,
 ) -> str:
     if requested:
+        if not limits.model_allowed(user, requested):
+            raise AppError(403, "model_not_allowed", "That model isn't available to you")
         return requested
-    if conversation_override:
-        return conversation_override
     user_default = await db.scalar(
         select(UserSettings.default_model_id).where(UserSettings.user_id == user.id)
     )
-    return user_default or settings.model_default_id
+    for candidate in (conversation_override, user_default, settings.model_default_id):
+        if candidate and limits.model_allowed(user, candidate):
+            return candidate
+    if user.allowed_models:
+        return user.allowed_models[0]
+    raise AppError(403, "model_not_allowed", "No model is available to you; ask an administrator")
 
 
 async def _writable_conversation(
@@ -317,6 +323,7 @@ async def submit_message(
             head_message_id=str(branch.head_message_id) if branch.head_message_id else None,
         )
 
+    await limits.check_daily_messages(db, user)
     model_id = await _resolve_model(db, user, body.model, conversation.model_override, settings)
     files = await _attachments(db, user, body.attachment_ids)
     message, parts = await _add_user_message(
@@ -365,6 +372,7 @@ async def edit_message(
 
     conversation = await _writable_conversation(db, user, original.conversation_id)
     branch = await _new_branch(db, conversation, original.parent_id)
+    await limits.check_daily_messages(db, user)
     model_id = await _resolve_model(db, user, body.model, conversation.model_override, settings)
     files = await _attachments(db, user, body.attachment_ids)
     message, parts = await _add_user_message(
@@ -440,6 +448,7 @@ async def regenerate(
     trigger = await db.get(Message, original.parent_id)
     assert trigger is not None
     branch = await _new_branch(db, conversation, trigger.id)
+    await limits.check_daily_messages(db, user)
     model_id = await _resolve_model(db, user, body.model, conversation.model_override, settings)
     assistant, run = await _enqueue_reply(
         db,

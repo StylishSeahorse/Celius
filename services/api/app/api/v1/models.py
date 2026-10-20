@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.auth.dependencies import CurrentAuth
 from app.config import Settings, get_settings
 from app.schemas.models import ModelListResponse
+from app.services.limits import model_allowed
 from app.services.model_gateway import (
     ModelCapabilities,
     ModelGateway,
@@ -20,7 +21,7 @@ Gateway = Annotated[ModelGateway, Depends(get_model_gateway)]
 
 @router.get("", response_model=ModelListResponse)
 async def list_models(
-    _: CurrentAuth, gateway: Gateway, settings: Annotated[Settings, Depends(get_settings)]
+    auth: CurrentAuth, gateway: Gateway, settings: Annotated[Settings, Depends(get_settings)]
 ) -> ModelListResponse:
     health = await gateway.health_check()
     models = []
@@ -30,9 +31,12 @@ async def list_models(
         except ModelGatewayError as exc:
             health.ok = False
             health.detail = exc.code
-    return ModelListResponse(
-        default_model_id=settings.model_default_id, models=models, health=health
-    )
+    # Only the models an administrator allows this user (A-03).
+    models = [m for m in models if model_allowed(auth.user, m.id)]
+    default = settings.model_default_id
+    if not model_allowed(auth.user, default) and auth.user.allowed_models:
+        default = auth.user.allowed_models[0]
+    return ModelListResponse(default_model_id=default, models=models, health=health)
 
 
 @router.post("/{model_id}/verify-tools", response_model=ModelCapabilities)

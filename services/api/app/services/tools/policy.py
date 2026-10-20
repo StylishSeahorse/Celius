@@ -15,7 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
 from app.errors import AppError
-from app.models import Conversation, ToolGrant, ToolProfile, UserSettings
+from app.models import Conversation, ToolGrant, ToolProfile, User, UserSettings
+from app.services import limits
 
 Decision = Literal["allow", "ask", "deny"]
 Risk = Literal["read", "write", "execute", "network", "external"]
@@ -112,9 +113,20 @@ def tool_preferences(settings_row: UserSettings | None) -> dict[str, Any]:
 async def resolve_profile(
     db: AsyncSession, owner_id: uuid.UUID, key: str | None, settings: Settings
 ) -> Profile:
-    """The named profile, else the user's default, else the deployment default.
+    """The named profile, else the user's default, else the deployment default, narrowed
+    to what an administrator allows this user (limits.PROFILE_ORDER)."""
+    profile = await _resolve_profile(db, owner_id, key, settings)
+    user = await db.get(User, owner_id)
+    if limits.profile_allowed(user, profile.base):
+        return profile
+    base = limits.widest_allowed_profile(user, profile.base)
+    return Profile(key=base, label=BUILTIN_PROFILES[base]["label"], base=base)
 
-    A profile that no longer exists falls back to read_only, never to something wider."""
+
+async def _resolve_profile(
+    db: AsyncSession, owner_id: uuid.UUID, key: str | None, settings: Settings
+) -> Profile:
+    """A profile that no longer exists falls back to read_only, never to something wider."""
     if key is None:
         prefs = tool_preferences(await db.get(UserSettings, owner_id))
         key = prefs.get("default_profile") or settings.tool_default_profile
@@ -140,7 +152,19 @@ async def resolve_profile(
 
 
 async def validate_profile_key(db: AsyncSession, owner_id: uuid.UUID, key: str | None) -> None:
-    if key is None or key in BUILTIN_PROFILES:
+    if key is None:
+        return
+    user = await db.get(User, owner_id)
+    base = key if key in BUILTIN_PROFILES else None
+    if key.startswith(CUSTOM_PREFIX):
+        try:
+            row = await db.get(ToolProfile, uuid.UUID(key[len(CUSTOM_PREFIX) :]))
+        except ValueError:
+            row = None
+        base = row.base if row is not None and row.owner_id == owner_id else None
+    if base is not None and not limits.profile_allowed(user, base):
+        raise AppError(403, "profile_not_allowed", "That tool profile isn't available to you")
+    if key in BUILTIN_PROFILES:
         return
     if key.startswith(CUSTOM_PREFIX):
         try:

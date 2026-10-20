@@ -12,7 +12,15 @@ from app.config import Settings, get_settings
 from app.db import get_db
 from app.db.base import utcnow
 from app.models import AuditEvent, Session, User
-from app.schemas.auth import LoginRequest, LoginResponse, MeResponse, PasswordChange
+from app.schemas.auth import (
+    InvitationCheck,
+    LoginRequest,
+    LoginResponse,
+    MeResponse,
+    PasswordChange,
+    RegisterRequest,
+)
+from app.services import users
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -57,10 +65,22 @@ async def login(
     assert user is not None
     if needs_rehash(user.password_hash):
         user.password_hash = hash_password(body.password)
+    return await _sign_in(db, request, response, settings, user, body.device_id, "auth.login")
+
+
+async def _sign_in(
+    db: AsyncSession,
+    request: Request,
+    response: Response,
+    settings: Settings,
+    user: User,
+    device_id: str | None,
+    action: str,
+) -> LoginResponse:
     token, session = await create_session(
-        db, user, settings, device_id=body.device_id, user_agent=request.headers.get("user-agent")
+        db, user, settings, device_id=device_id, user_agent=request.headers.get("user-agent")
     )
-    _audit(db, request, "auth.login", user, session_id=str(session.id))
+    _audit(db, request, action, user, session_id=str(session.id))
     await db.commit()
 
     response.set_cookie(
@@ -165,3 +185,25 @@ async def me(auth: CurrentAuth, settings: Annotated[Settings, Depends(get_settin
             "files": True,
         },
     )
+
+
+@router.get("/invitations/{token}", response_model=InvitationCheck)
+async def check_invitation(
+    token: str, db: Annotated[AsyncSession, Depends(get_db)]
+) -> InvitationCheck:
+    """Whether an invitation link can still be used (for the sign-up page)."""
+    invitation = await users.open_invitation(db, token)
+    return InvitationCheck(expires_at=invitation.expires_at, note=invitation.note)
+
+
+@router.post("/register", response_model=LoginResponse, status_code=status.HTTP_201_CREATED)
+async def register(
+    body: RegisterRequest,
+    request: Request,
+    response: Response,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> LoginResponse:
+    """Create an account with an invitation, and sign in."""
+    user = await users.register(db, body.token, body.username, body.password, body.display_name)
+    return await _sign_in(db, request, response, settings, user, body.device_id, "auth.registered")
