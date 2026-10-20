@@ -131,11 +131,28 @@ and set in `.env`: `MODEL_ENABLE_EMBEDDINGS=true`,
 `EMBEDDING_BASE_URL=http://<windows-pc-ip>:8081/v1`. Excerpts indexed before that are
 found by keywords; new ones get embeddings. The database image already includes pgvector.
 
+## Backups and alerts
+
+Before you rely on it, set up backups ([backup-restore.md](../operations/backup-restore.md)):
+
+```sh
+echo "BACKUP_PASSPHRASE=$(openssl rand -base64 32)" >> .env   # and save it in a password manager
+echo "BACKUP_OFFSITE_TARGET=backup@nas:/volume1/celius" >> .env
+make backup && make restore-drill
+( crontab -l 2>/dev/null; echo '15 3 * * * cd /opt/celius && infra/scripts/backup.sh >>backups/backup.log 2>&1' ) | crontab -
+```
+
+For alerts on your phone, add an ntfy topic or a Home Assistant webhook
+([monitoring.md](../operations/monitoring.md)).
+
 ## Updating
 
 ```sh
-cd /opt/celius && git pull && make up      # migrations run automatically before the API starts
+cd /opt/celius && make upgrade     # backup first, then pull, build, migrate, start; `make rollback` undoes it
 ```
+
+`git pull && make up` still works, but it doesn't take a backup first
+([upgrade-and-rollback.md](../operations/upgrade-and-rollback.md)).
 
 **From phase 4 to phase 5:** add a sandbox token to `.env` first, or `make up` stops with
 `set SANDBOX_TOKEN`:

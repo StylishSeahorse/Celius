@@ -45,7 +45,8 @@ See [`docs/backlog.md`](docs/backlog.md) for the full plan and what is done.
 - `apps/desktop`: Tauri v2 Windows app that connects to your server.
 - `packages/api-client`: TypeScript types generated from the API (`pnpm gen:api`).
 - `packages/contracts`: run-event JSON Schema and payload reference.
-- `infra/`: Docker images (API + worker + web, and the sandbox) and Compose files.
+- `infra/`: Docker images (API + worker + web, and the sandbox), Compose files, and the
+  operations scripts (backup, restore, restore drill, upgrade, rollback).
 - `devtools/fake_llama_server.py`: a stand-in llama-server for development and e2e tests without a GPU.
 
 ## Quick start (development)
@@ -87,6 +88,16 @@ including the manual ones for the real deployment.
   [`docs/deployment/reverse-proxy.md`](docs/deployment/reverse-proxy.md)
 - Phone and desktop apps: [`docs/deployment/clients.md`](docs/deployment/clients.md)
 
+## Operations
+
+- [Backup and restore](docs/operations/backup-restore.md): `make backup`, `make restore`,
+  `make restore-drill`
+- [Upgrade and rollback](docs/operations/upgrade-and-rollback.md): `make upgrade`,
+  `make rollback`
+- [Monitoring and alerts](docs/operations/monitoring.md): `make status`, the
+  **Account → System status** panel, alert webhook, Prometheus metrics
+- [Security review](docs/security-review.md)
+
 ## Layout
 
 ```
@@ -97,7 +108,7 @@ services/api/         API, worker, migrations, tests, dev tools
 services/sandbox/     Code execution service
 packages/contracts/   JSON Schemas shared with clients
 infra/                Dockerfile, Compose files, scripts
-docs/                 Backlog, ADRs, deployment, acceptance tests
+docs/                 Backlog, ADRs, deployment, operations, acceptance tests
 ```
 
 ## Architecture decisions

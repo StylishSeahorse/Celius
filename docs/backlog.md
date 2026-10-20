@@ -25,8 +25,8 @@ Status key: ✅ done in repo · 🔶 partially done · ⬜ not started
 | F-08 | CI: lint, tests (SQLite + PostgreSQL), migrations, web, e2e, image build | ✅ | `.github/workflows/ci.yml` |
 | F-09 | Reverse-proxy guide (TLS, SSE buffering, timeouts) | ✅ | `docs/deployment/reverse-proxy.md` |
 | F-10 | Deploy on Proxmox, restart stack, confirm data persists | ⬜ | Data survives `down`/`up` and host reboot |
-| F-11 | Login rate limiting | ⬜ | Repeated failures from one IP/username are throttled |
-| F-12 | Password change endpoint + CLI to reset the account | ⬜ | Changing the password revokes other sessions |
+| F-11 | Login rate limiting | ✅ | 10 failures per account / 30 per address in 15 min → 429 with Retry-After, even with the right password; CLI reset clears it |
+| F-12 | Password change endpoint + CLI to reset the account | ✅ | Changing the password revokes other sessions; `python -m app.ops.users reset-password`; signed-in devices list with sign-out |
 
 ## Phase 2 — Model gateway and chat
 
@@ -122,13 +122,15 @@ Arbitrary shell stays disabled until T-01 is decided and validated.
 
 **Exit gate:** all required acceptance tests pass in a clean deployment.
 
-| ID | Item | Acceptance criteria |
-| --- | --- | --- |
-| H-01 | Coordinated backup (DB + files + config + manifest with checksums) | Encrypted off-host copy |
-| H-02 | Restore into a clean environment | Messages, attachments, projects, memory recovered |
-| H-03 | Monitoring and alerting | Disk, queue depth, model health, backup age |
-| H-04 | Security review | Auth, secrets, file access, sandbox escape tests |
-| H-05 | Upgrade and rollback runbook | Pre-upgrade backup; tested rollback |
+| ID | Item | Status | Acceptance criteria |
+| --- | --- | --- | --- |
+| H-01 | Coordinated backup (DB + files + config + manifest with checksums) | ✅ | [Backup and restore](operations/backup-restore.md): api/worker paused for a consistent snapshot; manifest with SHA-256 per part and a database census; AES-256 archive; rsync/rclone off-host copy; retention; age shown and alerted |
+| H-02 | Restore into a clean environment | ✅ | `restore.sh` on a machine with no settings or volumes recovers chats, files (byte-identical), projects and memories; verified against the manifest; tampered archives refused; `restore-drill.sh` proves a backup next to the live stack (CI release gate) |
+| H-03 | Monitoring and alerting | ✅ | [Monitoring](operations/monitoring.md): database, model server, sandbox, worker heartbeat, disk, run/job queues, backup age and off-host copy; status panel, `make status`, Prometheus metrics; webhook (JSON / ntfy / text) on changes, repeated while critical |
+| H-04 | Security review | ✅ | [Security review](security-review.md): every route requires auth (generated test), throttling, CSRF origin check, CSP and headers; secrets, file access and sandbox escape tests listed; fixed: a background child could stall a sandbox slot forever |
+| H-05 | Upgrade and rollback runbook | ✅ | [Upgrade and rollback](operations/upgrade-and-rollback.md): pre-upgrade backup, saved images, health wait; rollback keeps data when no migrations changed, else restores the pre-upgrade backup; rollback exercised in CI |
+| H-06 | First backup and restore drill on the real host | ⬜ | Set `BACKUP_PASSPHRASE` and `BACKUP_OFFSITE_TARGET`; cron; `make restore-drill` passes |
+| H-07 | Dependency audit in CI | ⬜ | `pip-audit` and `pnpm audit` on a schedule |
 
 ---
 
@@ -141,4 +143,4 @@ Arbitrary shell stays disabled until T-01 is decided and validated.
 | Tool-calling support | Verified per model with `POST /api/v1/models/{id}/verify-tools` |
 | Parallel request limit | `MODEL_PARALLEL_REQUESTS=1` until benchmarked |
 | Sandbox isolation mode on the host | `SANDBOX_MODE` (auto: bubblewrap if allowed, else process limits) |
-| Backup destination | Phase 7 (H-01) |
+| Backup destination | `BACKUP_OFFSITE_TARGET` (rsync or rclone), set on the host (H-06) |
