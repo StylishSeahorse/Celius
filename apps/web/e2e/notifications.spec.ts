@@ -59,7 +59,11 @@ async function openAccount(page: Page) {
   return page.getByRole("dialog", { name: "Account" });
 }
 
-async function deliverPush(page: Page, data: object) {
+/**
+ * Deliver a push to the real service worker through DevTools, and wait until it says it
+ * got it (it tells open windows). DevTools occasionally drops a delivery, so send again.
+ */
+async function deliverPush(page: Page, data: { tag: string } & Record<string, string>) {
   const cdp = await page.context().newCDPSession(page);
   const registration = new Promise<string>((resolve) => {
     cdp.on("ServiceWorker.workerRegistrationUpdated", ({ registrations }) => {
@@ -68,13 +72,30 @@ async function deliverPush(page: Page, data: object) {
     });
   });
   await cdp.send("ServiceWorker.enable");
+  const registrationId = await registration;
   const origin = new URL(page.url()).origin;
-  await cdp.send("ServiceWorker.deliverPushMessage", {
-    origin,
-    registrationId: await registration,
-    data: JSON.stringify(data),
-  });
-  await cdp.detach();
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const received = page.evaluate(
+      (tag) =>
+        new Promise<boolean>((resolve) => {
+          const timer = setTimeout(() => resolve(false), 2000);
+          navigator.serviceWorker.addEventListener("message", function onMessage(event) {
+            if (event.data?.type === "celius:push" && event.data.tag === tag) {
+              clearTimeout(timer);
+              navigator.serviceWorker.removeEventListener("message", onMessage);
+              resolve(true);
+            }
+          });
+        }),
+      data.tag,
+    );
+    await cdp.send("ServiceWorker.deliverPushMessage", { origin, registrationId, data: JSON.stringify(data) });
+    if (await received) {
+      await cdp.detach();
+      return;
+    }
+  }
+  throw new Error("the service worker never received the push");
 }
 
 function shownNotifications(page: Page) {

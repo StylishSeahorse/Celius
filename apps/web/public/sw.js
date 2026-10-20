@@ -154,6 +154,10 @@ self.addEventListener("push", (event) => {
   }
   event.waitUntil(
     (async () => {
+      // Open windows refresh what changed (e.g. the conversation list), shown or not.
+      for (const w of await self.clients.matchAll({ type: "window" })) {
+        w.postMessage({ type: "celius:push", tag: data.tag ?? null });
+      }
       if (data.tag && data.tag !== "test" && (await someoneIsShowing(data.tag))) return;
       await self.registration.showNotification(data.title || "Celius", {
         body: data.body || "",

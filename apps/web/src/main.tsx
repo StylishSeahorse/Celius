@@ -26,6 +26,8 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
     if (data?.type === "celius:open" && data.url && new URL(data.url).origin === location.origin) {
       location.href = data.url;
     }
+    // A push arrived (a reply finished somewhere): let the open app refresh.
+    if (data?.type === "celius:push") window.dispatchEvent(new CustomEvent("celius:push"));
     // A push arrived: say which chat is on screen, so it isn't notified about.
     if (data?.type === "celius:showing?") {
       event.ports[0]?.postMessage({

@@ -108,6 +108,16 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
     return () => clearInterval(timer);
   }, [refreshApprovals]);
 
+  // A push notification arrived while open: a reply finished or a tool is waiting.
+  useEffect(() => {
+    const onPush = () => {
+      void refreshList();
+      refreshApprovals();
+    };
+    window.addEventListener("celius:push", onPush);
+    return () => window.removeEventListener("celius:push", onPush);
+  }, [refreshList, refreshApprovals]);
+
   const refreshProjects = useCallback(async () => {
     try {
       const items = await api.listProjects();
