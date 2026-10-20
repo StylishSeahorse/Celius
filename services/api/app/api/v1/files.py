@@ -19,6 +19,7 @@ from app.schemas.files import (
     UploadOut,
     UploadProgress,
 )
+from app.services.access import deletable_file, readable_file, require_project
 from app.services.files import quota
 from app.services.files import service as svc
 
@@ -94,13 +95,18 @@ async def complete_upload(
 async def list_files(
     auth: CurrentAuth, db: DB, project_id: uuid.UUID | None = None
 ) -> list[FileOut]:
-    query = select(StoredFile).where(
-        StoredFile.owner_id == auth.user.id, StoredFile.deleted_at.is_(None)
-    )
     if project_id is not None:
-        query = query.where(StoredFile.project_id == project_id).order_by(
-            StoredFile.relative_path, StoredFile.filename
+        # A project's files, whoever added them (projects can be shared).
+        await require_project(db, auth.user.id, project_id)
+        query = select(StoredFile).where(
+            StoredFile.project_id == project_id, StoredFile.deleted_at.is_(None)
         )
+    else:
+        query = select(StoredFile).where(
+            StoredFile.owner_id == auth.user.id, StoredFile.deleted_at.is_(None)
+        )
+    if project_id is not None:
+        query = query.order_by(StoredFile.relative_path, StoredFile.filename)
     else:
         query = query.order_by(StoredFile.created_at.desc()).limit(200)
     return [svc.file_out(f) for f in (await db.scalars(query)).all()]
@@ -117,12 +123,12 @@ async def storage_usage(auth: CurrentAuth, db: DB, settings: AppSettings) -> Sto
 
 @router.get("/{file_id}", response_model=FileOut)
 async def get_file(file_id: uuid.UUID, auth: CurrentAuth, db: DB) -> FileOut:
-    return svc.file_out(await svc.get_owned_file(db, auth.user.id, file_id))
+    return svc.file_out(await readable_file(db, auth.user.id, file_id))
 
 
 @router.get("/{file_id}/text", response_model=FileText)
 async def get_file_text(file_id: uuid.UUID, auth: CurrentAuth, db: DB) -> FileText:
-    file = await svc.get_owned_file(db, auth.user.id, file_id)
+    file = await readable_file(db, auth.user.id, file_id)
     text = await db.scalar(select(StoredFile.text_content).where(StoredFile.id == file.id))
     return FileText(text=text or "", truncated=file.text_truncated)
 
@@ -141,8 +147,8 @@ def _protect(response: FileResponse, *, pdf_inline: bool = False) -> FileRespons
 async def download(
     file_id: uuid.UUID, auth: CurrentAuth, db: DB, settings: AppSettings, inline: bool = False
 ) -> FileResponse:
-    """Authenticated download. Never a public URL: every request checks ownership."""
-    file = await svc.get_owned_file(db, auth.user.id, file_id)
+    """Authenticated download. Never a public URL: every request checks access."""
+    file = await readable_file(db, auth.user.id, file_id)
     path = svc.storage_for(settings).blob(file.sha256)
     if not path.is_file():
         raise AppError(404, "file_missing", "The file's content is missing from storage")
@@ -163,7 +169,7 @@ async def download(
 async def thumbnail(
     file_id: uuid.UUID, auth: CurrentAuth, db: DB, settings: AppSettings
 ) -> FileResponse:
-    file = await svc.get_owned_file(db, auth.user.id, file_id)
+    file = await readable_file(db, auth.user.id, file_id)
     path = svc.storage_for(settings).thumbnail(file.id)
     if not file.has_thumbnail or not path.is_file():
         raise AppError(404, "no_thumbnail", "This file has no thumbnail")
@@ -172,5 +178,5 @@ async def thumbnail(
 
 @router.delete("/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete(file_id: uuid.UUID, auth: CurrentAuth, db: DB, settings: AppSettings) -> None:
-    file = await svc.get_owned_file(db, auth.user.id, file_id)
+    file = await deletable_file(db, auth.user.id, file_id)
     await svc.delete_file(db, file, settings)

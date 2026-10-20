@@ -483,7 +483,7 @@ export interface paths {
         };
         /**
          * Download
-         * @description Authenticated download. Never a public URL: every request checks ownership.
+         * @description Authenticated download. Never a public URL: every request checks access.
          */
         get: operations["download_api_v1_files__file_id__download_get"];
         put?: never;
@@ -866,6 +866,47 @@ export interface paths {
         head?: never;
         /** Update Project */
         patch: operations["update_project_api_v1_projects__project_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Members */
+        get: operations["list_members_api_v1_projects__project_id__members_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/members/{username}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Share
+         * @description Share the project with someone (read or write), or change their access.
+         */
+        put: operations["share_api_v1_projects__project_id__members__username__put"];
+        post?: never;
+        /**
+         * Unshare
+         * @description The owner stops sharing with someone; a member can leave.
+         */
+        delete: operations["unshare_api_v1_projects__project_id__members__username__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/push": {
@@ -1701,6 +1742,20 @@ export interface components {
             /** Username */
             username: string;
         };
+        /** MemberIn */
+        MemberIn: {
+            /** Role */
+            role: string;
+        };
+        /** MemberOut */
+        MemberOut: {
+            /** Display Name */
+            display_name?: string | null;
+            /** Role */
+            role: string;
+            /** Username */
+            username: string;
+        };
         /** MemoryApprove */
         MemoryApprove: {
             /** Content */
@@ -2088,6 +2143,18 @@ export interface components {
             memory_enabled: boolean;
             /** Name */
             name: string;
+            /** Owner */
+            owner?: string | null;
+            /**
+             * Role
+             * @default owner
+             */
+            role: string;
+            /**
+             * Shared
+             * @default false
+             */
+            shared: boolean;
             /**
              * Updated At
              * Format: date-time
@@ -4426,6 +4493,103 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ProjectOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_members_api_v1_projects__project_id__members_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    share_api_v1_projects__project_id__members__username__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                username: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unshare_api_v1_projects__project_id__members__username__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                username: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

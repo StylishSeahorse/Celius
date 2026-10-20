@@ -17,6 +17,11 @@ class User(UUIDPrimaryKey, Timestamps, Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Limits set by an administrator; None = the server default / no limit.
+    storage_quota_bytes: Mapped[int | None] = mapped_column(BigInteger)
+    daily_message_limit: Mapped[int | None] = mapped_column(Integer)
+    allowed_models: Mapped[list | None] = mapped_column(JSONType)
+    allowed_tool_profiles: Mapped[list | None] = mapped_column(JSONType)
 
     settings: Mapped["UserSettings | None"] = relationship(back_populates="user", uselist=False)
 
@@ -89,3 +94,22 @@ class AuditEvent(Base):
     detail: Mapped[dict] = mapped_column(JSONType, default=dict, nullable=False)
     ip_address: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class Invitation(UUIDPrimaryKey, Timestamps, Base):
+    """A one-time link an administrator gives someone to create an account (A-01)."""
+
+    __tablename__ = "invitations"
+
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL")
+    )
+    note: Mapped[str | None] = mapped_column(String(200))
+    make_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    used_by: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL")
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

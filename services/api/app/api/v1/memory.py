@@ -21,7 +21,6 @@ from app.models import (
     Memory,
     MemoryChunk,
     MemoryStatus,
-    Project,
     UserSettings,
 )
 from app.schemas.memory import (
@@ -34,6 +33,7 @@ from app.schemas.memory import (
     MemorySettingsUpdate,
     MemoryUpdate,
 )
+from app.services.access import require_project
 from app.services.audit import audit
 from app.services.conversations import get_owned_conversation
 from app.services.memory import store
@@ -76,10 +76,7 @@ async def _check_scope(db, owner_id, scope: str, project_id: uuid.UUID | None) -
     if scope == "project":
         if project_id is None:
             raise AppError(422, "project_required", "A project memory needs a project")
-        if not await db.scalar(
-            select(Project.id).where(Project.id == project_id, Project.owner_id == owner_id)
-        ):
-            raise not_found("Project")
+        await require_project(db, owner_id, project_id)  # the memory itself stays yours
 
 
 async def _with_embedder(settings: Settings):

@@ -15,9 +15,14 @@ phone viewports.**
 | `apps/web/e2e/desktop.spec.ts` | With the desktop bridge: a reply that finishes while the window is in the background raises a native notification with the reply text; one you're watching doesn't |
 | CI `desktop` job | The Windows app builds with the tray and notification plugin (`cargo check` and the folder tests also pass on Linux) |
 
-## Results
+## Results, 2026-10-20 (CI run 27)
 
-Filled in from the CI run on the Phase 9 head.
+| Check | Result |
+| --- | --- |
+| API tests on SQLite and PostgreSQL (343 locally on PostgreSQL) | passed |
+| Playwright, desktop + Pixel 7 (71 tests, 1 skipped: folder picking on the phone viewport) | passed |
+| Windows installers with the tray and notification plugin | built |
+| Release gate, sandbox tests | passed |
 
 ## Manual
 

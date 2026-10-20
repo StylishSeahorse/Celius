@@ -18,7 +18,6 @@ from app.models import (
     Conversation,
     Message,
     MessagePart,
-    Project,
     Run,
     RunStatus,
 )
@@ -30,6 +29,7 @@ from app.schemas.conversations import (
     MessagePartOut,
     RunOut,
 )
+from app.services.access import require_project
 from app.services.audit import audit
 from app.services.memory.store import forget_conversation, move_chunks
 from app.services.runs import request_cancel
@@ -225,11 +225,8 @@ def run_out(run: Run) -> RunOut:
 
 
 async def _check_project(db: AsyncSession, owner_id: uuid.UUID, project_id: uuid.UUID) -> None:
-    owned = await db.scalar(
-        select(Project.id).where(Project.id == project_id, Project.owner_id == owner_id)
-    )
-    if owned is None:
-        raise not_found("Project")
+    """Chats can go in your projects and in projects shared with you."""
+    await require_project(db, owner_id, project_id)
 
 
 async def create_conversation(

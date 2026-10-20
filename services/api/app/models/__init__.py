@@ -9,6 +9,7 @@ from app.models.conversation import (
     MessageRole,
     MessageStatus,
     Project,
+    ProjectMember,
 )
 from app.models.files import (
     FileKind,
@@ -31,6 +32,7 @@ from app.models.generation import (
 from app.models.identity import (
     AuditEvent,
     DeviceSyncState,
+    Invitation,
     Session,
     SyncEvent,
     User,
@@ -65,6 +67,7 @@ __all__ = [
     "Branch",
     "Conversation",
     "DeviceSyncState",
+    "Invitation",
     "FileKind",
     "FileLink",
     "FileStatus",
@@ -81,6 +84,7 @@ __all__ = [
     "MessageStatus",
     "ModelCatalogEntry",
     "Project",
+    "ProjectMember",
     "Run",
     "RunEvent",
     "RunStatus",

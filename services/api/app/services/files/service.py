@@ -22,8 +22,9 @@ from app.config import Settings
 from app.db import SessionFactory
 from app.db.base import utcnow
 from app.errors import AppError, not_found
-from app.models import FileKind, FileStatus, Project, StoredFile, UploadSession, UploadStatus, User
+from app.models import FileKind, FileStatus, StoredFile, UploadSession, UploadStatus, User
 from app.schemas.files import FileOut, UploadCreate
+from app.services.access import require_project
 from app.services.files import quota
 from app.services.files.archives import ArchiveLimits, inspect_zip
 from app.services.files.paths import UnsafePath, safe_filename, safe_relative_path
@@ -139,11 +140,7 @@ async def create_upload(
             415, "unsupported_type", f"Files of type .{extension_of(filename)} are not supported"
         )
     if data.project_id is not None:
-        owned = await db.scalar(
-            select(Project.id).where(Project.id == data.project_id, Project.owner_id == user.id)
-        )
-        if owned is None:
-            raise not_found("Project")
+        await require_project(db, user.id, data.project_id, "write")
 
     await quota.reserve(db, user.id, data.size, settings.max_user_storage_bytes)
     session = UploadSession(

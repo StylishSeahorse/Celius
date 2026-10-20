@@ -34,6 +34,24 @@ class Project(UUIDPrimaryKey, Timestamps, Base):
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class ProjectMember(Timestamps, Base):
+    """Someone a project is shared with (A-04). Members use the project's instructions and
+    files in their own chats; chats and memories stay private to each person.
+
+    read: use the project; write: also change its instructions and files.
+    """
+
+    __tablename__ = "project_members"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    role: Mapped[str] = mapped_column(String(8), nullable=False)
+
+
 class Conversation(UUIDPrimaryKey, Timestamps, Base):
     __tablename__ = "conversations"
 

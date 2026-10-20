@@ -17,8 +17,9 @@ from app.config import Settings
 from app.db import SessionFactory
 from app.db.base import utcnow
 from app.errors import AppError
-from app.models import Conversation, Project, Run, ScheduledTask, User
+from app.models import Conversation, Run, ScheduledTask, User
 from app.schemas.conversations import ConversationCreate, MessageSubmit
+from app.services.access import require_project
 from app.services.chat import submit_message
 from app.services.conversations import create_conversation
 from app.services.tools.policy import validate_profile_key
@@ -73,10 +74,8 @@ async def validate(db: AsyncSession, user: User, task: ScheduledTask, settings: 
             raise AppError(422, "invalid_schedule", "Pick weekdays (0 = Monday … 6 = Sunday)")
     _zone(task.timezone)
     await validate_profile_key(db, user.id, task.tool_profile)
-    if task.project_id and not await db.scalar(
-        select(Project.id).where(Project.id == task.project_id, Project.owner_id == user.id)
-    ):
-        raise AppError(404, "not_found", "Project not found")
+    if task.project_id:
+        await require_project(db, user.id, task.project_id)
 
 
 async def check_quota(db: AsyncSession, user: User, settings: Settings) -> None:

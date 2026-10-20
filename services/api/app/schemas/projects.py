@@ -30,3 +30,17 @@ class ProjectOut(BaseModel):
     conversation_count: int = 0
     created_at: datetime
     updated_at: datetime
+    # Sharing (A-04): your role, and the owner's name when it isn't you.
+    role: str = "owner"
+    owner: str | None = None
+    shared: bool = False
+
+
+class MemberIn(BaseModel):
+    role: str = Field(pattern="^(read|write)$")
+
+
+class MemberOut(BaseModel):
+    username: str
+    display_name: str | None = None
+    role: str
