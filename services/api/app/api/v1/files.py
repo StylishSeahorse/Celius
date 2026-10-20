@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Header, Request, status
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +11,14 @@ from app.config import Settings, get_settings
 from app.db import get_db
 from app.errors import AppError
 from app.models import StoredFile
-from app.schemas.files import FileOut, FileText, StorageUsage, UploadCreate, UploadOut
+from app.schemas.files import (
+    FileOut,
+    FileText,
+    StorageUsage,
+    UploadCreate,
+    UploadOut,
+    UploadProgress,
+)
 from app.services.files import quota
 from app.services.files import service as svc
 
@@ -39,11 +46,38 @@ async def create_upload(
 
 @router.put("/uploads/{upload_id}/content")
 async def upload_content(
-    upload_id: uuid.UUID, request: Request, auth: CurrentAuth, db: DB, settings: AppSettings
+    upload_id: uuid.UUID,
+    request: Request,
+    auth: CurrentAuth,
+    db: DB,
+    settings: AppSettings,
+    content_range: Annotated[str | None, Header()] = None,
 ) -> dict:
-    """The raw file bytes as the request body. Sending again replaces the previous attempt."""
-    session = await svc.receive_content(db, auth.user, upload_id, request.stream(), settings)
+    """The raw file bytes as the request body. Sending the whole file again replaces the
+    previous attempt. With `Content-Range: bytes first-last/total` the body is one chunk;
+    chunks resume an interrupted upload (see `GET /uploads/{id}`)."""
+    session = await svc.receive_content(
+        db,
+        auth.user,
+        upload_id,
+        request.stream(),
+        settings,
+        content_range=svc.parse_content_range(content_range),
+    )
     return {"received_bytes": session.received_bytes}
+
+
+@router.get("/uploads/{upload_id}", response_model=UploadProgress)
+async def upload_progress(upload_id: uuid.UUID, auth: CurrentAuth, db: DB) -> UploadProgress:
+    """How much of an upload has arrived, to resume it after a dropped connection."""
+    session = await svc.get_upload(db, auth.user, upload_id)
+    return UploadProgress(
+        id=session.id,
+        status=session.status.value,
+        declared_size=session.declared_size,
+        received_bytes=session.received_bytes,
+        expires_at=session.expires_at,
+    )
 
 
 @router.post(

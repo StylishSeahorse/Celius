@@ -243,6 +243,44 @@ def _delta_event(message_id: uuid.UUID, state: _StreamState) -> dict[str, Any]:
     return data
 
 
+TOOL_NOTE_HEADER = "(Tools used for this reply, summarised by the app; not part of the reply:)"
+TOOL_NOTE_STATUSES = (ToolCallStatus.completed, ToolCallStatus.failed, ToolCallStatus.refused)
+
+
+def _clip(text: str, limit: int) -> str:
+    text = " ".join(text.split())
+    return text if len(text) <= limit else text[: max(limit - 1, 0)] + "…"
+
+
+async def _tool_history_notes(db, message_ids: list[uuid.UUID], settings: Settings) -> dict:
+    """For earlier replies: which tools ran, with what, and what came back (shortened).
+
+    Only a reply's final text is replayed otherwise, so the model would forget that it
+    already wrote `report.docx` or what a search returned.
+    """
+    limit = settings.tool_history_result_chars
+    if not message_ids or limit <= 0:
+        return {}
+    calls = (
+        await db.scalars(
+            select(ToolCall)
+            .options(undefer(ToolCall.model_content))
+            .where(ToolCall.message_id.in_(message_ids), ToolCall.status.in_(TOOL_NOTE_STATUSES))
+            .order_by(ToolCall.message_id, ToolCall.step, ToolCall.position)
+        )
+    ).all()
+    lines: dict[uuid.UUID, list[str]] = {}
+    for call in calls:
+        args = _clip(canonical_json(call.arguments), 160)
+        if call.status == ToolCallStatus.refused:
+            outcome = "not run: " + _clip(call.decision_reason or "refused", 120)
+        else:
+            label = "error" if call.is_error or call.status == ToolCallStatus.failed else "ok"
+            outcome = f"{label}: " + _clip(call.model_content or "", limit)
+        lines.setdefault(call.message_id, []).append(f"- {call.tool_name}({args}) → {outcome}")
+    return {mid: "\n".join([TOOL_NOTE_HEADER, *items]) for mid, items in lines.items()}
+
+
 async def _renew_lease(
     factory: SessionFactory,
     run_id: uuid.UUID,
@@ -962,6 +1000,9 @@ async def _prepare(
                 else settings.max_attachment_prompt_chars * max(latest_files, 1)
             )
             readable = toolset is not None and "read_file" in toolset.offered
+            tool_notes = await _tool_history_notes(
+                db, [m.id for m in path if m.role == MessageRole.assistant], settings
+            )
             history: list[HistoryItem] = []
             for message in path:
                 text = message_text(parts[message.id])
@@ -986,7 +1027,8 @@ async def _prepare(
                 elif message.role == MessageRole.assistant and (
                     message.status == MessageStatus.complete
                 ):
-                    history.append(HistoryItem("assistant", text))
+                    note = tool_notes.get(message.id)
+                    history.append(HistoryItem("assistant", f"{note}\n\n{text}" if note else text))
 
             system_prompt = settings.default_system_prompt
             project_block = ""

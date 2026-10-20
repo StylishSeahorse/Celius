@@ -47,7 +47,7 @@ Status key: ✅ done in repo · 🔶 partially done · ⬜ not started
 | C-06 | Context assembly with token budget | ✅ | Oldest turns dropped first; system prompt and latest user message always kept; `context_overflow` before calling the model; consecutive same-role turns merged |
 | C-07 | Minimal chat UI (React + Vite + Tailwind) | ✅ | Login, sidebar, search, new/delete chat, streaming markdown, reasoning disclosure, stop, model override per conversation, resume after reload, mobile layout |
 | C-08 | Verify the end-to-end flow on the real deployment | ⬜ | `docs/acceptance-tests/phase-2.md`, manual section |
-| C-09 | Prune `message.delta` events after completion | ⬜ | Keeps `run_events` small; clients that reconnect late fall back to the message state |
+| C-09 | Prune `message.delta` events after completion | ✅ | Phase 8: deleted `RUN_DELTA_RETENTION_MINUTES` after a run ends; other events kept; late clients reload the message |
 | C-10 | `LISTEN/NOTIFY` wake-ups (optional) | ⬜ | Only if polling latency or load is noticeable |
 
 ## Phase 3 — Client experience and sync
@@ -64,7 +64,7 @@ Status key: ✅ done in repo · 🔶 partially done · ⬜ not started
 | S-06 | Sidebar, search, projects | ✅ | Projects CRUD with instructions in the system prompt; project filter; search over titles and message text |
 | S-07 | PWA (manifest, icons, service worker) | ✅ | Installable; app shell and saved conversations open offline (needs HTTPS or localhost) |
 | S-08 | Tauri v2 Windows wrapper | 🔶 | Connect page, menu, no IPC for remote pages; compiles on Linux; CI builds NSIS + MSI on Windows. **Authenticode signing not set up** (needs a certificate); Windows build not yet run |
-| S-09 | Open reply links in the system browser from the desktop app | ⬜ | Needs a narrowly scoped opener command (phase 4, with folder access) |
+| S-09 | Open reply links in the system browser from the desktop app | ✅ | Done in phase 4 (see U-06 area) |
 | S-10 | Push notifications for finished replies | ⬜ | Optional; Web Push needs HTTPS and a VAPID key |
 
 ## Phase 4 — Files and workspaces
@@ -84,7 +84,7 @@ Status key: ✅ done in repo · 🔶 partially done · ⬜ not started
 | S-09 | Reply links open in the system browser from the desktop app | ✅ | `open_external`, http(s) only |
 | U-09 | Code-block Copy/Download | ✅ | Client-side, language → file extension |
 | U-10 | Previews for PDFs and Office files (page images) | ⬜ | Thumbnails exist for images only |
-| U-11 | Resumable chunked uploads | ⬜ | Large files over flaky mobile links currently restart from zero |
+| U-11 | Resumable chunked uploads | ✅ | Phase 8: 4 MB chunks with `Content-Range`; resume from `GET /files/uploads/{id}` after a dropped connection |
 | U-12 | Server-side project workspaces (extract archives to disk) | ⬜ | Needed by tools in phase 5; containment helper `resolve_within` already in place |
 
 ## Phase 5 — Tool execution and autonomy
@@ -103,7 +103,7 @@ Arbitrary shell stays disabled until T-01 is decided and validated.
 | T-07 | Scheduled and background jobs | ✅ | Interval (≥15 min), daily and weekly in the user's time zone; fired once per occurrence by a conditional claim; per-user quota; activity panel lists runs and jobs with cancel |
 | T-08 | Run the sandbox image on the real host | ⬜ | `make up` on Proxmox; **Tools → Permissions** shows the sandbox running; Python and a document round-trip |
 | T-09 | Tool calling with the real model | ⬜ | Verify with `POST /models/{id}/verify-tools`; record which models and templates call tools reliably |
-| T-10 | Tool results in later turns | ⬜ | Only final text of earlier replies is replayed; consider summaries of tool results |
+| T-10 | Tool results in later turns | ✅ | Phase 8: earlier replies are replayed with a short summary of their tool calls (`TOOL_HISTORY_RESULT_CHARS`) |
 
 ## Phase 6 — Memory and retrieval
 
@@ -130,7 +130,41 @@ Arbitrary shell stays disabled until T-01 is decided and validated.
 | H-04 | Security review | ✅ | [Security review](security-review.md): every route requires auth (generated test), throttling, CSRF origin check, CSP and headers; secrets, file access and sandbox escape tests listed; fixed: a background child could stall a sandbox slot forever |
 | H-05 | Upgrade and rollback runbook | ✅ | [Upgrade and rollback](operations/upgrade-and-rollback.md): pre-upgrade backup, saved images, health wait; rollback keeps data when no migrations changed, else restores the pre-upgrade backup; rollback exercised in CI |
 | H-06 | First backup and restore drill on the real host | ⬜ | Set `BACKUP_PASSPHRASE` and `BACKUP_OFFSITE_TARGET`; cron; `make restore-drill` passes |
-| H-07 | Dependency audit in CI | ⬜ | `pip-audit` and `pnpm audit` on a schedule |
+| H-07 | Dependency audit in CI | ✅ | Phase 8: weekly and on lockfile changes; first run found and fixed pypdf (85 advisories), Pillow, lxml, requests, Markdown |
+
+## Phase 8 — Reliability and scale
+
+**Exit gate:** reliability tests pass on CI (API, browser, release gate) and the dependency audit is clean.
+
+| ID | Item | Status | Acceptance criteria |
+| --- | --- | --- | --- |
+| U-11 | Resumable chunked uploads | ✅ | A 9 MB upload whose connection drops mid-way completes byte-identical without starting over (e2e, desktop and phone) |
+| C-09 | Prune streamed-token events | ✅ | Finished runs keep only their non-delta events; a late client still sees the outcome and the reply |
+| T-10 | Tool use remembered in later turns | ✅ | The next turn's prompt lists the earlier tool calls and a shortened result |
+| H-07 | Dependency audit | ✅ | `.github/workflows/audit.yml`; no known vulnerabilities in the API, sandbox service, sandbox image libraries or web production packages |
+
+## Phase 9 — Phone and desktop polish
+
+**Exit gate:** notifications, previews and sharing work in the browser tests on desktop and phone viewports.
+
+| ID | Item | Status | Acceptance criteria |
+| --- | --- | --- | --- |
+| S-10 | Push notifications for finished replies | ⬜ | Web Push (VAPID keys generated on first start); opt-in per device; sent only when no tab has the chat open; works for the installed Android PWA |
+| U-10 | Previews for PDFs and Office files | ⬜ | First-page image for PDFs (and Office documents via PDF conversion where available) shown like image thumbnails |
+| S-11 | Share into Celius from Android | ⬜ | PWA share target: text, links and files shared from other apps open a new chat with them attached |
+| S-12 | Desktop app notifications and tray | ⬜ | Native notification when a reply finishes in the background; tray icon to show/hide |
+
+## Phase 10 — Multiple users (family)
+
+**Exit gate:** isolation tests between users pass for every resource; admin flows pass in the browser tests.
+
+| ID | Item | Status | Acceptance criteria |
+| --- | --- | --- | --- |
+| A-01 | Invitations | ⬜ | An admin creates a one-time invite link; the invitee chooses a username and password; links expire |
+| A-02 | User management | ⬜ | Admins list, disable, re-enable, reset and delete users; deleting removes their data and files |
+| A-03 | Per-user limits | ⬜ | Storage quota, allowed models, tool profiles available, daily message limit |
+| A-04 | Shared projects | ⬜ | A project owner shares with named users (read or write); shared chats and files follow the project's rights |
+| A-05 | Isolation review | ⬜ | Every route tested with a second user; memories, tools, workspaces and scheduled tasks never cross users |
 
 ---
 

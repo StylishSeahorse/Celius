@@ -8,6 +8,7 @@ Nothing in quarantine is ever served. Every step is idempotent for a retrying cl
 """
 
 import hashlib
+import re
 import uuid
 from collections.abc import AsyncIterator
 from datetime import timedelta
@@ -99,6 +100,17 @@ async def _owned_upload(db: AsyncSession, user: User, upload_id: uuid.UUID) -> U
     return session
 
 
+async def get_upload(db: AsyncSession, user: User, upload_id: uuid.UUID) -> UploadSession:
+    session = await db.scalar(
+        select(UploadSession).where(
+            UploadSession.id == upload_id, UploadSession.owner_id == user.id
+        )
+    )
+    if session is None:
+        raise not_found("Upload")
+    return session
+
+
 def _require_open(session: UploadSession) -> None:
     expires_at = session.expires_at
     if expires_at.tzinfo is None:  # SQLite drops tz info
@@ -148,16 +160,41 @@ async def create_upload(
     return session
 
 
+CONTENT_RANGE = re.compile(r"bytes (\d+)-(\d+)/(\d+)")
+
+
+def parse_content_range(header: str | None) -> tuple[int, int, int] | None:
+    """`bytes <first>-<last>/<total>` → (first, last, total); None when absent."""
+    if header is None:
+        return None
+    match = CONTENT_RANGE.fullmatch(header.strip())
+    if not match:
+        raise AppError(400, "bad_content_range", "Content-Range must be 'bytes first-last/total'")
+    first, last, total = (int(g) for g in match.groups())
+    if last < first or last >= total:
+        raise AppError(400, "bad_content_range", "Content-Range is out of order")
+    return first, last, total
+
+
 async def receive_content(
     db: AsyncSession,
     user: User,
     upload_id: uuid.UUID,
     body: AsyncIterator[bytes],
     settings: Settings,
+    content_range: tuple[int, int, int] | None = None,
 ) -> UploadSession:
-    """Stream the body into quarantine. Re-sending replaces the previous attempt."""
+    """Stream the body into quarantine.
+
+    Without Content-Range the body is the whole file and replaces any earlier attempt.
+    With it, the body is one chunk starting at `first`, which may be at most what has
+    been received so far: a client that lost the response to a chunk re-sends it (or
+    asks `GET /uploads/{id}` where to continue) and nothing is duplicated.
+    """
     session = await _owned_upload(db, user, upload_id)
     _require_open(session)
+    if content_range is not None:
+        return await _receive_chunk(db, session, body, settings, content_range)
     path = storage_for(settings).quarantine(session.id)
     digest = hashlib.sha256()
     received = 0
@@ -177,6 +214,52 @@ async def receive_content(
     return session
 
 
+async def _receive_chunk(
+    db: AsyncSession,
+    session: UploadSession,
+    body: AsyncIterator[bytes],
+    settings: Settings,
+    content_range: tuple[int, int, int],
+) -> UploadSession:
+    first, _last, total = content_range
+    if total != session.declared_size:
+        raise AppError(
+            400, "bad_content_range", f"The upload was declared as {session.declared_size} bytes"
+        )
+    if first > session.received_bytes:
+        raise AppError(
+            409,
+            "upload_offset_mismatch",
+            f"Continue from byte {session.received_bytes}",
+            received_bytes=session.received_bytes,
+        )
+    path = storage_for(settings).quarantine(session.id)
+    written = 0
+    mode = "r+b" if path.exists() else "wb"
+    async with await anyio.open_file(path, mode) as handle:
+        await handle.truncate(first)  # drop anything after the resume point
+        await handle.seek(first)
+        async for chunk in body:
+            if first + written + len(chunk) > total:
+                raise AppError(413, "upload_too_large", "More data was sent than the declared size")
+            await handle.write(chunk)
+            written += len(chunk)
+    session.received_bytes = first + written
+    session.sha256 = None  # hashed once, when the upload is completed
+    # A slow link keeps its upload alive as long as chunks keep arriving.
+    session.expires_at = utcnow() + timedelta(minutes=settings.upload_session_ttl_minutes)
+    await db.commit()
+    return session
+
+
+def _hash_file(path) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
 async def _reject(
     db: AsyncSession, session: UploadSession, settings: Settings, error: FileRejected
 ):
@@ -194,14 +277,17 @@ async def complete_upload(
     if session.status == UploadStatus.completed and session.file_id:
         return await get_owned_file(db, user.id, session.file_id)  # a retried "complete"
     _require_open(session)
-    if session.sha256 is None or session.received_bytes != session.declared_size:
+    path = storage_for(settings).quarantine(session.id)
+    if session.received_bytes != session.declared_size or not path.exists():
         raise AppError(
             422,
             "size_mismatch",
             f"Received {session.received_bytes} of {session.declared_size} bytes; "
-            "send the content again",
+            "send the rest of the content",
+            received_bytes=session.received_bytes,
         )
-    path = storage_for(settings).quarantine(session.id)
+    if session.sha256 is None:  # sent in chunks
+        session.sha256 = await anyio.to_thread.run_sync(_hash_file, path)
 
     try:
         detected = await anyio.to_thread.run_sync(detect, path, session.filename)

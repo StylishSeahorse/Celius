@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     run_lease_seconds: int = Field(default=30, ge=5)
     run_max_attempts: int = Field(default=2, ge=1)
     run_delta_flush_ms: int = Field(default=100, ge=10)
+    # Streamed-token events of finished runs are deleted after this long (the reply itself
+    # is kept on its message).
+    run_delta_retention_minutes: float = Field(default=10, ge=0)
     worker_poll_interval_seconds: float = Field(default=0.5, gt=0)
     sse_poll_interval_seconds: float = Field(default=0.25, gt=0)
     sse_keepalive_seconds: float = Field(default=15, gt=0)
@@ -82,6 +85,9 @@ class Settings(BaseSettings):
     attachment_context_share: float = Field(default=0.4, ge=0.05, le=0.8)
     # Excerpt kept from files attached to earlier messages (already answered).
     attachment_history_chars: int = Field(default=3000, ge=0)
+    # Earlier replies are replayed with a summary of the tools they used: this much of each
+    # tool's result (0 = don't summarise tool use).
+    tool_history_result_chars: int = Field(default=400, ge=0)
     # Share of the context budget that project knowledge files may use.
     project_files_context_share: float = Field(default=0.3, ge=0, le=0.9)
     archive_max_entries: int = Field(default=10_000, ge=1)

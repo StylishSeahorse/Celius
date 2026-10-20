@@ -57,6 +57,39 @@ test("attached files reach the model and download byte-for-byte", async ({ page 
   );
 });
 
+test("a large upload survives a dropped connection", async ({ page }, info) => {
+  // 9 MB: three 4 MB chunks. The second chunk's connection fails once; the upload asks the
+  // server how much arrived and carries on.
+  const line = "Resumable uploads keep going over flaky mobile links.\n";
+  const big = line.repeat(Math.ceil((9 * 1024 * 1024) / line.length));
+  const path = fixture(info.outputPath("files"), "big-notes.txt", big);
+  let chunks = 0;
+  let dropped = false;
+  await page.route("**/api/v1/files/uploads/*/content", async (route) => {
+    chunks += 1;
+    if (chunks === 2 && !dropped) {
+      dropped = true;
+      return route.abort("connectionreset");
+    }
+    return route.continue();
+  });
+
+  await attach(page, [path]);
+  expect(dropped).toBe(true);
+  expect(chunks).toBe(4); // 3 chunks + the retried one
+
+  await send(page, "Here are my notes.");
+  await expect(lastReply(page)).toContainText("big-notes.txt");
+  const attached = chat(page).getByRole("list", { name: "Attached files" });
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    attached.getByRole("link", { name: /big-notes\.txt/ }).click(),
+  ]);
+  const received = readFileSync((await download.path())!);
+  expect(received.length).toBe(Buffer.byteLength(big));
+  expect(createHash("sha256").update(received).digest("hex")).toBe(createHash("sha256").update(big).digest("hex"));
+});
+
 test("a file that isn't what its name says is refused", async ({ page }, info) => {
   const fake = fixture(info.outputPath("files"), "holiday.png", "this is not an image");
   await page.getByLabel("Choose files").setInputFiles([fake]);

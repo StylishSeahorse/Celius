@@ -28,6 +28,21 @@ TypeScript client (phase 3) is produced from the API's OpenAPI document.
 SSE wire format: `id: <event_id>` / `event: <type>` / `data: <envelope JSON>`. The server
 closes the stream after the terminal event. Resume with the `Last-Event-ID` header or `?after=<id>`.
 
+`message.delta` events of a run are deleted `RUN_DELTA_RETENTION_MINUTES` (10) after it
+finishes; every other event is kept. A client that opens a finished run's stream later
+gets its other events and the terminal one, and should load the reply from the message
+(the web app reloads the conversation on any terminal event).
+
+## Uploads
+
+`POST /files/uploads` → `PUT {upload_url}` with the bytes → `POST /files/uploads/{id}/complete`.
+The PUT body is either the whole file (re-sending replaces it) or, with
+`Content-Range: bytes <first>-<last>/<total>`, one chunk. A chunk may start at most at the
+bytes already received (`409 upload_offset_mismatch` carries `received_bytes` otherwise);
+overlapping bytes replace what was there. `GET /files/uploads/{id}` returns
+`received_bytes`, to resume after a dropped connection. Each chunk extends the upload's
+expiry. The web app uses 4 MB chunks for files above 4 MB.
+
 ## Sync change feed
 
 `entity_type` is one of `conversation`, `message`, `project`, `file`, `memory`. A `memory`

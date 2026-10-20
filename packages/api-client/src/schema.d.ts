@@ -377,6 +377,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/files/uploads/{upload_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Upload Progress
+         * @description How much of an upload has arrived, to resume it after a dropped connection.
+         */
+        get: operations["upload_progress_api_v1_files_uploads__upload_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/files/uploads/{upload_id}/complete": {
         parameters: {
             query?: never;
@@ -407,7 +427,9 @@ export interface paths {
         get?: never;
         /**
          * Upload Content
-         * @description The raw file bytes as the request body. Sending again replaces the previous attempt.
+         * @description The raw file bytes as the request body. Sending the whole file again replaces the
+         *     previous attempt. With `Content-Range: bytes first-last/total` the body is one chunk;
+         *     chunks resume an interrupted upload (see `GET /uploads/{id}`).
          */
         put: operations["upload_content_api_v1_files_uploads__upload_id__content_put"];
         post?: never;
@@ -2446,6 +2468,28 @@ export interface components {
             /** Upload Url */
             upload_url: string;
         };
+        /**
+         * UploadProgress
+         * @description Where a chunked upload stands: send the next chunk from `received_bytes`.
+         */
+        UploadProgress: {
+            /** Declared Size */
+            declared_size: number;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Received Bytes */
+            received_bytes: number;
+            /** Status */
+            status: string;
+        };
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -3202,6 +3246,37 @@ export interface operations {
             };
         };
     };
+    upload_progress_api_v1_files_uploads__upload_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                upload_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadProgress"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     complete_upload_api_v1_files_uploads__upload_id__complete_post: {
         parameters: {
             query?: never;
@@ -3236,7 +3311,9 @@ export interface operations {
     upload_content_api_v1_files_uploads__upload_id__content_put: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "content-range"?: string | null;
+            };
             path: {
                 upload_id: string;
             };

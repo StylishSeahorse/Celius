@@ -3792,6 +3792,42 @@
         "title": "UploadOut",
         "type": "object"
       },
+      "UploadProgress": {
+        "description": "Where a chunked upload stands: send the next chunk from `received_bytes`.",
+        "properties": {
+          "declared_size": {
+            "title": "Declared Size",
+            "type": "integer"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "received_bytes": {
+            "title": "Received Bytes",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "declared_size",
+          "received_bytes",
+          "expires_at"
+        ],
+        "title": "UploadProgress",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -4885,6 +4921,50 @@
         ]
       }
     },
+    "/api/v1/files/uploads/{upload_id}": {
+      "get": {
+        "description": "How much of an upload has arrived, to resume it after a dropped connection.",
+        "operationId": "upload_progress_api_v1_files_uploads__upload_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "upload_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Upload Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadProgress"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Progress",
+        "tags": [
+          "files"
+        ]
+      }
+    },
     "/api/v1/files/uploads/{upload_id}/complete": {
       "post": {
         "description": "Verify the upload (size, real type, optional malware scan) and store it.",
@@ -4931,7 +5011,7 @@
     },
     "/api/v1/files/uploads/{upload_id}/content": {
       "put": {
-        "description": "The raw file bytes as the request body. Sending again replaces the previous attempt.",
+        "description": "The raw file bytes as the request body. Sending the whole file again replaces the\nprevious attempt. With `Content-Range: bytes first-last/total` the body is one chunk;\nchunks resume an interrupted upload (see `GET /uploads/{id}`).",
         "operationId": "upload_content_api_v1_files_uploads__upload_id__content_put",
         "parameters": [
           {
@@ -4942,6 +5022,22 @@
               "format": "uuid",
               "title": "Upload Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "content-range",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Content-Range"
             }
           }
         ],

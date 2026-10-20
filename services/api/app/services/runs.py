@@ -1,7 +1,8 @@
 import uuid
+from datetime import timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.base import utcnow
@@ -78,3 +79,26 @@ async def finish_cancelled(db: AsyncSession, run: Run) -> None:
     await append_event(
         db, run.id, RunEventType.run_cancelled, {"message_id": str(run.output_message_id)}
     )
+
+
+async def prune_stream_events(factory, older_than_minutes: float) -> int:
+    """Delete the token-by-token `message.delta` events of runs that finished a while ago.
+
+    They are only needed to replay a reply while it streams; a finished reply is saved on
+    its message, and a client that connects after the end reloads the conversation when it
+    sees the terminal event (which, like every other event type, is kept).
+    """
+    cutoff = utcnow() - timedelta(minutes=older_than_minutes)
+    finished = select(Run.id).where(
+        Run.status.in_(TERMINAL_RUN_STATUSES),
+        Run.finished_at.is_not(None),
+        Run.finished_at < cutoff,
+    )
+    async with factory() as db:
+        result = await db.execute(
+            delete(RunEvent).where(
+                RunEvent.type == RunEventType.message_delta.value, RunEvent.run_id.in_(finished)
+            )
+        )
+        await db.commit()
+    return result.rowcount or 0

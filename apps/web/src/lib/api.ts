@@ -139,6 +139,8 @@ export const api = {
     project_id?: string | null;
   }) => request<UploadSession>("/files/uploads", json("POST", body)),
   completeUpload: (id: string) => request<StoredFile>(`/files/uploads/${id}/complete`, json("POST")),
+  uploadProgress: (id: string) =>
+    request<{ received_bytes: number; declared_size: number; status: string }>(`/files/uploads/${id}`),
   getFile: (id: string) => request<StoredFile>(`/files/${id}`),
   listFiles: (projectId: string) => request<StoredFile[]>(`/files?project_id=${projectId}`),
   deleteFile: (id: string) => request<void>(`/files/${id}`, json("DELETE")),

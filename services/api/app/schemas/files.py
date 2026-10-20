@@ -22,6 +22,16 @@ class UploadOut(BaseModel):
     expires_at: datetime
 
 
+class UploadProgress(BaseModel):
+    """Where a chunked upload stands: send the next chunk from `received_bytes`."""
+
+    id: uuid.UUID
+    status: str
+    declared_size: int
+    received_bytes: int
+    expires_at: datetime
+
+
 class FileOut(BaseModel):
     id: uuid.UUID
     filename: str
