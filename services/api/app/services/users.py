@@ -30,7 +30,6 @@ from app.services.files.service import storage_for
 from app.services.limits import PROFILE_ORDER
 
 
-
 def _hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
