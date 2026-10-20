@@ -30,6 +30,8 @@ interface Props {
   onStop: () => void;
   onReasoning: (value: boolean | null) => void;
   onStorageChanged?: () => void;
+  /** Start with this text and these files (shared from another app). */
+  initial?: { key: string; text: string; files: File[] } | null;
 }
 
 const REASONING_NEXT: Record<string, boolean | null> = { null: true, true: false, false: null };
@@ -50,6 +52,14 @@ export function Composer(props: Props) {
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
   }, [text]);
+
+  const initialKey = props.initial?.key;
+  useEffect(() => {
+    if (!props.initial) return;
+    setText(props.initial.text);
+    if (props.initial.files.length) void add(props.initial.files);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per shared item
+  }, [initialKey]);
 
   const update = (key: string, patch: Partial<Attachment>) =>
     setAttachments((list) => list.map((a) => (a.key === key ? { ...a, ...patch } : a)));

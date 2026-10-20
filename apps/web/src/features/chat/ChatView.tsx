@@ -25,6 +25,7 @@ interface Props {
   onDraftMemory: (value: boolean) => void;
   onOpenSidebar: () => void;
   onStorageChanged: () => void;
+  shared?: { key: string; text: string; files: File[] } | null;
 }
 
 export function ChatView(props: Props) {
@@ -176,6 +177,7 @@ export function ChatView(props: Props) {
           onStop={() => void chat.cancel()}
           onReasoning={(value) => (savedOnServer ? void save({ reasoning: value }) : props.onDraftReasoning(value))}
           onStorageChanged={props.onStorageChanged}
+          initial={props.shared}
         />
       </div>
 

@@ -50,9 +50,41 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+/*
+ * Share target (Android: "Share" → Celius). The shared text and files are kept in a cache
+ * entry and the app opens with ?share=<id>, which starts a new chat with them attached.
+ */
+const SHARE = "celius-share";
+
+async function receiveShare(request) {
+  const form = await request.formData();
+  const id = crypto.randomUUID();
+  const cache = await caches.open(SHARE);
+  const files = form.getAll("files").filter((f) => f instanceof File && f.size >= 0);
+  const text = [form.get("title"), form.get("text"), form.get("url")]
+    .filter((v) => typeof v === "string" && v.trim())
+    .join("\n");
+  await Promise.all(
+    files.map((file, index) =>
+      cache.put(
+        `/shared/${id}/file/${index}`,
+        new Response(file, {
+          headers: { "Content-Type": file.type || "application/octet-stream", "X-Name": encodeURIComponent(file.name) },
+        }),
+      ),
+    ),
+  );
+  await cache.put(`/shared/${id}/meta`, new Response(JSON.stringify({ text, files: files.length })));
+  return Response.redirect(`/?share=${id}`, 303);
+}
+
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
+  if (request.method === "POST" && url.origin === self.location.origin && url.pathname === "/share-target") {
+    event.respondWith(receiveShare(request));
+    return;
+  }
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
   if (url.pathname.startsWith("/api/")) return;
 

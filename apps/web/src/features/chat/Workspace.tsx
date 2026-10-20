@@ -7,6 +7,7 @@ import { outbox } from "../../offline/outbox";
 import { startSync } from "../../offline/sync";
 import { useOnline } from "../../offline/useOnline";
 import { desktop } from "../../lib/desktop";
+import { type Shared, takeShared } from "../../lib/share";
 import { AccountPanel } from "../account/AccountPanel";
 import { DeleteConversationDialog } from "../memory/DeleteConversationDialog";
 import { MemoryPanel } from "../memory/MemoryPanel";
@@ -49,6 +50,16 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const [pendingApprovals, setPendingApprovals] = useState(0);
   const [projectDialog, setProjectDialog] = useState<{ project: Project | null } | null>(null);
   // Desktop app only: a folder browser that resolves with the files the user picked.
+  const [shared, setShared] = useState<Shared | null>(null);
+  // Opened from Android's share sheet: a new chat with the shared text and files.
+  useEffect(() => {
+    void takeShared().then((item) => {
+      if (!item) return;
+      window.location.hash = "";
+      setSelectedId(null);
+      setShared(item);
+    });
+  }, []);
   const [folderPick, setFolderPick] = useState<((files: File[]) => void) | null>(null);
   const extraAttach = desktop
     ? { label: "From PC…", pick: () => new Promise<File[]>((resolve) => setFolderPick(() => resolve)) }
@@ -285,6 +296,7 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
         onOpenSidebar={() => setSidebarOpen(true)}
         onStorageChanged={refreshStorage}
         extraAttach={extraAttach}
+        shared={shared ? { key: shared.id, text: shared.text, files: shared.files } : null}
       />
       {folderPick && (
         <FolderBrowser
