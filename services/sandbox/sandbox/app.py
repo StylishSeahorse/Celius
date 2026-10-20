@@ -15,7 +15,14 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from sandbox.config import SandboxConfig
-from sandbox.runner import Execution, InvalidRequest, become_subreaper, bwrap_available, run
+from sandbox.runner import (
+    Execution,
+    InvalidRequest,
+    become_subreaper,
+    bwrap_available,
+    protect_secrets,
+    run,
+)
 
 log = logging.getLogger("sandbox")
 
@@ -27,6 +34,8 @@ class ExecutionRequest(BaseModel):
     timeout_seconds: int = Field(default=60, ge=1, le=3600)
     memory_mb: int = Field(default=1024, ge=64, le=65536)
     output_limit: int = Field(default=64 * 1024, ge=1024, le=64 * 1024 * 1024)
+    # Internet through the egress proxy; None: the service default.
+    network: bool | None = None
 
 
 def create_app(config: SandboxConfig | None = None) -> FastAPI:
@@ -43,6 +52,8 @@ def create_app(config: SandboxConfig | None = None) -> FastAPI:
         else:
             state["mode"] = config.mode
         state["slots"] = asyncio.Semaphore(config.max_concurrent)
+        if not protect_secrets():
+            log.warning("could not mark the service non-dumpable")
         if not become_subreaper():
             log.warning("could not become a child subreaper: daemonised strays may survive")
         if state["mode"] == "process":
@@ -67,6 +78,8 @@ def create_app(config: SandboxConfig | None = None) -> FastAPI:
             "mode": state.get("mode"),
             "max_timeout_seconds": config.max_timeout_seconds,
             "max_memory_mb": config.max_memory_mb,
+            "network": config.proxy_url() is not None,
+            "network_default": config.network_default and config.proxy_url() is not None,
         }
 
     @app.post("/v1/executions", dependencies=[Depends(authorise)])

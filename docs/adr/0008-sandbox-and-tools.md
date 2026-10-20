@@ -21,7 +21,7 @@ depending on the host, the LXC's nesting setting and Docker's seccomp profile.
 | --- | --- | --- |
 | Database, sessions, `APP_SECRET_KEY`, model API key | Code reads env, files or sockets of the app | Code runs in a **separate container** that has none of them: no env file, no app-data volume, no route to Postgres/Redis/API |
 | The host and Docker | Escape via the Docker socket or privileges | **No Docker socket anywhere in the stack**; non-root, `cap_drop: ALL`, `no-new-privileges`, read-only root |
-| The LAN and internet | Exfiltration, SSRF against the router or llama.cpp, scanning | Sandbox on an `internal: true` network: no egress at all. Web access only through the worker's HTTP tool, which has an SSRF guard and an allowlist |
+| The LAN and internet | SSRF against the router or llama.cpp, scanning, exfiltration | Sandbox on an `internal: true` network. Internet only through the egress proxy (public addresses, ports 80/443, credential per deployment); LAN unreachable. Worker web tools have the same guard and an allowlist |
 | Other workspaces | One conversation reads another's files | One workspace directory per conversation. Under bubblewrap, only that one is mounted. Ids are validated, and the worker resolves every path inside the workspace (no `..` or symlink escapes) |
 | Availability | Fork bombs, memory or disk exhaustion, infinite loops, output floods | Container pid/memory/CPU limits; per-run rlimits (CPU, address space, file size, processes, files); wall-clock timeout; output caps; workspace size check; concurrency limit |
 | The user's intent | The model does something the user wouldn't approve | A server-side policy on every call, approvals bound to exact arguments, and audit (below) |
@@ -60,15 +60,32 @@ no Docker socket: rejected because socket access is root on the host.
 Considered and rejected for now: gVisor and Firecracker need host changes on Proxmox.
 Rootless Docker/Podman inside the stack needs a socket or nested privileges.
 
-### Network off by default
-The sandbox has no network. Code can't `pip install`; a fixed set of libraries
-(numpy, pandas, matplotlib, Pillow, python-docx, openpyxl, python-pptx, fpdf2) comes
-with the image. Web access is a separate tool, `web_fetch`, run by the worker. It
-allows only http(s) on ports 80/443. It resolves the host and refuses private,
-loopback, link-local, CGNAT and multicast addresses, also after redirects. Each
-redirect is checked and the connection is pinned to the checked address. Responses
-are size-capped. An optional host allowlist (`TOOL_WEB_ALLOWLIST`) narrows it
-further.
+### Network: public internet through an egress proxy (revised 2026-10-20)
+Originally the sandbox had no network. In use, that made it too limited: no
+`pip install`, no downloading data, no ffmpeg fetched on demand. It now reaches the
+internet only through a separate **egress proxy** container (`python -m sandbox.egress`,
+same image):
+
+- The sandbox stays on the `internal: true` network. It has no route out, and raw
+  sockets go nowhere.
+- Runs with network on get `HTTP(S)_PROXY` pointing at the proxy, with a credential.
+  Runs with network off don't get it. The sandbox service is non-dumpable, so code
+  can't read the credential from `/proc`.
+- The proxy allows ports 80 and 443 only. It resolves each host itself, refuses private,
+  loopback, link-local, CGNAT, multicast and reserved addresses (all answers, not just
+  the first), and connects to the address it checked. LAN devices, the host, llama.cpp
+  and the other containers are unreachable. It logs every destination.
+- `TOOL_SANDBOX_NETWORK=false` turns it off. Under bubblewrap a network run keeps the
+  container's network namespace (`--share-net`); otherwise each run gets an empty one.
+
+The remaining risk is that code can now send workspace data to the internet. Running
+code still needs approval under the standard profile, and the proxy log records where
+data went. Web access from the worker (`web_fetch`, `git_clone`) is unchanged.
+
+The image includes a toolbox: ffmpeg, ImageMagick, pandoc, poppler, curl/wget, jq,
+sqlite3, zip/7z, Node.js/npm, gcc/make, and Python's scientific, media and document
+libraries. The root filesystem is read-only, so `apt-get` can't work. `pip install` and
+`npm install` go to the conversation's workspace and persist for that conversation.
 
 ### The server decides, every call
 Each tool has a risk class (`read`, `write`, `execute`, `network`, `external`). A

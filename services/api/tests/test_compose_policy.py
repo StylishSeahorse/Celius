@@ -29,6 +29,9 @@ def test_sandbox_is_locked_down(compose):
         "SANDBOX_MODE",
         "SANDBOX_MAX_CONCURRENT",
         "SANDBOX_MAX_MEMORY_MB",
+        "SANDBOX_EGRESS_PROXY",
+        "SANDBOX_EGRESS_TOKEN",
+        "SANDBOX_NETWORK",
     }
     assert sandbox["networks"] == ["sandbox"]
     assert compose["networks"]["sandbox"]["internal"] is True
@@ -45,7 +48,7 @@ def test_only_the_worker_talks_to_the_sandbox(compose):
     on_sandbox_network = [
         name for name, s in compose["services"].items() if "sandbox" in s.get("networks", [])
     ]
-    assert sorted(on_sandbox_network) == ["sandbox", "worker"]
+    assert sorted(on_sandbox_network) == ["egress", "sandbox", "worker"]
     assert compose["services"]["worker"]["environment"]["SANDBOX_URL"] == "http://sandbox:8100"
 
 
@@ -53,3 +56,17 @@ def test_database_and_cache_have_no_route_out(compose):
     assert compose["networks"]["backend"]["internal"] is True
     for name in ("postgres", "redis"):
         assert compose["services"][name]["networks"] == ["backend"]
+
+
+def test_the_egress_proxy_is_the_only_way_out_and_holds_nothing_else(compose):
+    egress = compose["services"]["egress"]
+    assert "env_file" not in egress and "volumes" not in egress and "ports" not in egress
+    assert set(egress["environment"]) <= {"SANDBOX_EGRESS_TOKEN", "EGRESS_PORTS"}
+    assert sorted(egress["networks"]) == ["egress", "sandbox"]
+    assert egress["cap_drop"] == ["ALL"] and egress["read_only"] is True
+    assert egress["command"][-1] == "sandbox.egress"
+    # The sandbox itself still has no route out.
+    assert compose["services"]["sandbox"]["networks"] == ["sandbox"]
+    assert compose["services"]["sandbox"]["environment"]["SANDBOX_EGRESS_PROXY"] == (
+        "http://egress:3128"
+    )

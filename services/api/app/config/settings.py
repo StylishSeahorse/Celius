@@ -112,6 +112,9 @@ class Settings(BaseSettings):
     # and image tools are not offered at all.
     sandbox_url: str | None = None
     sandbox_token: SecretStr | None = None
+    # Code in the sandbox may use the internet through the egress proxy (public addresses
+    # only; never the LAN). Off: the sandbox has no network at all.
+    tool_sandbox_network: bool = True
     # Web access (web_fetch, git_clone) from the worker, through the SSRF guard.
     tool_network_enabled: bool = True
     # Comma-separated host suffixes (e.g. "github.com,python.org"). Empty: any public host.

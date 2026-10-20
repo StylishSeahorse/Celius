@@ -120,6 +120,7 @@ jobs:
         run: |
           cp .env.example .env
           echo "SANDBOX_TOKEN=ci-sandbox-token-0123456789" >> .env
+          echo "SANDBOX_EGRESS_TOKEN=ci-egress-token-0123456789" >> .env
           docker compose -f infra/compose.yaml --env-file .env config -q
           docker compose -f infra/compose.dev.yaml config -q
       - name: Build image (API + worker + web)
@@ -135,7 +136,7 @@ jobs:
             "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/v1/health')" && break; sleep 1; done
           docker exec sb /srv/sandbox/.venv/bin/python -c "
           import json, urllib.request
-          body = json.dumps({'workspace': 'ci', 'kind': 'python', 'code': 'import pandas, docx, openpyxl, pptx, fpdf, matplotlib; print(6*7)'}).encode()
+          body = json.dumps({'workspace': 'ci', 'kind': 'python', 'code': 'import pandas, docx, openpyxl, pptx, fpdf, matplotlib, cv2, moviepy, sklearn; import subprocess; subprocess.run([\"ffmpeg\", \"-version\"], check=True, capture_output=True); print(6*7)'}).encode()
           req = urllib.request.Request('http://127.0.0.1:8100/v1/executions', body, {'Authorization': 'Bearer ci-sandbox-token-0123456789', 'Content-Type': 'application/json'})
           result = json.load(urllib.request.urlopen(req))
           print(result)

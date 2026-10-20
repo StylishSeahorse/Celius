@@ -110,6 +110,10 @@ services:
     environment:
       SANDBOX_TOKEN: ${SANDBOX_TOKEN:?set SANDBOX_TOKEN}
       SANDBOX_MODE: ${SANDBOX_MODE:-auto}
+      # Internet only through the egress proxy below (public addresses only).
+      SANDBOX_EGRESS_PROXY: http://egress:3128
+      SANDBOX_EGRESS_TOKEN: ${SANDBOX_EGRESS_TOKEN:?set SANDBOX_EGRESS_TOKEN}
+      SANDBOX_NETWORK: ${TOOL_SANDBOX_NETWORK:-true}
       SANDBOX_MAX_CONCURRENT: ${SANDBOX_MAX_CONCURRENT:-2}
       SANDBOX_MAX_MEMORY_MB: ${TOOL_MEMORY_MB:-1024}
     volumes:
@@ -126,6 +130,29 @@ services:
     cpus: ${SANDBOX_CPUS:-2}
     ulimits:
       nofile: { soft: 1024, hard: 1024 }
+
+  # The sandbox's way out: an HTTP(S) proxy that reaches public addresses only (never the
+  # LAN, the host or the other containers' networks), on ports 80/443. Same image as the
+  # sandbox, different command; it holds only the proxy credential.
+  egress:
+    image: ${CELIUS_SANDBOX_IMAGE:-celius-sandbox:local}
+    restart: unless-stopped
+    command: ["/srv/sandbox/.venv/bin/python", "-m", "sandbox.egress"]
+    environment:
+      SANDBOX_EGRESS_TOKEN: ${SANDBOX_EGRESS_TOKEN:?set SANDBOX_EGRESS_TOKEN}
+      EGRESS_PORTS: ${EGRESS_PORTS:-80,443}
+    networks: [sandbox, egress]
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 128
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD", "/srv/sandbox/.venv/bin/python", "-c", "import socket; socket.create_connection(('127.0.0.1', 3128), 2)"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
 
 networks:
   # No outbound route: postgres and redis are reachable only from inside the stack.

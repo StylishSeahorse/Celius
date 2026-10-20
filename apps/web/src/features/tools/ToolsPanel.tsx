@@ -393,7 +393,11 @@ function Permissions() {
         <p className="text-muted">
           {settings.sandbox
             ? settings.sandbox.status === "ok"
-              ? `Running (${settings.sandbox.mode === "bwrap" ? "with per-run namespaces" : "container isolation"}). Code has no network access.`
+              ? `Running (${settings.sandbox.mode === "bwrap" ? "with per-run namespaces" : "container isolation"}). ${
+                  settings.sandbox.network_default
+                    ? "Code can use the internet through the egress proxy (public sites only, never your local network)."
+                    : "Code has no network access."
+                }`
               : "Configured but not reachable. Code tools fail until it is back."
             : "Not configured: Python, shell, Git and document tools are off. See the deployment guide."}
         </p>

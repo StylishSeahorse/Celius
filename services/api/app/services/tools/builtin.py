@@ -318,6 +318,7 @@ async def _execute(ctx: ToolContext, kind: str, code: str, seconds: int | None) 
             timeout_seconds=limit,
             memory_mb=ctx.settings.tool_memory_mb,
             output_limit=min(ctx.settings.tool_max_result_chars * 2, 1024 * 1024),
+            network=ctx.settings.tool_sandbox_network,
         )
     except SandboxUnavailable as exc:
         return _error(str(exc))
@@ -337,10 +338,11 @@ builtin(
     ToolSpec(
         name="run_python",
         label="Run Python",
-        description="Run Python 3 in an isolated sandbox with no network. The working directory "
-        "is the conversation's workspace and files persist between calls. numpy, pandas, "
-        "matplotlib (save figures to files), Pillow, python-docx, openpyxl, python-pptx and "
-        "fpdf2 are installed; nothing else can be installed. Print what you need to see.",
+        description="Run Python 3 in an isolated sandbox. The working directory is the "
+        "conversation's workspace and files persist between calls. Installed: numpy, pandas, "
+        "scipy, scikit-learn, matplotlib/seaborn/plotly (save figures to files), Pillow, "
+        "OpenCV, imageio/moviepy (video via ffmpeg), python-docx, openpyxl, python-pptx, "
+        "fpdf2, reportlab, pypdf, requests, beautifulsoup4. Print what you need to see.",
         risk="execute",
         handler=_run_python,
         args_model=PythonArgs,
@@ -362,8 +364,11 @@ builtin(
     ToolSpec(
         name="run_shell",
         label="Run shell",
-        description="Run bash commands in the same sandbox and workspace as run_python "
-        "(no network, no root, standard Unix tools and git).",
+        description="Run bash commands in the same sandbox and workspace as run_python. "
+        "Available: coreutils, git, curl, wget, ffmpeg, ImageMagick, pandoc, poppler-utils, "
+        "jq, sqlite3, zip/unzip/7z, node/npm, gcc/make. No root and a read-only system: "
+        "apt-get does not work; install with `pip install <pkg>` or `npm install <pkg>` "
+        "(they go to the workspace) when the sandbox has internet.",
         risk="execute",
         handler=_run_shell,
         args_model=ShellArgs,

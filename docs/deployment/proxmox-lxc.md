@@ -41,6 +41,7 @@ chmod 600 .env
 sed -i "s|REPLACE_WITH_RANDOM_SECRET|$(openssl rand -hex 32)|" .env
 sed -i "s|REPLACE_WITH_RANDOM_PASSWORD|$(openssl rand -hex 24)|" .env
 sed -i "s|REPLACE_WITH_RANDOM_TOKEN|$(openssl rand -hex 32)|" .env
+sed -i "s|REPLACE_WITH_RANDOM_EGRESS_TOKEN|$(openssl rand -hex 32)|" .env
 nano .env
 ```
 
@@ -90,8 +91,12 @@ Point your domain at `API_BIND_ADDRESS:8000`. Disable buffering for `/api/v1/run
 ## Tools and the sandbox
 
 `make up` also builds and starts the `sandbox` container, which runs the code the model
-writes. It has no network, no secrets except `SANDBOX_TOKEN` and no access to the app's
-data (see [ADR 0008](../adr/0008-sandbox-and-tools.md)). Check it from the app: **Tools &
+writes, and the `egress` container, its only way to the internet. The sandbox has no
+secrets except its tokens and no access to the app's data
+(see [ADR 0008](../adr/0008-sandbox-and-tools.md)). Code can use the internet (pip, npm,
+curl, git) through the egress proxy, which allows public sites on ports 80 and 443 only:
+your LAN, the host and llama.cpp are unreachable from the sandbox. Set
+`TOOL_SANDBOX_NETWORK=false` for no network at all. Check it from the app: **Tools &
 activity → Permissions** shows "Running".
 
 - **Mode.** Inside an LXC with Docker's default seccomp profile, bubblewrap can't create
@@ -138,7 +143,12 @@ cd /opt/celius && git pull && make up      # migrations run automatically before
 ```sh
 echo "SANDBOX_URL=http://sandbox:8100" >> .env
 echo "SANDBOX_TOKEN=$(openssl rand -hex 32)" >> .env
+echo "SANDBOX_EGRESS_TOKEN=$(openssl rand -hex 32)" >> .env
 ```
+
+If you already set up phase 5, add only the `SANDBOX_EGRESS_TOKEN` line (otherwise `make
+up` stops with `set SANDBOX_EGRESS_TOKEN`). The sandbox image is larger now (ffmpeg,
+Node.js, build tools, pandoc…); the first build takes a while.
 
 A `.env` from before phase 5 also has `TOOL_DEFAULT_PROFILE=read_only`. With it, chats on
 "Tools: default" can only read files. Change it to `standard`, or pick a default under

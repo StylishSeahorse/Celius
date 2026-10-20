@@ -38,6 +38,7 @@ class SandboxClient:
         timeout_seconds: float,
         memory_mb: int,
         output_limit: int,
+        network: bool | None = None,
     ) -> dict[str, Any]:
         seconds = max(1, int(timeout_seconds))
         try:
@@ -50,6 +51,7 @@ class SandboxClient:
                     "timeout_seconds": seconds,
                     "memory_mb": memory_mb,
                     "output_limit": output_limit,
+                    "network": network,
                 },
                 # The sandbox enforces the timeout; this only guards against it hanging.
                 timeout=httpx.Timeout(seconds + 30, connect=5),

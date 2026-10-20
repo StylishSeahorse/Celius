@@ -33,6 +33,7 @@ WORKSPACE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 SNAPSHOT_LIMIT = 20_000
 SIGNAL_REASONS = {signal.SIGXCPU: "cpu_limit", signal.SIGXFSZ: "file_size_limit"}
 PR_SET_CHILD_SUBREAPER = 36
+PR_SET_DUMPABLE = 4
 
 # Sessions of executions in progress; anything else we started is a stray.
 _active_sessions: set[int] = set()
@@ -50,6 +51,7 @@ class Execution:
     timeout_seconds: int = 60
     memory_mb: int = 1024
     output_limit: int = 64 * 1024
+    network: bool | None = None  # None: the service default
 
 
 @dataclass
@@ -131,10 +133,17 @@ def _limits(config: SandboxConfig, memory_mb: int, cpu_seconds: int):
     return apply
 
 
-def _environment(home: str, tmp: str) -> dict[str, str]:
+def _environment(home: str, tmp: str, proxy: str | None = None) -> dict[str, str]:
     # Built from scratch: nothing from the service's own environment (e.g. its token) leaks.
-    return {
-        "PATH": "/usr/local/bin:/usr/bin:/bin",
+    # With network on, only the proxy credential is added: it is all the code needs.
+    network = (
+        {name: proxy for name in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy")}
+        | {"NO_PROXY": "localhost,127.0.0.1", "no_proxy": "localhost,127.0.0.1"}
+        if proxy
+        else {}
+    )
+    return network | {
+        "PATH": f"{home}/.local/bin:/usr/local/bin:/usr/bin:/bin",
         "HOME": home,
         "TMPDIR": tmp,
         "LANG": "C.UTF-8",
@@ -145,18 +154,33 @@ def _environment(home: str, tmp: str) -> dict[str, str]:
         "OPENBLAS_NUM_THREADS": "1",
         "OMP_NUM_THREADS": "1",
         "MKL_NUM_THREADS": "1",
+        # Installs go to the workspace (it persists between runs of a conversation).
+        "PIP_USER": "1",
+        "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+        "PYTHONUSERBASE": f"{home}/.local",
+        "NPM_CONFIG_PREFIX": f"{home}/.local",
+        "NPM_CONFIG_CACHE": f"{tmp}/npm-cache",
+        "PIP_CACHE_DIR": f"{tmp}/pip-cache",
     }
 
 
 def _command(
-    mode: str, kind: str, code_file: Path, workspace: Path, scratch: Path, config: SandboxConfig
+    mode: str,
+    kind: str,
+    code_file: Path,
+    workspace: Path,
+    scratch: Path,
+    config: SandboxConfig,
+    network: bool = False,
 ) -> tuple[list[str], dict[str, str], str]:
+    proxy = config.proxy_url() if network else None
     interpreter = ["python3", "-I"] if kind == "python" else ["bash", "--noprofile", "--norc"]
     if mode == "bwrap":
         inner_code = f"/run/celius/{code_file.name}"
         command = [
             "bwrap",
             "--unshare-all",  # network, pid, ipc, uts, user, cgroup namespaces
+            *(["--share-net"] if proxy else []),  # reaches only the proxy (internal network)
             "--die-with-parent",
             "--new-session",
             "--ro-bind",
@@ -185,10 +209,11 @@ def _command(
             *interpreter,
             inner_code,
         ]
-        return command, _environment("/home/workspace", "/tmp"), str(workspace)
+        return command, _environment("/home/workspace", "/tmp", proxy), str(workspace)
     tmp = scratch / "tmp"
     tmp.mkdir(exist_ok=True)
-    return [*interpreter, str(code_file)], _environment(str(workspace), str(tmp)), str(workspace)
+    env = _environment(str(workspace), str(tmp), proxy)
+    return [*interpreter, str(code_file)], env, str(workspace)
 
 
 async def _read_capped(stream: asyncio.StreamReader, limit: int, on_flood) -> tuple[bytes, bool]:
@@ -207,6 +232,16 @@ async def _read_capped(stream: asyncio.StreamReader, limit: int, on_flood) -> tu
 def _kill_group(pid: int) -> None:
     with contextlib.suppress(ProcessLookupError, PermissionError):
         os.killpg(pid, signal.SIGKILL)
+
+
+def protect_secrets() -> bool:
+    """Code runs as the same uid as this service; without this it could read the service's
+    environment (its token, the proxy credential) from /proc/<pid>/environ."""
+    try:
+        libc = ctypes.CDLL(None, use_errno=True)
+        return libc.prctl(PR_SET_DUMPABLE, 0, 0, 0, 0) == 0
+    except (OSError, AttributeError):
+        return False
 
 
 def become_subreaper() -> bool:
@@ -270,7 +305,10 @@ async def run(execution: Execution, config: SandboxConfig, mode: str) -> Result:
     code_file = scratch / ("main.py" if execution.kind == "python" else "main.sh")
     code_file.write_text(execution.code)
     before = _snapshot(workspace)
-    command, env, cwd = _command(mode, execution.kind, code_file, workspace, scratch, config)
+    network = config.network_default if execution.network is None else execution.network
+    command, env, cwd = _command(
+        mode, execution.kind, code_file, workspace, scratch, config, network=network
+    )
 
     started = time.monotonic()
     killed_reason: str | None = None

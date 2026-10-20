@@ -35,5 +35,21 @@ class SandboxConfig:
         default_factory=lambda: int(os.environ.get("SANDBOX_MAX_WORKSPACE_BYTES", str(2 * 1024**3)))
     )
     max_processes: int = field(
-        default_factory=lambda: int(os.environ.get("SANDBOX_MAX_PROCESSES", "128"))
+        default_factory=lambda: int(os.environ.get("SANDBOX_MAX_PROCESSES", "256"))
     )
+    # Internet through the egress proxy (sandbox/egress.py). Without a proxy: no network.
+    egress_proxy: str = field(default_factory=lambda: os.environ.get("SANDBOX_EGRESS_PROXY", ""))
+    egress_token: str = field(default_factory=lambda: os.environ.get("SANDBOX_EGRESS_TOKEN", ""))
+    # Default for runs that don't say; the worker normally decides per run.
+    network_default: bool = field(
+        default_factory=lambda: (
+            os.environ.get("SANDBOX_NETWORK", "true").lower() in ("1", "true", "yes")
+        )
+    )
+
+    def proxy_url(self) -> str | None:
+        """The proxy URL with its credential, or None when the sandbox has no network."""
+        if not self.egress_proxy or not self.egress_token:
+            return None
+        scheme, _, rest = self.egress_proxy.partition("://")
+        return f"{scheme}://sandbox:{self.egress_token}@{rest.rstrip('/')}"
