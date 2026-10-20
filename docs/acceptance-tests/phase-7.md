@@ -17,9 +17,21 @@ production images, then `infra/scripts/test-clean-deployment.sh` runs the stack 
 | `services/sandbox/tests/` | Escape tests (background processes, setsid, fork bombs, memory, output floods, timeouts, workspace escape, environment, non-dumpable service, egress proxy rules); now also run on Python 3.12 in CI |
 | `tests/test_compose_policy.py` | Sandbox and egress get no app secrets, volumes or ports; internal networks; backups mounted read-only |
 
-## Results
+## Results, 2026-10-20 (CI runs 19–20, fresh GitHub runners)
 
-See below; filled from the CI run on the Phase 7 head.
+| Check | Result |
+| --- | --- |
+| Clean deployment release gate | **passed**: deployed from scratch; backup paused the app for 4 s and took the dump, files and workspaces (manifest: 6 files); the status page saw it ("only on this machine"); `down -v` and `.env` deleted; restore from the archive and passphrase alone: "restore verified: row counts and stored files match the backup"; old password works; the chat from before the backup is there and the later one isn't; the uploaded file is byte-identical; the memory is there; a tampered archive was refused and the deployment kept running; the restore drill passed next to the live stack; the rollback kept the data |
+| API tests on SQLite and on PostgreSQL + migration round-trip | passed |
+| Sandbox tests (Python 3.12) | passed |
+| Web typecheck, unit tests, build; Windows installers | passed |
+| Playwright, desktop + Pixel 7 | 57 passed, 1 skipped (folder picking on the phone viewport) |
+
+**Note on earlier phases.** CI had been red since Phase 5 while the local runs passed:
+the sandbox job hung on Python 3.12 (a real bug, fixed; see the security review), two
+API tests behaved differently with internet access, the image smoke test had no writable
+workspace, and `ubuntu-latest` moved to 26.04 before Playwright supports it. All are fixed,
+so every job now runs and passes on CI, not just on the development machine.
 
 ## Manual (on the real deployment, H-06)
 
