@@ -1,6 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 import { ApiError, api } from "../../lib/api";
+import { disablePush, enablePush, type PushState, pushState } from "../../lib/notifications";
 
 const button = "rounded-md border border-line px-2.5 py-1 text-sm hover:bg-panel disabled:opacity-40";
 const input = "w-full rounded-md border border-line bg-canvas px-2 py-1.5 text-sm outline-none focus:border-accent";
@@ -56,6 +57,7 @@ export function AccountPanel({ isAdmin, onClose }: { isAdmin: boolean; onClose: 
         </header>
         <div className="flex-1 space-y-6 overflow-y-auto p-4 text-sm">
           {isAdmin && <SystemStatus />}
+          <Notifications />
           <PasswordForm />
           <Sessions />
         </div>
@@ -108,6 +110,71 @@ function SystemStatus() {
           ? "Problems are sent to your alert webhook."
           : "Set ALERT_WEBHOOK_URL (e.g. a Home Assistant webhook or an ntfy topic) to be told about problems."}
       </p>
+    </section>
+  );
+}
+
+const PUSH_TEXT: Record<PushState, string> = {
+  unsupported:
+    "This browser can't receive notifications. On iPhone, add Celius to the Home Screen first; over plain http (not https) they are unavailable.",
+  denied: "Notifications are blocked for this site. Allow them in the browser's site settings.",
+  off: "Get a notification on this device when a reply is ready or a tool needs your approval.",
+  on: "On for this device. Nothing is shown for the chat you are looking at.",
+};
+
+function Notifications() {
+  const [state, setState] = useState<PushState | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  useEffect(() => {
+    pushState()
+      .then(setState)
+      .catch(() => setState("off"));
+  }, []);
+
+  async function toggle() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      setState(state === "on" ? await disablePush() : await enablePush());
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Could not change notifications");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="space-y-2" aria-label="Notifications">
+      <h3 className="font-medium">Notifications</h3>
+      <p className="text-xs text-muted" data-testid="push-state" data-state={state ?? "checking"}>
+        {state ? PUSH_TEXT[state] : "Checking…"}
+      </p>
+      {(state === "on" || state === "off") && (
+        <div className="flex items-center gap-2">
+          <button className={button} disabled={busy} onClick={() => void toggle()}>
+            {state === "on" ? "Turn off on this device" : "Turn on for this device"}
+          </button>
+          {state === "on" && (
+            <button
+              className={button}
+              onClick={() =>
+                void api
+                  .pushTest()
+                  .then(() => setMessage("Test sent."))
+                  .catch(() => setMessage("Could not send a test"))
+              }
+            >
+              Send a test
+            </button>
+          )}
+          {message && (
+            <span role="status" className="text-xs">
+              {message}
+            </span>
+          )}
+        </div>
+      )}
     </section>
   );
 }

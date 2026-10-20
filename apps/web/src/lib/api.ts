@@ -94,6 +94,14 @@ export const api = {
     request<void>("/auth/password", json("POST", { current_password, new_password })),
   sessions: () => request<unknown[]>("/auth/sessions"),
   revokeOtherSessions: () => request<void>("/auth/sessions/revoke-others", json("POST")),
+  pushInfo: (endpoint?: string) =>
+    request<{ enabled: boolean; public_key: string; devices: number; subscribed: boolean }>(
+      `/push${endpoint ? `?endpoint=${encodeURIComponent(endpoint)}` : ""}`,
+    ),
+  pushSubscribe: (subscription: PushSubscriptionJSON) =>
+    request<void>("/push/subscriptions", json("POST", subscription)),
+  pushUnsubscribe: (endpoint: string) => request<void>("/push/subscriptions/remove", json("POST", { endpoint })),
+  pushTest: () => request<{ queued: boolean }>("/push/test", json("POST")),
   status: () =>
     request<{ status: string; checks: unknown[]; alerts: unknown }>("/status"),
   models: () => request<ModelList>("/models"),

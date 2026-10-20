@@ -8,6 +8,7 @@ import httpx
 import app.services.exports  # noqa: F401 - registers job handlers
 import app.services.files.processing  # noqa: F401 - registers job handlers
 import app.services.memory.jobs  # noqa: F401 - registers job handlers
+import app.services.push  # noqa: F401 - registers job handlers
 from app.services.jobs import claim_next_job, run_job
 from app.worker.executor import claim_next_run, execute_run
 

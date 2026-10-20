@@ -37,6 +37,7 @@ from app.models.identity import (
     UserSettings,
 )
 from app.models.memory import Memory, MemoryChunk, MemoryStatus
+from app.models.push import PushSubscription
 from app.models.tools import (
     FINAL_TOOL_CALL_STATUSES,
     McpServer,
@@ -54,6 +55,7 @@ __all__ = [
     "Memory",
     "MemoryChunk",
     "MemoryStatus",
+    "PushSubscription",
     "ScheduledTask",
     "ToolCall",
     "ToolCallStatus",

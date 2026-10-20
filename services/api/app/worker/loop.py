@@ -10,6 +10,7 @@ import anyio
 import app.services.exports  # noqa: F401 - registers job handlers
 import app.services.files.processing  # noqa: F401 - registers job handlers
 import app.services.memory.jobs  # noqa: F401 - registers job handlers
+import app.services.push  # noqa: F401 - registers job handlers
 from app.config import Settings
 from app.db import SessionFactory
 from app.services import monitoring

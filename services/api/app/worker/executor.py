@@ -49,6 +49,7 @@ from app.models import (
     MessageRole,
     MessageStatus,
     Project,
+    PushSubscription,
     Run,
     RunStatus,
     StoredFile,
@@ -56,6 +57,7 @@ from app.models import (
     ToolCallStatus,
 )
 from app.schemas.events import RunEventType
+from app.services import push
 from app.services.audit import audit
 from app.services.context import (
     CHARS_PER_TOKEN,
@@ -279,6 +281,28 @@ async def _tool_history_notes(db, message_ids: list[uuid.UUID], settings: Settin
             outcome = f"{label}: " + _clip(call.model_content or "", limit)
         lines.setdefault(call.message_id, []).append(f"- {call.tool_name}({args}) → {outcome}")
     return {mid: "\n".join([TOOL_NOTE_HEADER, *items]) for mid, items in lines.items()}
+
+
+async def _queue_push(db, run_id: uuid.UUID, body: str, *, urgency: str = "normal") -> None:
+    """A notification for the user's devices, if any are subscribed (sent by a job)."""
+    run = await db.get(Run, run_id)
+    if run is None:
+        return
+    subscribed = await db.scalar(
+        select(PushSubscription.id).where(PushSubscription.user_id == run.owner_id).limit(1)
+    )
+    if subscribed is None:
+        return
+    conversation = await db.get(Conversation, run.conversation_id)
+    push.queue(
+        db,
+        run.owner_id,
+        title=(conversation.title if conversation and conversation.title else None) or "Celius",
+        body=_clip(body, 180) or "Your reply is ready.",
+        url=f"/#/c/{run.conversation_id}",
+        tag=str(run.conversation_id),
+        urgency=urgency,
+    )
 
 
 async def _renew_lease(
@@ -851,6 +875,20 @@ class _Loop:
                 RunEventType.run_progress,
                 {"stage": "awaiting_approval", "message_id": str(self.p.message_id)},
             )
+            waiting = (
+                await db.scalars(
+                    select(ToolCall.tool_name).where(
+                        ToolCall.run_id == self.p.run_id,
+                        ToolCall.status == ToolCallStatus.pending_approval,
+                    )
+                )
+            ).all()
+            await _queue_push(
+                db,
+                self.p.run_id,
+                f"Waiting for your approval: {', '.join(sorted(set(waiting))) or 'a tool'}",
+                urgency="high",
+            )
             await db.commit()
         return "paused"
 
@@ -1318,6 +1356,7 @@ async def _finish(
                     "finish_reason": state.finish_reason,
                 },
             )
+            await _queue_push(db, run.id, "".join(state.text))
         if error is None and not (state.cancel_requested or run.cancel_requested):
             if settings is not None:
                 conversation = await db.get(Conversation, run.conversation_id)
@@ -1373,3 +1412,4 @@ async def _mark_failed(
             "retryable": retryable,
         },
     )
+    await _queue_push(db, run.id, f"The reply failed: {error}")

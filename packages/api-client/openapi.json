@@ -2407,6 +2407,56 @@
         "title": "ProjectUpdate",
         "type": "object"
       },
+      "PushInfo": {
+        "properties": {
+          "devices": {
+            "title": "Devices",
+            "type": "integer"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "public_key": {
+            "title": "Public Key",
+            "type": "string"
+          },
+          "subscribed": {
+            "default": false,
+            "title": "Subscribed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled",
+          "public_key",
+          "devices"
+        ],
+        "title": "PushInfo",
+        "type": "object"
+      },
+      "PushKeys": {
+        "properties": {
+          "auth": {
+            "maxLength": 100,
+            "minLength": 16,
+            "title": "Auth",
+            "type": "string"
+          },
+          "p256dh": {
+            "maxLength": 200,
+            "minLength": 20,
+            "title": "P256Dh",
+            "type": "string"
+          }
+        },
+        "required": [
+          "p256dh",
+          "auth"
+        ],
+        "title": "PushKeys",
+        "type": "object"
+      },
       "Regenerate": {
         "description": "Generate an alternative reply on a new branch; the original reply stays.",
         "properties": {
@@ -3079,6 +3129,26 @@
         "title": "StorageUsage",
         "type": "object"
       },
+      "SubscriptionIn": {
+        "description": "`PushSubscription.toJSON()` from the browser.",
+        "properties": {
+          "endpoint": {
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Endpoint",
+            "type": "string"
+          },
+          "keys": {
+            "$ref": "#/components/schemas/PushKeys"
+          }
+        },
+        "required": [
+          "endpoint",
+          "keys"
+        ],
+        "title": "SubscriptionIn",
+        "type": "object"
+      },
       "SyncAck": {
         "properties": {
           "cursor": {
@@ -3720,6 +3790,21 @@
           }
         },
         "title": "ToolSettingsUpdate",
+        "type": "object"
+      },
+      "Unsubscribe": {
+        "properties": {
+          "endpoint": {
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Endpoint",
+            "type": "string"
+          }
+        },
+        "required": [
+          "endpoint"
+        ],
+        "title": "Unsubscribe",
         "type": "object"
       },
       "UploadCreate": {
@@ -6391,6 +6476,148 @@
         "summary": "Update Project",
         "tags": [
           "projects"
+        ]
+      }
+    },
+    "/api/v1/push": {
+      "get": {
+        "description": "The key to subscribe with, and how many of your devices get notifications.",
+        "operationId": "push_info_api_v1_push_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "endpoint",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Endpoint"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Push Info",
+        "tags": [
+          "push"
+        ]
+      }
+    },
+    "/api/v1/push/subscriptions": {
+      "post": {
+        "operationId": "subscribe_api_v1_push_subscriptions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubscriptionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Subscribe",
+        "tags": [
+          "push"
+        ]
+      }
+    },
+    "/api/v1/push/subscriptions/remove": {
+      "post": {
+        "operationId": "unsubscribe_api_v1_push_subscriptions_remove_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Unsubscribe"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unsubscribe",
+        "tags": [
+          "push"
+        ]
+      }
+    },
+    "/api/v1/push/test": {
+      "post": {
+        "description": "Send \"Notifications work\" to every device of yours.",
+        "operationId": "send_test_api_v1_push_test_post",
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Send Test Api V1 Push Test Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Send Test",
+        "tags": [
+          "push"
         ]
       }
     },

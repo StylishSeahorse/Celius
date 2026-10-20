@@ -163,6 +163,15 @@ class Settings(BaseSettings):
     alert_failed_jobs_per_day: int = 5
     alert_backup_warning_hours: float = 26
     alert_backup_critical_hours: float = 72
+    # Web Push notifications (replies ready, approvals). Keys are derived from APP_SECRET_KEY.
+    push_enabled: bool = True
+    # VAPID contact, e.g. mailto:you@example.com (defaults to APP_PUBLIC_URL).
+    push_contact: str | None = None
+    # Push services subscriptions may point at (comma-separated host suffixes; empty = the
+    # browser vendors' services).
+    push_allowed_hosts: str = ""
+    push_ttl_seconds: int = Field(default=86400, ge=0)
+
     # Bearer token for GET /api/v1/metrics (Prometheus). Unset: the endpoint is off.
     metrics_token: SecretStr | None = None
 

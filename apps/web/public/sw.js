@@ -89,3 +89,63 @@ self.addEventListener("fetch", (event) => {
     })(),
   );
 });
+
+/*
+ * Notifications (Web Push). The server sends {title, body, url, tag}; tag is the
+ * conversation id. Nothing is shown while that conversation is on screen.
+ */
+/** Ask each open window what it shows (hash routes aren't reliably in Client.url). */
+function askWindow(client) {
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    const timer = setTimeout(() => resolve(null), 500);
+    channel.port1.onmessage = (event) => {
+      clearTimeout(timer);
+      resolve(event.data);
+    };
+    client.postMessage({ type: "celius:showing?" }, [channel.port2]);
+  });
+}
+
+async function someoneIsShowing(conversationId) {
+  const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+  const answers = await Promise.all(windows.map(askWindow));
+  return answers.some((a) => a && a.visible && a.conversation === conversationId);
+}
+
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data ? event.data.text() : "" };
+  }
+  event.waitUntil(
+    (async () => {
+      if (data.tag && data.tag !== "test" && (await someoneIsShowing(data.tag))) return;
+      await self.registration.showNotification(data.title || "Celius", {
+        body: data.body || "",
+        tag: data.tag || undefined,
+        data: { url: data.url || "/" },
+        icon: "/icon-192.png",
+        badge: "/icon-192.png",
+      });
+    })(),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = new URL(event.notification.data?.url || "/", self.location.origin).href;
+  event.waitUntil(
+    (async () => {
+      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      const open = windows.find((w) => new URL(w.url).origin === self.location.origin);
+      if (open) {
+        open.postMessage({ type: "celius:open", url });
+        return open.focus();
+      }
+      return self.clients.openWindow(url);
+    })(),
+  );
+});

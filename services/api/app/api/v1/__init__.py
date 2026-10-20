@@ -11,6 +11,7 @@ from app.api.v1 import (
     messages,
     models,
     projects,
+    push,
     runs,
     sync,
     tools,
@@ -30,3 +31,4 @@ router.include_router(sync.router)
 router.include_router(tools.router)
 router.include_router(automation.router)
 router.include_router(memory.router)
+router.include_router(push.router)
