@@ -70,3 +70,13 @@ def test_the_egress_proxy_is_the_only_way_out_and_holds_nothing_else(compose):
     assert compose["services"]["sandbox"]["environment"]["SANDBOX_EGRESS_PROXY"] == (
         "http://egress:3128"
     )
+
+
+def test_backups_are_read_only_inside_the_app(compose):
+    """Only backup.sh on the host writes archives; the app just reads the status file."""
+    for name in ("api", "worker"):
+        mounts = [
+            v for v in compose["services"][name]["volumes"] if v.endswith(":/data/backups:ro")
+        ]
+        assert len(mounts) == 1, name
+    assert not any("backups" in str(v) for v in compose["services"]["sandbox"]["volumes"])
