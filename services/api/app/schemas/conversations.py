@@ -18,6 +18,8 @@ class ConversationCreate(BaseModel):
     reasoning: bool | None = None
     # Tool profile (built-in name or "custom:<id>"); None = the user's default.
     tool_profile: str | None = Field(default=None, max_length=80)
+    # False: an "incognito" chat, neither remembered nor given memory.
+    memory_enabled: bool = True
 
 
 class ConversationUpdate(BaseModel):

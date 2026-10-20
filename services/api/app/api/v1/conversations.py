@@ -113,11 +113,18 @@ async def update_conversation(
 
 
 @router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_conversation(conversation_id: uuid.UUID, auth: CurrentAuth, db: DB) -> None:
+async def delete_conversation(
+    conversation_id: uuid.UUID,
+    auth: CurrentAuth,
+    db: DB,
+    forget_memories: Annotated[bool, Query()] = False,
+) -> None:
+    """`forget_memories=true` also deletes the memories that were learned from this chat
+    (see GET /conversations/{id}/memory for how many)."""
     conversation = await svc.get_owned_conversation(
         db, auth.user.id, conversation_id, for_update=True
     )
-    await svc.delete_conversation(db, conversation)
+    await svc.delete_conversation(db, conversation, forget_memories=forget_memories)
     await db.commit()
 
 

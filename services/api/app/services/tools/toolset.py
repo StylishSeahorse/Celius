@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import app.services.tools.builtin  # noqa: F401 - registers the built-in tools
 from app.config import Settings
 from app.models import Conversation, McpServer, UserSettings
+from app.services.memory.store import memory_active_for
 from app.services.tools.mcp import server_headers, specs_for
 from app.services.tools.policy import (
     Profile,
@@ -17,6 +18,8 @@ from app.services.tools.policy import (
     tool_preferences,
 )
 from app.services.tools.registry import BUILTIN, ToolSpec
+
+MEMORY_TOOLS = ("remember", "search_memory")
 
 
 @dataclass
@@ -64,6 +67,9 @@ async def build_toolset(
 ) -> Toolset:
     profile = await conversation_profile(db, conversation, settings)
     known, unavailable = await available_tools(db, conversation.owner_id, settings, sandbox=sandbox)
+    if not await memory_active_for(db, conversation, settings):
+        for name in MEMORY_TOOLS:
+            unavailable.setdefault(name, "Memory is off for this chat")
     offered = {
         name: spec
         for name, spec in known.items()

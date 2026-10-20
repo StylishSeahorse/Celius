@@ -27,6 +27,10 @@ class Project(UUIDPrimaryKey, Timestamps, Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     instructions: Mapped[str | None] = mapped_column(Text)
+    # Off: chats in this project are not remembered or recalled, and get no memories.
+    memory_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="true", nullable=False
+    )
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 

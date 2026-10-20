@@ -9,12 +9,14 @@ class ProjectCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=2000)
     instructions: str | None = Field(default=None, max_length=50_000)
+    memory_enabled: bool = True
 
 
 class ProjectUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=2000)
     instructions: str | None = Field(default=None, max_length=50_000)
+    memory_enabled: bool | None = None
     archived: bool | None = None
 
 
@@ -23,6 +25,7 @@ class ProjectOut(BaseModel):
     name: str
     description: str | None
     instructions: str | None
+    memory_enabled: bool = True
     archived: bool
     conversation_count: int = 0
     created_at: datetime

@@ -31,6 +31,7 @@ from app.schemas.conversations import (
     RunOut,
 )
 from app.services.audit import audit
+from app.services.memory.store import forget_conversation, move_chunks
 from app.services.runs import request_cancel
 from app.services.sync import record_sync
 from app.services.tools.policy import validate_profile_key
@@ -253,6 +254,7 @@ async def create_conversation(
         model_override=data.model_override,
         reasoning=data.reasoning,
         tool_profile=data.tool_profile,
+        memory_enabled=data.memory_enabled,
         version=1,
     )
     db.add(conversation)
@@ -283,16 +285,28 @@ async def update_conversation(
             previous=conversation.tool_profile,
             profile=fields["tool_profile"],
         )
+    moved = "project_id" in fields and fields["project_id"] != conversation.project_id
+    memory_off = fields.get("memory_enabled") is False and conversation.memory_enabled
     for key, value in fields.items():
         setattr(conversation, key, value)
+    if memory_off:
+        # Not remembered any more: its excerpts go now. Memories learned from it stay
+        # until deleted (the UI offers that).
+        await forget_conversation(db, conversation, memories_too=False)
+    elif moved:
+        await move_chunks(db, conversation)
     if data.archived is not None:
         conversation.archived_at = utcnow() if data.archived else None
     touch(db, conversation)
     return conversation
 
 
-async def delete_conversation(db: AsyncSession, conversation: Conversation) -> None:
-    """Soft delete; active runs are cancelled. Purging is a separate retention job."""
+async def delete_conversation(
+    db: AsyncSession, conversation: Conversation, *, forget_memories: bool = False
+) -> dict[str, int]:
+    """Soft delete; active runs are cancelled. Its recall excerpts are removed at once (and
+    the memories learned from it, if asked). Purging the rest is a separate retention job."""
+    forgotten = await forget_conversation(db, conversation, memories_too=forget_memories)
     now = utcnow()
     conversation.deleted_at = now
     runs = (
@@ -306,6 +320,7 @@ async def delete_conversation(db: AsyncSession, conversation: Conversation) -> N
         await request_cancel(db, run)
     conversation.version += 1
     record_sync(db, conversation.owner_id, "conversation", conversation.id, operation="delete")
+    return forgotten
 
 
 def _encode_cursor(updated_at: datetime, conversation_id: uuid.UUID) -> str:

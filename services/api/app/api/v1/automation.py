@@ -323,6 +323,13 @@ async def delete_server(server_id: uuid.UUID, request: Request, auth: Admin, db:
 # ---------------------------------------------------------------------- activity
 
 ACTIVE_RUNS = (RunStatus.queued, RunStatus.running, RunStatus.awaiting_approval)
+# Housekeeping that runs after every reply; listing it would drown everything else.
+HIDDEN_JOBS = ("memory.index",)
+JOB_TITLES = {
+    "file.process": "Reading a file",
+    "export": "Export",
+    "memory.extract": "Looking for things to remember",
+}
 
 
 @router.get("/activity", response_model=ActivityList)
@@ -377,7 +384,7 @@ async def activity(
     jobs = (
         await db.scalars(
             select(Job)
-            .where(Job.owner_id == auth.user.id)
+            .where(Job.owner_id == auth.user.id, Job.kind.not_in(HIDDEN_JOBS))
             .order_by(Job.created_at.desc())
             .limit(limit)
         )
@@ -387,7 +394,7 @@ async def activity(
             kind="job",
             id=job.id,
             status=job.status.value,
-            title=job.kind,
+            title=JOB_TITLES.get(job.kind, job.kind),
             source=job.kind,
             error=job.error,
             created_at=job.created_at,

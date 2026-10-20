@@ -7,6 +7,7 @@ import httpx
 
 import app.services.exports  # noqa: F401 - registers job handlers
 import app.services.files.processing  # noqa: F401 - registers job handlers
+import app.services.memory.jobs  # noqa: F401 - registers job handlers
 from app.services.jobs import claim_next_job, run_job
 from app.worker.executor import claim_next_run, execute_run
 
@@ -28,6 +29,11 @@ class FakeLlama:
         # Scripted turns: each is a reply text, or a list of tool calls
         # ({"name": ..., "arguments": {...} or "raw json"}). Used in order, then `reply`.
         self.turns: list[str | list[dict[str, Any]]] = []
+        # Answer to memory extraction requests (recognised by their system prompt).
+        self.memory_reply = '{"memories": []}'
+        self.extraction_requests: list[dict[str, Any]] = []
+        self.embedding_requests: list[list[str]] = []
+        self.embeddings_fail = False
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         path = request.url.path
@@ -44,8 +50,30 @@ class FakeLlama:
             if self.chat_template is not None:
                 props["chat_template"] = self.chat_template
             return httpx.Response(200, json=props)
+        if path == "/v1/embeddings":
+            if self.embeddings_fail:
+                return httpx.Response(503)
+            texts = json.loads(request.content)["input"]
+            self.embedding_requests.append(texts)
+            return httpx.Response(
+                200,
+                json={
+                    "data": [
+                        {"index": i, "embedding": bag_of_words(t)} for i, t in enumerate(texts)
+                    ]
+                },
+            )
         if path == "/v1/chat/completions":
-            self.requests.append(json.loads(request.content))
+            body = json.loads(request.content)
+            system = (body.get("messages") or [{}])[0].get("content") or ""
+            if isinstance(system, str) and system.startswith("You decide what an assistant"):
+                self.extraction_requests.append(body)
+                return httpx.Response(
+                    200,
+                    content=_text_stream(self.memory_reply),
+                    headers={"content-type": "text/event-stream"},
+                )
+            self.requests.append(body)
             if self.fail_status:
                 return httpx.Response(
                     self.fail_status, json={"error": {"message": "context size exceeded"}}
@@ -125,13 +153,29 @@ class FakeLlama:
         yield b"data: [DONE]\n\n"
 
 
-async def drain_jobs(sessionmaker, settings, worker_id: str = "test-worker") -> int:
-    """Run queued background jobs (file processing, exports) synchronously."""
+async def drain_jobs(sessionmaker, settings, worker_id: str = "test-worker", gateway=None) -> int:
+    """Run queued background jobs (file processing, exports, memory) synchronously."""
     count = 0
     while (job_id := await claim_next_job(sessionmaker, worker_id, settings)) is not None:
-        await run_job(job_id, factory=sessionmaker, settings=settings, worker_id=worker_id)
+        await run_job(
+            job_id, factory=sessionmaker, settings=settings, worker_id=worker_id, gateway=gateway
+        )
         count += 1
     return count
+
+
+def bag_of_words(text: str, dims: int = 64) -> list[float]:
+    """A deterministic stand-in embedding: texts sharing words are close."""
+    vector = [0.0] * dims
+    for word in re.findall(r"[a-z]{3,}", text.lower()):
+        vector[sum(map(ord, word)) % dims] += 1.0
+    return vector if any(vector) else [1.0] + [0.0] * (dims - 1)
+
+
+async def _text_stream(text: str):
+    yield _sse({"choices": [{"delta": {"content": text}}]})
+    yield _sse({"choices": [{"delta": {}, "finish_reason": "stop"}]})
+    yield b"data: [DONE]\n\n"
 
 
 def _sse(payload: dict) -> bytes:

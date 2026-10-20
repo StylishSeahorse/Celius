@@ -20,12 +20,24 @@ import httpx
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
-from app.models import FileLink, FileStatus, Message, MessagePart, StoredFile
+from app.models import (
+    Conversation,
+    FileLink,
+    FileStatus,
+    MemoryStatus,
+    Message,
+    MessagePart,
+    StoredFile,
+)
 from app.services.files import quota
 from app.services.files.paths import UnsafePath, safe_filename
 from app.services.files.service import storage_for
 from app.services.files.sniff import FileRejected, detect
 from app.services.jobs import enqueue_job
+from app.services.memory.embeddings import Embedder
+from app.services.memory.retrieval import prompt_block as memory_prompt_block
+from app.services.memory.retrieval import retrieve, usage_part
+from app.services.memory.store import add_memory, memory_active_for
 from app.services.sync import record_sync
 from app.services.tools import workspace as ws
 from app.services.tools.netguard import (
@@ -881,5 +893,102 @@ builtin(
         handler=_make_document,
         args_model=DocumentArgs,
         needs_sandbox=True,
+    )
+)
+
+
+# ---------------------------------------------------------------------- memory
+
+
+class RememberArgs(BaseModel):
+    fact: str = Field(
+        min_length=3,
+        max_length=1000,
+        description="One durable fact about the user, in the third person",
+    )
+    scope: Literal["global", "project"] = Field(
+        default="global", description="project: only for chats in this chat's project"
+    )
+
+
+async def _remember(ctx: ToolContext, args: RememberArgs) -> ToolOutput:
+    async with ctx.factory() as db:
+        conversation = await db.get(Conversation, ctx.conversation_id)
+        if conversation is None or not await memory_active_for(db, conversation, ctx.settings):
+            return _error("Memory is turned off for this chat")
+        project_id = conversation.project_id if args.scope == "project" else None
+        embedder = Embedder.from_settings(ctx.settings)
+        try:
+            memory = await add_memory(
+                db,
+                ctx.owner_id,
+                args.fact,
+                ctx.settings,
+                source="model",
+                scope="project" if project_id else "global",
+                project_id=project_id,
+                conversation_id=ctx.conversation_id,
+                message_id=ctx.message_id,
+                embedder=embedder,
+            )
+        finally:
+            if embedder is not None:
+                await embedder.aclose()
+        await db.commit()
+    if memory is None:
+        return ToolOutput(content="Already remembered.", data={"duplicate": True})
+    if memory.status == MemoryStatus.proposed:
+        return ToolOutput(
+            content="Proposed; the user will review it before it is remembered.",
+            data={"memory_id": str(memory.id), "status": "proposed"},
+        )
+    return ToolOutput(content="Remembered.", data={"memory_id": str(memory.id), "status": "active"})
+
+
+builtin(
+    ToolSpec(
+        name="remember",
+        label="Remember",
+        description="Propose a lasting fact about the user (a preference, their setup, an "
+        "ongoing project) to remember in future chats. Only when they would clearly want it "
+        "kept; never secrets or sensitive details.",
+        risk="read",
+        handler=_remember,
+        args_model=RememberArgs,
+    )
+)
+
+
+class SearchMemoryArgs(BaseModel):
+    query: str = Field(min_length=2, max_length=500, description="What to look for")
+
+
+async def _search_memory(ctx: ToolContext, args: SearchMemoryArgs) -> ToolOutput:
+    async with ctx.factory() as db:
+        conversation = await db.get(Conversation, ctx.conversation_id)
+        if conversation is None:
+            return _error("Conversation not found")
+        embedder = Embedder.from_settings(ctx.settings)
+        try:
+            found = await retrieve(db, conversation, args.query, ctx.settings, embedder)
+        finally:
+            if embedder is not None:
+                await embedder.aclose()
+        await db.commit()
+    if found.empty:
+        return ToolOutput(content="Nothing found in memory.", data={"results": 0})
+    block = memory_prompt_block(found, ctx.settings.tool_max_result_chars)
+    return ToolOutput(content=block, data=usage_part(found))
+
+
+builtin(
+    ToolSpec(
+        name="search_memory",
+        label="Search memory",
+        description="Search what you remember about the user and their earlier chats (in the "
+        "same project). Use when they refer to something from another conversation.",
+        risk="read",
+        handler=_search_memory,
+        args_model=SearchMemoryArgs,
     )
 )

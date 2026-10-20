@@ -7,6 +7,7 @@ from app.api.v1 import (
     exports,
     files,
     health,
+    memory,
     messages,
     models,
     projects,
@@ -28,3 +29,4 @@ router.include_router(runs.router)
 router.include_router(sync.router)
 router.include_router(tools.router)
 router.include_router(automation.router)
+router.include_router(memory.router)

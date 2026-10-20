@@ -20,6 +20,7 @@ dependencies = [
     "python-pptx>=1.0,<2",
     "pillow>=11.0,<13",
     "cryptography>=43",
+    "pgvector>=0.3",
 ]
 
 [dependency-groups]

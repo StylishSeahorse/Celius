@@ -58,6 +58,10 @@ from app.services.audit import audit
 from app.services.context import CHARS_PER_TOKEN, HistoryItem, build_context, context_budget
 from app.services.conversations import load_parts, message_ancestry, message_text
 from app.services.files.service import storage_for
+from app.services.memory.embeddings import Embedder
+from app.services.memory.jobs import queue_after_reply
+from app.services.memory.retrieval import Retrieved, retrieve, usage_part
+from app.services.memory.retrieval import prompt_block as memory_prompt_block
 from app.services.model_gateway import ChatMessage, ChatRequest, ModelGateway, ModelGatewayError
 from app.services.prompt_files import (
     DATA_NOT_INSTRUCTIONS,
@@ -813,7 +817,15 @@ class _Loop:
     async def _finish(self, state: _StreamState, *, error: ModelGatewayError | None = None) -> None:
         # One model turn: its usage as reported. Several: the sum of their token counts.
         usage = self.p.usage if self.p.step else state.usage
-        await _finish(self.factory, self.p.run_id, self.worker_id, state, usage=usage, error=error)
+        await _finish(
+            self.factory,
+            self.p.run_id,
+            self.worker_id,
+            state,
+            usage=usage,
+            error=error,
+            settings=self.settings,
+        )
 
 
 def _missing_tools_note(toolset: Toolset) -> str:
@@ -923,6 +935,31 @@ async def _prepare(
             if attachments or project_block:
                 system_prompt += "\n\n" + DATA_NOT_INSTRUCTIONS
 
+            retrieved = Retrieved()
+            if latest_user is not None:
+                embedder = Embedder.from_settings(settings)
+                try:
+                    async with db.begin_nested():
+                        retrieved = await retrieve(
+                            db,
+                            conversation,
+                            message_text(parts[latest_user.id]),
+                            settings,
+                            embedder,
+                        )
+                except Exception:
+                    # Memory is an extra: without it the reply is still worth writing.
+                    log.exception("Memory retrieval failed for run %s", run_id)
+                    retrieved = Retrieved()
+                finally:
+                    if embedder is not None:
+                        await embedder.aclose()
+            memory_budget = (
+                int(budget * settings.memory_context_share * CHARS_PER_TOKEN) if budget else 12_000
+            )
+            if memory := memory_prompt_block(retrieved, memory_budget):
+                system_prompt += "\n\n" + memory
+
             toolset = None
             if tool_calling:
                 toolset = await build_toolset(db, conversation, settings, sandbox=sandbox)
@@ -960,6 +997,23 @@ async def _prepare(
             usage=dict(run.usage or {}),
         )
         resumed = await _restore_steps(db, prepared, output)
+        if not retrieved.empty and not await db.scalar(
+            select(MessagePart.id).where(
+                MessagePart.message_id == output.id,
+                MessagePart.revision == output.current_revision,
+                MessagePart.type == "memory",
+            )
+        ):
+            # Shown under the reply: which memories and earlier chats it was given.
+            db.add(
+                MessagePart(
+                    message_id=output.id,
+                    revision=output.current_revision,
+                    position=await _next_position(db, output),
+                    type="memory",
+                    data=usage_part(retrieved),
+                )
+            )
 
         output.status = MessageStatus.streaming
         if resumed:
@@ -1080,6 +1134,7 @@ async def _finish(
     *,
     usage: dict[str, Any] | None = None,
     error: ModelGatewayError | None = None,
+    settings: Settings | None = None,
 ) -> None:
     async with factory() as db:
         run = await db.scalar(select(Run).where(Run.id == run_id).with_for_update())
@@ -1140,6 +1195,10 @@ async def _finish(
                 },
             )
         if error is None and not (state.cancel_requested or run.cancel_requested):
+            if settings is not None:
+                conversation = await db.get(Conversation, run.conversation_id)
+                if conversation is not None:
+                    await queue_after_reply(db, conversation, run, settings)
             record_sync(
                 db,
                 run.owner_id,

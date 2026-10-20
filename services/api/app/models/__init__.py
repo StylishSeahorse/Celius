@@ -36,6 +36,7 @@ from app.models.identity import (
     User,
     UserSettings,
 )
+from app.models.memory import Memory, MemoryChunk, MemoryStatus
 from app.models.tools import (
     FINAL_TOOL_CALL_STATUSES,
     McpServer,
@@ -50,6 +51,9 @@ __all__ = [
     "FINAL_TOOL_CALL_STATUSES",
     "TERMINAL_RUN_STATUSES",
     "McpServer",
+    "Memory",
+    "MemoryChunk",
+    "MemoryStatus",
     "ScheduledTask",
     "ToolCall",
     "ToolCallStatus",

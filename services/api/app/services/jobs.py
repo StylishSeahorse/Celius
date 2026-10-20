@@ -1,6 +1,7 @@
 """Durable background jobs (file processing, exports) with the same claim/lease model as
 generation runs (ADR 0005). Handlers register by kind and run in the worker process."""
 
+import inspect
 import logging
 import uuid
 from collections.abc import Awaitable, Callable
@@ -73,8 +74,14 @@ async def claim_next_job(
 
 
 async def run_job(
-    job_id: uuid.UUID, *, factory: SessionFactory, settings: Settings, worker_id: str
+    job_id: uuid.UUID,
+    *,
+    factory: SessionFactory,
+    settings: Settings,
+    worker_id: str,
+    gateway: Any = None,
 ) -> None:
+    """`gateway` (the model gateway) is passed to handlers that take it (memory jobs)."""
     async with factory() as db:
         job = await db.get(Job, job_id)
         if job is None or job.status != JobStatus.running or job.worker_id != worker_id:
@@ -84,7 +91,10 @@ async def run_job(
     try:
         if handler is None:
             raise JobFailed(f"No handler for job kind {job.kind!r}")
-        result = await handler(factory, settings, job)
+        if "gateway" in inspect.signature(handler).parameters:
+            result = await handler(factory, settings, job, gateway=gateway)
+        else:
+            result = await handler(factory, settings, job)
         status, error = JobStatus.completed, None
     except JobFailed as exc:
         result, status, error = None, JobStatus.failed, str(exc)

@@ -86,10 +86,22 @@ class Settings(BaseSettings):
     job_lease_seconds: int = Field(default=600, ge=30)
     job_max_attempts: int = Field(default=2, ge=1)
 
-    # Memory
+    # Memory and recall (ADR 0009). These are defaults; each user can change their own.
     memory_enabled: bool = True
+    # After each reply, ask the model what is worth remembering (uses inference time).
     memory_auto_extraction: bool = True
+    # Proposed memories wait in a review queue until approved.
     memory_require_review: bool = True
+    # Embeddings (optional; keyword search is used without them). An OpenAI-compatible
+    # /v1/embeddings endpoint, e.g. a second llama-server started with --embeddings.
+    embedding_base_url: str | None = None  # defaults to MODEL_BASE_URL
+    embedding_model: str | None = None
+    embedding_api_key: SecretStr | None = None
+    # How much memory goes into a prompt.
+    memory_prompt_max_items: int = Field(default=30, ge=0, le=200)
+    memory_recall_chunks: int = Field(default=4, ge=0, le=20)
+    memory_context_share: float = Field(default=0.15, ge=0, le=0.5)
+    memory_extraction_max_per_turn: int = Field(default=3, ge=0, le=10)
 
     # Tools (ADR 0008)
     # Profile for conversations that don't pick one (users can change their own default).

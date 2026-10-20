@@ -9,6 +9,7 @@ import anyio
 
 import app.services.exports  # noqa: F401 - registers job handlers
 import app.services.files.processing  # noqa: F401 - registers job handlers
+import app.services.memory.jobs  # noqa: F401 - registers job handlers
 from app.config import Settings
 from app.db import SessionFactory
 from app.services.files.service import cleanup_expired_uploads
@@ -117,7 +118,14 @@ async def run_worker(
                 if job_id is None:
                     break
                 track(
-                    jobs, run_job(job_id, factory=factory, settings=settings, worker_id=worker_id)
+                    jobs,
+                    run_job(
+                        job_id,
+                        factory=factory,
+                        settings=settings,
+                        worker_id=worker_id,
+                        gateway=gateway,
+                    ),
                 )
         except Exception:
             # Database unavailable, etc. Keep the process alive and try again.

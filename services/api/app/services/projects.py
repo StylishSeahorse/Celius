@@ -7,6 +7,7 @@ from app.db.base import utcnow
 from app.errors import AppError, not_found
 from app.models import Conversation, Project
 from app.schemas.projects import ProjectCreate, ProjectOut, ProjectUpdate
+from app.services.memory.store import forget_project
 from app.services.sync import record_sync
 
 
@@ -16,6 +17,7 @@ def project_out(project: Project, conversation_count: int = 0) -> ProjectOut:
         name=project.name,
         description=project.description,
         instructions=project.instructions,
+        memory_enabled=project.memory_enabled,
         archived=project.archived_at is not None,
         conversation_count=conversation_count,
         created_at=project.created_at,
@@ -72,6 +74,7 @@ async def create_project(
         name=data.name.strip(),
         description=data.description,
         instructions=data.instructions,
+        memory_enabled=data.memory_enabled,
     )
     db.add(project)
     await db.flush()
@@ -81,6 +84,10 @@ async def create_project(
 
 async def update_project(db: AsyncSession, project: Project, data: ProjectUpdate) -> Project:
     fields = data.model_dump(exclude_unset=True, exclude={"archived"})
+    if fields.get("memory_enabled") is None:
+        fields.pop("memory_enabled", None)
+    elif project.memory_enabled and not fields["memory_enabled"]:
+        await forget_project(db, project)  # its chats stop being recalled at once
     for key, value in fields.items():
         setattr(project, key, value.strip() if key == "name" and value else value)
     if data.archived is not None:
