@@ -82,6 +82,8 @@ cp "$ROOT/infra/compose.yaml" "$staging/config/compose.yaml"
 revision="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
 echo "$revision" >"$staging/config/git-revision"
 
+# Readable by the container's user for the checksums; $work itself stays private (0700).
+find "$staging" -user "$(id -u)" -exec chmod a+rX {} +
 compose run --rm --no-deps -T -v "$staging:/backup" api \
   python -m app.ops.backup manifest /backup --git-revision "$revision" >&2
 restart
