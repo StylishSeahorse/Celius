@@ -121,6 +121,30 @@ export function AttachmentList({ message, align = "end" }: { message: Message; a
               />
             </a>
           </li>
+        ) : f.has_thumbnail ? (
+          <li key={f.file_id}>
+            <a
+              href={f.kind === "pdf" ? fileUrls.inline(f.file_id) : fileUrls.download(f.file_id)}
+              {...(f.kind === "pdf" ? { target: "_blank", rel: "noopener noreferrer" } : { download: true })}
+              className="flex w-40 flex-col overflow-hidden rounded-lg border border-line bg-canvas text-sm hover:border-accent/60"
+              title={f.kind === "pdf" ? `Open ${f.filename}` : `Download ${f.filename}`}
+              data-testid="file-preview"
+            >
+              <img
+                src={fileUrls.thumbnail(f.file_id)}
+                alt={`Preview of ${f.filename}`}
+                loading="lazy"
+                className="h-28 w-full border-b border-line bg-white object-cover object-top"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+              <span className="flex items-center gap-1 px-2 py-1">
+                <span className="truncate">{f.relative_path ?? f.filename}</span>
+                <span className="ml-auto shrink-0 text-xs text-muted">{formatBytes(f.size_bytes)}</span>
+              </span>
+            </a>
+          </li>
         ) : (
           <li key={f.file_id}>
             <a

@@ -76,6 +76,8 @@ class Settings(BaseSettings):
 
     # Files
     upload_session_ttl_minutes: int = Field(default=60, ge=1)
+    # Preview images for PDFs (first page) and Office files (their embedded preview).
+    file_previews: bool = True
     max_extracted_text_chars: int = Field(default=500_000, ge=1000)
     # Most of one attachment's text that goes into a prompt. Longer documents are sent as
     # their beginning plus the passages most relevant to the question; tools can read the

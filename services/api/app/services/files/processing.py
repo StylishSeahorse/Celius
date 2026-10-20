@@ -36,6 +36,7 @@ async def process_file(factory: SessionFactory, settings: Settings, job: Job) ->
                 max_chars=settings.max_extracted_text_chars,
                 limits=archive_limits(settings),
                 max_pixels=settings.image_max_pixels,
+                previews=settings.file_previews,
             )
         )
         if result.thumbnail:

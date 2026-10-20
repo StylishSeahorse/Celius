@@ -12,6 +12,12 @@ const PNG = Buffer.from(
   "base64",
 );
 
+// One page, "Preview me" (the same generator as the API's tests).
+const PDF = Buffer.from(
+  "JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMTQ0XSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4gPj4gPj4KZW5kb2JqCjQgMCBvYmoKPDwgL0xlbmd0aCA0MSA+PgpzdHJlYW0KQlQgL0YxIDE4IFRmIDIwIDEwMCBUZCAoUHJldmlldyBtZSkgVGogRVQKZW5kc3RyZWFtCmVuZG9iago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDA5IDAwMDAwIG4gCjAwMDAwMDAwNTggMDAwMDAgbiAKMDAwMDAwMDExNSAwMDAwMCBuIAowMDAwMDAwMjQxIDAwMDAwIG4gCjAwMDAwMDAzMzIgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo0MDIKJSVFT0YK",
+  "base64",
+);
+
 function fixture(dir: string, name: string, content: string | Buffer): string {
   const path = join(dir, name);
   mkdirSync(join(path, ".."), { recursive: true });
@@ -88,6 +94,19 @@ test("a large upload survives a dropped connection", async ({ page }, info) => {
   const received = readFileSync((await download.path())!);
   expect(received.length).toBe(Buffer.byteLength(big));
   expect(createHash("sha256").update(received).digest("hex")).toBe(createHash("sha256").update(big).digest("hex"));
+});
+
+test("a PDF shows a preview of its first page", async ({ page }, info) => {
+  const path = fixture(info.outputPath("files"), "flyer.pdf", PDF);
+  await attach(page, [path]);
+  await send(page, "What does the flyer say?");
+  await expect(lastReply(page)).toContainText("flyer.pdf");
+  const preview = chat(page).getByTestId("file-preview");
+  await expect(preview).toHaveAttribute("href", /\/download\?inline=1$/);
+  const image = preview.getByRole("img", { name: "Preview of flyer.pdf" });
+  await expect(image).toBeVisible();
+  // The thumbnail really loaded (not a broken image).
+  await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(512);
 });
 
 test("a file that isn't what its name says is refused", async ({ page }, info) => {

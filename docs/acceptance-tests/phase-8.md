@@ -21,6 +21,12 @@ audit is clean.**
 | requests | 2.32.3 | 2.33.0 | Sandbox image |
 | Markdown | 3.7 | 3.8.1 | Sandbox image |
 
-## Results
+## Results, 2026-10-20 (CI run 23, dependency audit run 1)
 
-Filled in from the CI run on the Phase 8 head (below).
+| Check | Result |
+| --- | --- |
+| API tests on SQLite and PostgreSQL + migration round-trip | passed (324 locally on PostgreSQL) |
+| Playwright, desktop + Pixel 7, including the dropped-connection upload | passed |
+| Release gate (clean deployment, backup, restore, drill, rollback) with the upgraded sandbox libraries | passed |
+| Sandbox tests; image smoke test (pandas, docx, openpyxl, pptx, fpdf, matplotlib, cv2, moviepy, sklearn, ffmpeg) | passed |
+| Dependency audit (API, sandbox service, sandbox image libraries, web) | no known vulnerabilities |

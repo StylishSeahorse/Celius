@@ -10,6 +10,7 @@ from pathlib import Path
 
 from app.models import FileKind
 from app.services.files.archives import ArchiveLimits, inspect_zip
+from app.services.files.previews import office_preview, pdf_preview
 from app.services.files.sniff import FileRejected
 
 MAX_PDF_PAGES = 500
@@ -55,6 +56,24 @@ class _Budget:
 
 
 def extract(
+    path: Path,
+    kind: FileKind,
+    *,
+    max_chars: int,
+    limits: ArchiveLimits,
+    max_pixels: int,
+    previews: bool = True,
+) -> Extracted:
+    result = _extract(path, kind, max_chars=max_chars, limits=limits, max_pixels=max_pixels)
+    if previews and result.thumbnail is None:
+        if kind == FileKind.pdf:
+            result.thumbnail = pdf_preview(path)
+        elif kind in (FileKind.document, FileKind.spreadsheet, FileKind.presentation):
+            result.thumbnail = office_preview(path)
+    return result
+
+
+def _extract(
     path: Path, kind: FileKind, *, max_chars: int, limits: ArchiveLimits, max_pixels: int
 ) -> Extracted:
     try:
