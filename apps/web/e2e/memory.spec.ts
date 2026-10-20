@@ -14,7 +14,7 @@ async function memories(page: Page, status: "active" | "proposed") {
 
 async function openMemory(page: Page) {
   const sidebar = await openSidebar(page);
-  await sidebar.getByRole("button", { name: /^🧠 Memory/ }).click();
+  await sidebar.getByRole("button", { name: /^Memory/ }).click();
   return page.getByRole("dialog", { name: "Memory" });
 }
 

@@ -90,6 +90,7 @@ export function ChatView(props: Props) {
           />
           <MemoryToggle
             on={detail && savedOnServer ? detail.memory_enabled : props.draftMemory}
+            confirmOff={savedOnServer}
             disabled={savedOnServer && !online}
             onChange={(on) => (savedOnServer ? void save({ memory_enabled: on }) : props.onDraftMemory(on))}
           />
@@ -192,11 +193,22 @@ export function ChatView(props: Props) {
   );
 }
 
-function MemoryToggle({ on, disabled, onChange }: { on: boolean; disabled: boolean; onChange: (on: boolean) => void }) {
+function MemoryToggle({
+  on,
+  confirmOff,
+  disabled,
+  onChange,
+}: {
+  on: boolean;
+  confirmOff: boolean;
+  disabled: boolean;
+  onChange: (on: boolean) => void;
+}) {
   return (
     <button
       onClick={() => {
-        if (on && !confirm("Turn memory off for this chat? It won't be remembered or recalled, and gets no memories. Its excerpts are removed from recall now.")) return;
+        // A chat not sent yet has nothing to remove: no need to ask.
+        if (on && confirmOff && !confirm("Turn memory off for this chat? It won't be remembered or recalled, and gets no memories. Its excerpts are removed from recall now.")) return;
         onChange(!on);
       }}
       disabled={disabled}
