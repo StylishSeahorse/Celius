@@ -130,11 +130,14 @@ jobs:
         run: docker build -f infra/docker/Dockerfile.sandbox -t celius-sandbox:ci .
       - name: The sandbox image runs code and has no network
         run: |
-          docker run -d --name sb --network none --read-only --tmpfs /tmp --cap-drop ALL \
+          # As in compose: read-only root, writable workspaces (a volume there, tmpfs here).
+          docker run -d --name sb --network none --read-only --tmpfs /tmp \
+            --tmpfs /workspaces:uid=10001,gid=10001,mode=0755 --cap-drop ALL \
             --security-opt no-new-privileges -e SANDBOX_TOKEN=ci-sandbox-token-0123456789 \
             celius-sandbox:ci
           for i in $(seq 1 30); do docker exec sb /srv/sandbox/.venv/bin/python -c \
             "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/v1/health')" && break; sleep 1; done
+          trap 'docker logs sb' ERR
           docker exec sb /srv/sandbox/.venv/bin/python -c "
           import json, urllib.request
           body = json.dumps({'workspace': 'ci', 'kind': 'python', 'code': 'import pandas, docx, openpyxl, pptx, fpdf, matplotlib, cv2, moviepy, sklearn; import subprocess; subprocess.run([\"ffmpeg\", \"-version\"], check=True, capture_output=True); print(6*7)'}).encode()

@@ -2,6 +2,7 @@
 
 import json
 import os
+import shutil
 import subprocess
 import uuid
 from datetime import UTC, datetime
@@ -162,8 +163,9 @@ async def test_redirects_to_private_addresses_are_blocked(settings, tmp_path):
             return httpx.Response(302, headers={"location": "http://169.254.169.254/latest"})
         return httpx.Response(200, text="metadata")
 
+    ctx = _ctx(settings, tmp_path, httpx.MockTransport(handler))
     with pytest.raises(BlockedDestination):
-        await fetch(_ctx(settings, tmp_path, httpx.MockTransport(handler)), "https://example.com/")
+        await fetch(ctx, "https://example.com/", transport=ctx.web_transport)
 
 
 async def test_web_fetch_returns_readable_text_and_caps_size(settings, tmp_path):
@@ -425,8 +427,13 @@ async def test_due_schedule_fires_once_into_its_own_conversation(
 
 
 def _system_python_has(*modules: str) -> bool:
+    """Whether the python3 the sandbox runs (from its fixed PATH) has these modules."""
+    python = shutil.which("python3", path="/usr/local/bin:/usr/bin:/bin")
     code = "import " + ",".join(modules)
-    return subprocess.run(["python3", "-I", "-c", code], capture_output=True).returncode == 0
+    return (
+        bool(python)
+        and subprocess.run([python, "-I", "-c", code], capture_output=True).returncode == 0
+    )
 
 
 async def test_git_tool_works_offline_and_refuses_network_commands(settings, tmp_path):

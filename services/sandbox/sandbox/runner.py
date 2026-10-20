@@ -292,6 +292,15 @@ def _descends_from(pid: int, ancestor: int) -> bool:
     return False
 
 
+async def _exited(process: asyncio.subprocess.Process) -> int:
+    """The exit status, as soon as the process itself has exited. (Process.wait() on
+    Python 3.12 also waits for every pipe to close, which a background child can hold
+    open indefinitely.)"""
+    while process.returncode is None:  # noqa: ASYNC110  no exit event to wait on
+        await asyncio.sleep(0.02)
+    return process.returncode
+
+
 async def run(execution: Execution, config: SandboxConfig, mode: str) -> Result:
     if execution.kind not in ("python", "shell"):
         raise InvalidRequest("kind must be python or shell")
@@ -334,7 +343,7 @@ async def run(execution: Execution, config: SandboxConfig, mode: str) -> Result:
             _read_capped(process.stdout, output_limit, flood),
             _read_capped(process.stderr, output_limit, flood),
         )
-        exited = asyncio.ensure_future(process.wait())
+        exited = asyncio.ensure_future(_exited(process))
         done, _ = await asyncio.wait({exited}, timeout=timeout)
         if not done:
             killed_reason = killed_reason or "timeout"
@@ -347,10 +356,12 @@ async def run(execution: Execution, config: SandboxConfig, mode: str) -> Result:
             _kill_group(process.pid)
             reap_strays()
         (out, out_cut), (err, err_cut) = await reader
+        await process.wait()  # the pipes are closed now: returns at once, frees the transport
     except asyncio.CancelledError:
         _kill_group(process.pid)  # the caller went away: stop the code, now
+        reap_strays()
         reader.cancel()
-        await asyncio.shield(process.wait())
+        await asyncio.shield(_exited(process))
         raise
     finally:
         _kill_group(process.pid)  # anything still alive in its session
