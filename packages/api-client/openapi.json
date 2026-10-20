@@ -169,6 +169,11 @@
             ],
             "title": "Id"
           },
+          "memory_enabled": {
+            "default": true,
+            "title": "Memory Enabled",
+            "type": "boolean"
+          },
           "model_override": {
             "anyOf": [
               {
@@ -396,6 +401,30 @@
           "items"
         ],
         "title": "ConversationList",
+        "type": "object"
+      },
+      "ConversationMemory": {
+        "description": "What a chat has contributed, so deletion can say what it removes.",
+        "properties": {
+          "excerpts": {
+            "title": "Excerpts",
+            "type": "integer"
+          },
+          "memories_learned": {
+            "title": "Memories Learned",
+            "type": "integer"
+          },
+          "memory_active": {
+            "title": "Memory Active",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "memory_active",
+          "excerpts",
+          "memories_learned"
+        ],
+        "title": "ConversationMemory",
         "type": "object"
       },
       "ConversationSummary": {
@@ -849,6 +878,24 @@
         "title": "FileText",
         "type": "object"
       },
+      "ForgetResult": {
+        "properties": {
+          "excerpts": {
+            "title": "Excerpts",
+            "type": "integer"
+          },
+          "memories": {
+            "title": "Memories",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "memories",
+          "excerpts"
+        ],
+        "title": "ForgetResult",
+        "type": "object"
+      },
       "GenerationParams": {
         "properties": {
           "max_tokens": {
@@ -1216,6 +1263,294 @@
           "capabilities"
         ],
         "title": "MeResponse",
+        "type": "object"
+      },
+      "MemoryApprove": {
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "minLength": 3,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          }
+        },
+        "title": "MemoryApprove",
+        "type": "object"
+      },
+      "MemoryCreate": {
+        "properties": {
+          "content": {
+            "maxLength": 1000,
+            "minLength": 3,
+            "title": "Content",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "scope": {
+            "default": "global",
+            "enum": [
+              "global",
+              "project"
+            ],
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "title": "MemoryCreate",
+        "type": "object"
+      },
+      "MemoryOut": {
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "scope": {
+            "enum": [
+              "global",
+              "project"
+            ],
+            "title": "Scope",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "source_conversation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Conversation Id"
+          },
+          "source_conversation_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Conversation Title"
+          },
+          "status": {
+            "$ref": "#/components/schemas/MemoryStatus"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "use_count": {
+            "title": "Use Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "scope",
+          "project_id",
+          "content",
+          "status",
+          "source",
+          "source_conversation_id",
+          "last_used_at",
+          "use_count",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "MemoryOut",
+        "type": "object"
+      },
+      "MemorySettings": {
+        "properties": {
+          "auto_extract": {
+            "title": "Auto Extract",
+            "type": "boolean"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "embeddings": {
+            "title": "Embeddings",
+            "type": "boolean"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "require_review": {
+            "title": "Require Review",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled",
+          "auto_extract",
+          "require_review",
+          "embeddings"
+        ],
+        "title": "MemorySettings",
+        "type": "object"
+      },
+      "MemorySettingsUpdate": {
+        "properties": {
+          "auto_extract": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Extract"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "require_review": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Require Review"
+          }
+        },
+        "title": "MemorySettingsUpdate",
+        "type": "object"
+      },
+      "MemoryStatus": {
+        "enum": [
+          "proposed",
+          "active",
+          "rejected"
+        ],
+        "title": "MemoryStatus",
+        "type": "string"
+      },
+      "MemoryUpdate": {
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "minLength": 3,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "enum": [
+                  "global",
+                  "project"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope"
+          }
+        },
+        "title": "MemoryUpdate",
         "type": "object"
       },
       "MessageEdit": {
@@ -1897,6 +2232,11 @@
             ],
             "title": "Instructions"
           },
+          "memory_enabled": {
+            "default": true,
+            "title": "Memory Enabled",
+            "type": "boolean"
+          },
           "name": {
             "maxLength": 200,
             "minLength": 1,
@@ -1952,6 +2292,11 @@
               }
             ],
             "title": "Instructions"
+          },
+          "memory_enabled": {
+            "default": true,
+            "title": "Memory Enabled",
+            "type": "boolean"
           },
           "name": {
             "title": "Name",
@@ -2011,6 +2356,17 @@
               }
             ],
             "title": "Instructions"
+          },
+          "memory_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Enabled"
           },
           "name": {
             "anyOf": [
@@ -2743,7 +3099,8 @@
               "conversation",
               "message",
               "project",
-              "file"
+              "file",
+              "memory"
             ],
             "title": "Entity Type",
             "type": "string"
@@ -3805,6 +4162,7 @@
     },
     "/api/v1/conversations/{conversation_id}": {
       "delete": {
+        "description": "`forget_memories=true` also deletes the memories that were learned from this chat\n(see GET /conversations/{id}/memory for how many).",
         "operationId": "delete_conversation_api_v1_conversations__conversation_id__delete",
         "parameters": [
           {
@@ -3815,6 +4173,16 @@
               "format": "uuid",
               "title": "Conversation Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "forget_memories",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Forget Memories",
+              "type": "boolean"
             }
           }
         ],
@@ -3928,6 +4296,49 @@
         "summary": "Update Conversation",
         "tags": [
           "conversations"
+        ]
+      }
+    },
+    "/api/v1/conversations/{conversation_id}/memory": {
+      "get": {
+        "operationId": "conversation_memory_api_v1_conversations__conversation_id__memory_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationMemory"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Conversation Memory",
+        "tags": [
+          "memory"
         ]
       }
     },
@@ -4931,6 +5342,403 @@
         "summary": "Refresh Server",
         "tags": [
           "automation"
+        ]
+      }
+    },
+    "/api/v1/memories": {
+      "delete": {
+        "description": "Delete every memory and every recall excerpt (pass confirm=forget-everything).",
+        "operationId": "forget_everything_api_v1_memories_delete",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "confirm",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Confirm",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForgetResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Forget Everything",
+        "tags": [
+          "memory"
+        ]
+      },
+      "get": {
+        "operationId": "list_memories_api_v1_memories_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/MemoryStatus",
+              "default": "active"
+            }
+          },
+          {
+            "in": "query",
+            "name": "project_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MemoryOut"
+                  },
+                  "title": "Response List Memories Api V1 Memories Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Memories",
+        "tags": [
+          "memory"
+        ]
+      },
+      "post": {
+        "operationId": "create_memory_api_v1_memories_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Memory",
+        "tags": [
+          "memory"
+        ]
+      }
+    },
+    "/api/v1/memories/{memory_id}": {
+      "delete": {
+        "operationId": "delete_memory_api_v1_memories__memory_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memory_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Memory Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Memory",
+        "tags": [
+          "memory"
+        ]
+      },
+      "patch": {
+        "operationId": "update_memory_api_v1_memories__memory_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memory_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Memory Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Memory",
+        "tags": [
+          "memory"
+        ]
+      }
+    },
+    "/api/v1/memories/{memory_id}/approve": {
+      "post": {
+        "operationId": "approve_memory_api_v1_memories__memory_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memory_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Memory Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryApprove"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Memory",
+        "tags": [
+          "memory"
+        ]
+      }
+    },
+    "/api/v1/memories/{memory_id}/reject": {
+      "post": {
+        "operationId": "reject_memory_api_v1_memories__memory_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memory_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Memory Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject Memory",
+        "tags": [
+          "memory"
+        ]
+      }
+    },
+    "/api/v1/memory/settings": {
+      "get": {
+        "operationId": "get_memory_settings_api_v1_memory_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemorySettings"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Memory Settings",
+        "tags": [
+          "memory"
+        ]
+      },
+      "put": {
+        "operationId": "update_memory_settings_api_v1_memory_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemorySettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemorySettings"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Memory Settings",
+        "tags": [
+          "memory"
         ]
       }
     },

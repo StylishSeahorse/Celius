@@ -1,6 +1,7 @@
 import type {
   ActivityItem,
   ConversationDetail,
+  ConversationMemory,
   ConversationSummary,
   ExportJob,
   StorageUsage,
@@ -8,6 +9,8 @@ import type {
   UploadSession,
   McpServer,
   Me,
+  Memory,
+  MemorySettings,
   ModelList,
   PendingApproval,
   Schedule,
@@ -73,6 +76,7 @@ export interface ConversationCreate {
   project_id?: string | null;
   reasoning?: boolean | null;
   tool_profile?: string | null;
+  memory_enabled?: boolean;
 }
 
 export interface MessageBody {
@@ -101,7 +105,9 @@ export const api = {
   getConversation: (id: string) => request<ConversationDetail>(`/conversations/${id}`),
   updateConversation: (id: string, body: Record<string, unknown>) =>
     request<ConversationDetail>(`/conversations/${id}`, json("PATCH", body)),
-  deleteConversation: (id: string) => request<void>(`/conversations/${id}`, json("DELETE")),
+  deleteConversation: (id: string, forgetMemories = false) =>
+    request<void>(`/conversations/${id}${forgetMemories ? "?forget_memories=true" : ""}`, json("DELETE")),
+  conversationMemory: (id: string) => request<ConversationMemory>(`/conversations/${id}/memory`),
   sendMessage: (id: string, body: MessageBody) =>
     request<SubmitResponse>(`/conversations/${id}/messages`, json("POST", body)),
 
@@ -175,6 +181,22 @@ export const api = {
     request<McpServer>(`/mcp-servers/${id}`, json("PATCH", body)),
   refreshMcpServer: (id: string) => request<McpServer>(`/mcp-servers/${id}/refresh`, json("POST")),
   deleteMcpServer: (id: string) => request<void>(`/mcp-servers/${id}`, json("DELETE")),
+
+  memorySettings: () => request<MemorySettings>("/memory/settings"),
+  updateMemorySettings: (body: { enabled?: boolean; auto_extract?: boolean; require_review?: boolean }) =>
+    request<MemorySettings>("/memory/settings", json("PUT", body)),
+  memories: (status: "active" | "proposed", q?: string) =>
+    request<Memory[]>(`/memories?status=${status}${q ? `&q=${encodeURIComponent(q)}` : ""}`),
+  createMemory: (body: { content: string; scope: "global" | "project"; project_id?: string | null }) =>
+    request<Memory>("/memories", json("POST", body)),
+  updateMemory: (id: string, body: { content?: string; scope?: "global" | "project"; project_id?: string | null }) =>
+    request<Memory>(`/memories/${id}`, json("PATCH", body)),
+  approveMemory: (id: string, content?: string) =>
+    request<Memory>(`/memories/${id}/approve`, json("POST", content ? { content } : {})),
+  rejectMemory: (id: string) => request<void>(`/memories/${id}/reject`, json("POST")),
+  deleteMemory: (id: string) => request<void>(`/memories/${id}`, json("DELETE")),
+  forgetEverything: () =>
+    request<{ memories: number; excerpts: number }>("/memories?confirm=forget-everything", json("DELETE")),
 
   activity: () => request<{ items: ActivityItem[] }>("/activity"),
   cancelActivity: (kind: "run" | "job", id: string) =>

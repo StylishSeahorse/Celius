@@ -109,12 +109,14 @@ Arbitrary shell stays disabled until T-01 is decided and validated.
 
 **Exit gate:** retrieval scope, exclusion and deletion tests pass.
 
-| ID | Item | Acceptance criteria |
-| --- | --- | --- |
-| R-01 | pgvector + embedding provider config, keyword fallback | Works with embeddings disabled |
-| R-02 | Memory proposal extraction with review queue | Nothing becomes durable memory without approval when review is required |
-| R-03 | Memory edit/exclude/disable (global, project, conversation) | Excluded sources never retrieved |
-| R-04 | Dependency-aware deletion | Deleted memory is unretrievable immediately; UI explains what deletion does not erase |
+| ID | Item | Status | Acceptance criteria |
+| --- | --- | --- | --- |
+| R-01 | pgvector + embedding provider config, keyword fallback | ✅ | [ADR 0009](adr/0009-memory-and-recall.md): optional `/v1/embeddings` endpoint; pgvector cosine ranking on PostgreSQL; word ranking without embeddings or when the server is down (tested) |
+| R-02 | Memory proposal extraction with review queue | ✅ | Worker job proposes up to 3 facts per reply; `remember` tool proposes too; proposals never used until approved (or edited and approved); rejected text erased and not proposed again; duplicates dropped |
+| R-03 | Memory edit/exclude/disable (global, project, conversation) | ✅ | Global and project scopes; switches per user, project and chat (incognito from the first message); excluded chats never indexed or recalled; recall stays within the project boundary |
+| R-04 | Dependency-aware deletion | ✅ | Deleting a memory or "forget everything" removes rows and embeddings at once; deleting a chat removes its excerpts and, if ticked, the memories learned from it; the UI says what deletion can't erase |
+| R-05 | Memory with the real models | ⬜ | Check extraction quality with the deployed model; choose and benchmark an embedding model on the 3060 (or CPU) |
+| R-06 | Memory summaries for long histories | ⬜ | Only if recall quality drops as history grows |
 
 ## Phase 7 — Release hardening
 

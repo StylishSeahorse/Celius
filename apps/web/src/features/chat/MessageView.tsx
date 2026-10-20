@@ -255,6 +255,34 @@ function UserMessage({ message, actions }: { message: Message; actions: MessageA
   );
 }
 
+interface MemoryUse {
+  memories: { id: string; content: string }[];
+  recalled: { conversation_id: string; title: string; excerpt: string }[];
+}
+
+/** Which memories and earlier chats this reply was given. */
+function MemoryUsed({ data }: { data: MemoryUse }) {
+  const parts = [];
+  if (data.memories.length) parts.push(`${data.memories.length} ${data.memories.length === 1 ? "memory" : "memories"}`);
+  if (data.recalled.length) parts.push(`${data.recalled.length} earlier ${data.recalled.length === 1 ? "chat" : "chats"}`);
+  if (!parts.length) return null;
+  return (
+    <details className="text-xs text-muted" data-testid="memory-used">
+      <summary className="cursor-pointer select-none">🧠 Used {parts.join(" and ")}</summary>
+      <ul className="mt-1 space-y-0.5 pl-4">
+        {data.memories.map((m) => (
+          <li key={m.id}>• {m.content}</li>
+        ))}
+        {data.recalled.map((r, i) => (
+          <li key={`${r.conversation_id}-${i}`}>
+            • from <a className="underline" href={`#/c/${r.conversation_id}`}>{r.title}</a>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 function Reasoning({ text }: { text: string }) {
   return (
     <details className="rounded-lg border border-line px-3 py-2 text-sm text-muted">
@@ -291,6 +319,7 @@ export function MessageView({
       {message.parts.map((part, index) => {
         if (part.type === "reasoning" && part.text) return <Reasoning key={index} text={part.text} />;
         if (part.type === "text" && part.text) return <AssistantMarkdown key={index} text={part.text} />;
+        if (part.type === "memory" && part.data) return <MemoryUsed key={index} data={part.data as unknown as MemoryUse} />;
         if (part.type === "tool_call") {
           const id = (part.data as { tool_call_id?: string } | null)?.tool_call_id ?? "";
           const call = (isLive && live.toolCalls[id]) || calls.get(id);

@@ -7,6 +7,8 @@ import { outbox } from "../../offline/outbox";
 import { startSync } from "../../offline/sync";
 import { useOnline } from "../../offline/useOnline";
 import { desktop } from "../../lib/desktop";
+import { DeleteConversationDialog } from "../memory/DeleteConversationDialog";
+import { MemoryPanel } from "../memory/MemoryPanel";
 import { ToolsPanel } from "../tools/ToolsPanel";
 import { ChatView } from "./ChatView";
 import { FolderBrowser } from "./FolderBrowser";
@@ -34,6 +36,10 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const [draftModel, setDraftModel] = useState<string | null>(null);
   const [draftReasoning, setDraftReasoning] = useState<boolean | null>(null);
   const [draftToolProfile, setDraftToolProfile] = useState<string | null>(null);
+  const [draftMemory, setDraftMemory] = useState(true);
+  const [memoryOpen, setMemoryOpen] = useState(false);
+  const [memoryToReview, setMemoryToReview] = useState(0);
+  const [deleting, setDeleting] = useState<ConversationSummary | null>(null);
   const [storage, setStorage] = useState<StorageUsage | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [queued, setQueued] = useState(outbox.size);
@@ -70,6 +76,15 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
     api.storageUsage().then(setStorage).catch(() => undefined);
   }, []);
   useEffect(refreshStorage, [refreshStorage]);
+
+  const refreshMemory = useCallback(() => {
+    api.memorySettings().then((m) => setMemoryToReview(m.counts?.proposed ?? 0)).catch(() => undefined);
+  }, []);
+  useEffect(() => {
+    refreshMemory();
+    const timer = setInterval(refreshMemory, 30_000);
+    return () => clearInterval(timer);
+  }, [refreshMemory]);
 
   const refreshApprovals = useCallback(() => {
     api.pendingApprovals().then((items) => setPendingApprovals(items.length)).catch(() => undefined);
@@ -128,7 +143,13 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
 
   const chat = useChat({
     conversationId: selectedId,
-    draft: { modelOverride: draftModel, projectId, reasoning: draftReasoning, toolProfile: draftToolProfile },
+    draft: {
+      modelOverride: draftModel,
+      projectId,
+      reasoning: draftReasoning,
+      toolProfile: draftToolProfile,
+      memoryEnabled: draftMemory,
+    },
     onConversationCreated: (id) => select(id),
     onChanged: () => {
       void refreshList();
@@ -149,13 +170,14 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
   }, []);
 
   // Changes from other devices.
-  const latest = useRef({ refreshList, refreshProjects, refreshStorage, refreshApprovals, chat, selectedId, select });
-  latest.current = { refreshList, refreshProjects, refreshStorage, refreshApprovals, chat, selectedId, select };
+  const latest = useRef({ refreshList, refreshProjects, refreshStorage, refreshApprovals, refreshMemory, chat, selectedId, select });
+  latest.current = { refreshList, refreshProjects, refreshStorage, refreshApprovals, refreshMemory, chat, selectedId, select };
   useEffect(
     () =>
       startSync((changes: SyncChange[], resync: boolean) => {
-        const { refreshList, refreshProjects, refreshStorage, refreshApprovals, chat, selectedId, select } =
+        const { refreshList, refreshProjects, refreshStorage, refreshApprovals, refreshMemory, chat, selectedId, select } =
           latest.current;
+        if (changes.some((c) => c.entity_type === "memory")) refreshMemory();
         void refreshList();
         if (changes.some((c) => c.entity_type === "message")) refreshApprovals();
         if (changes.some((c) => c.entity_type === "file")) {
@@ -179,8 +201,8 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
     [],
   );
 
-  async function remove(id: string) {
-    await api.deleteConversation(id);
+  async function remove(id: string, forgetMemories = false) {
+    await api.deleteConversation(id, forgetMemories);
     void cache.removeConversation(id);
     if (id === selectedId) select(null);
     void refreshList();
@@ -224,11 +246,16 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
           }}
           onNewProject={() => setProjectDialog({ project: null })}
           onEditProject={(project) => setProjectDialog({ project })}
-          onDelete={(id) => void remove(id)}
+          onDelete={(id) => setDeleting(conversations.find((c) => c.id === id) ?? null)}
           onLogout={() => void logout()}
           pendingApprovals={pendingApprovals}
           onOpenTools={() => {
             setToolsOpen(true);
+            setSidebarOpen(false);
+          }}
+          memoryToReview={memoryToReview}
+          onOpenMemory={() => {
+            setMemoryOpen(true);
             setSidebarOpen(false);
           }}
         />
@@ -247,6 +274,8 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
         onDraftReasoning={setDraftReasoning}
         draftToolProfile={draftToolProfile}
         onDraftToolProfile={setDraftToolProfile}
+        draftMemory={draftMemory}
+        onDraftMemory={setDraftMemory}
         onOpenSidebar={() => setSidebarOpen(true)}
         onStorageChanged={refreshStorage}
         extraAttach={extraAttach}
@@ -257,6 +286,32 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
           onClose={() => {
             folderPick([]);
             setFolderPick(null);
+          }}
+        />
+      )}
+      {memoryOpen && (
+        <MemoryPanel
+          projects={projects}
+          initialTab={memoryToReview ? "review" : "remembered"}
+          onChanged={refreshMemory}
+          onOpenConversation={(id) => {
+            setMemoryOpen(false);
+            select(id);
+          }}
+          onClose={() => {
+            setMemoryOpen(false);
+            refreshMemory();
+          }}
+        />
+      )}
+      {deleting && (
+        <DeleteConversationDialog
+          conversation={deleting}
+          onCancel={() => setDeleting(null)}
+          onDelete={(forget) => {
+            const id = deleting.id;
+            setDeleting(null);
+            void remove(id, forget).then(refreshMemory);
           }}
         />
       )}

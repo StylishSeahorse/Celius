@@ -23,6 +23,7 @@ export interface OutboxItem {
     project_id: string | null;
     reasoning?: boolean | null;
     tool_profile?: string | null;
+    memory_enabled?: boolean;
   };
   status: "queued" | "failed";
   error?: string;

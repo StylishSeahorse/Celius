@@ -3,7 +3,7 @@
 A self-hosted, Claude-style AI workspace. It syncs conversations across Windows (Tauri),
 Android (PWA) and web clients, and talks to a remote llama.cpp inference server.
 
-**Status:** Phases 1–5 are implemented. You can:
+**Status:** Phases 1–6 are implemented. You can:
 - chat with streaming replies
 - edit messages, regenerate replies and switch between versions
 - group chats into projects with their own instructions
@@ -22,6 +22,8 @@ Android (PWA) and web clients, and talks to a remote llama.cpp inference server.
   approvals inbox
 - schedule prompts to run every N minutes, daily or weekly, and follow all work in the
   activity panel
+- let Celius remember what matters: it suggests facts, you approve them; it recalls
+  earlier chats within the same project; per-chat incognito; delete anything at once
 
 See [`docs/backlog.md`](docs/backlog.md) for the full plan and what is done.
 
@@ -108,3 +110,4 @@ docs/                 Backlog, ADRs, deployment, acceptance tests
 - [0006: Change feed, outbox and branches for multi-device use](docs/adr/0006-sync-and-offline.md)
 - [0007: File uploads, storage and processing](docs/adr/0007-file-storage.md)
 - [0008: Sandbox, tool policy and approvals](docs/adr/0008-sandbox-and-tools.md)
+- [0009: Memory and recall](docs/adr/0009-memory-and-recall.md)

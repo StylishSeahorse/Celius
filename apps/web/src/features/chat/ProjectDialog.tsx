@@ -8,7 +8,7 @@ import { runExport } from "./exporting";
 interface Props {
   project: Project | null; // null: create
   online: boolean;
-  onSave: (fields: { name: string; instructions: string | null }) => Promise<void>;
+  onSave: (fields: { name: string; instructions: string | null; memory_enabled: boolean }) => Promise<void>;
   onDelete?: () => Promise<void>;
   onClose: () => void;
   onStorageChanged: () => void;
@@ -17,6 +17,7 @@ interface Props {
 export function ProjectDialog({ project, online, onSave, onDelete, onClose, onStorageChanged }: Props) {
   const [name, setName] = useState(project?.name ?? "");
   const [instructions, setInstructions] = useState(project?.instructions ?? "");
+  const [memory, setMemory] = useState(project?.memory_enabled ?? true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -24,7 +25,7 @@ export function ProjectDialog({ project, online, onSave, onDelete, onClose, onSt
     event.preventDefault();
     setBusy(true);
     try {
-      await onSave({ name: name.trim(), instructions: instructions.trim() || null });
+      await onSave({ name: name.trim(), instructions: instructions.trim() || null, memory_enabled: memory });
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -66,6 +67,16 @@ export function ProjectDialog({ project, online, onSave, onDelete, onClose, onSt
             placeholder="e.g. Answer as a concise senior engineer. Prefer TypeScript examples."
             className="w-full resize-y rounded-lg border border-line bg-canvas px-3 py-2 outline-none focus:border-accent"
           />
+        </label>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-1" checked={memory} onChange={(e) => setMemory(e.target.checked)} />
+          <span>
+            Memory in this project
+            <span className="block text-xs text-muted">
+              Off: its chats aren't remembered or recalled and get no memories. Turning it off
+              removes its chats from recall now.
+            </span>
+          </span>
         </label>
         {project && <ProjectFiles project={project} online={online} onStorageChanged={onStorageChanged} />}
         {error && (

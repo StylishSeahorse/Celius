@@ -38,6 +38,7 @@ interface Options {
     projectId: string | null;
     reasoning: boolean | null;
     toolProfile: string | null;
+    memoryEnabled: boolean;
   };
   onConversationCreated: (id: string) => void;
   onChanged: () => void;
@@ -54,7 +55,7 @@ function placeholder(id: string, draft: Options["draft"], title: string): Conver
     title,
     project_id: draft.projectId,
     model_override: draft.modelOverride,
-    memory_enabled: true,
+    memory_enabled: draft.memoryEnabled,
     reasoning: draft.reasoning,
     tool_profile: draft.toolProfile,
     active_branch_id: null,
@@ -215,6 +216,7 @@ export function useChat({ conversationId, draft, onConversationCreated, onChange
                 projectId: created.project_id,
                 reasoning: created.reasoning ?? null,
                 toolProfile: created.tool_profile ?? null,
+                memoryEnabled: created.memory_enabled ?? true,
               },
               queuedCreate.content.slice(0, 80) || queuedCreate.attachments?.[0]?.filename || "New chat",
             ),
@@ -248,6 +250,7 @@ export function useChat({ conversationId, draft, onConversationCreated, onChange
           project_id: draft.projectId,
           reasoning: draft.reasoning,
           tool_profile: draft.toolProfile,
+          memory_enabled: draft.memoryEnabled,
         };
         setDetailState(placeholder(id, draft, content.slice(0, 80) || attachments[0]?.filename || "New chat"));
         onConversationCreated(id);

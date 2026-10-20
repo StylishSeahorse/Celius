@@ -38,3 +38,6 @@ export type Schedule = Schemas["ScheduleOut"];
 export type ScheduleCreate = Schemas["ScheduleCreate"];
 export type McpServer = Schemas["McpServerOut"];
 export type ActivityItem = Schemas["ActivityItem"];
+export type Memory = Schemas["MemoryOut"];
+export type MemorySettings = Schemas["MemorySettings"];
+export type ConversationMemory = Schemas["ConversationMemory"];

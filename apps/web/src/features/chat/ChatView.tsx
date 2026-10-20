@@ -21,6 +21,8 @@ interface Props {
   onDraftReasoning: (value: boolean | null) => void;
   draftToolProfile: string | null;
   onDraftToolProfile: (value: string | null) => void;
+  draftMemory: boolean;
+  onDraftMemory: (value: boolean) => void;
   onOpenSidebar: () => void;
   onStorageChanged: () => void;
 }
@@ -85,6 +87,11 @@ export function ChatView(props: Props) {
             onChange={(profile) =>
               savedOnServer ? void save({ tool_profile: profile }) : props.onDraftToolProfile(profile)
             }
+          />
+          <MemoryToggle
+            on={detail && savedOnServer ? detail.memory_enabled : props.draftMemory}
+            disabled={savedOnServer && !online}
+            onChange={(on) => (savedOnServer ? void save({ memory_enabled: on }) : props.onDraftMemory(on))}
           />
           <ModelPicker
             models={models}
@@ -182,6 +189,24 @@ export function ChatView(props: Props) {
         />
       )}
     </main>
+  );
+}
+
+function MemoryToggle({ on, disabled, onChange }: { on: boolean; disabled: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <button
+      onClick={() => {
+        if (on && !confirm("Turn memory off for this chat? It won't be remembered or recalled, and gets no memories. Its excerpts are removed from recall now.")) return;
+        onChange(!on);
+      }}
+      disabled={disabled}
+      aria-pressed={on}
+      aria-label="Memory for this chat"
+      title={on ? "This chat uses and adds to memory" : "Incognito: not remembered, no memories used"}
+      className={`shrink-0 rounded-md border border-line px-2 py-1 text-sm ${on ? "" : "bg-panel text-muted line-through"}`}
+    >
+      🧠
+    </button>
   );
 }
 

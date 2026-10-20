@@ -113,6 +113,19 @@ activity → Permissions** shows "Running".
   that writes, runs code or uses the web). Change your default, edit profiles and see the
   approval inbox under **Tools & activity**.
 
+## Memory (optional embeddings)
+
+Memory works out of the box with keyword search. For recall by meaning, run a small
+embedding model next to the chat model, for example on the same Windows PC:
+
+```powershell
+llama-server -m nomic-embed-text-v1.5.Q8_0.gguf --embeddings --port 8081 --host 0.0.0.0
+```
+
+and set in `.env`: `MODEL_ENABLE_EMBEDDINGS=true`,
+`EMBEDDING_BASE_URL=http://<windows-pc-ip>:8081/v1`. Excerpts indexed before that are
+found by keywords; new ones get embeddings. The database image already includes pgvector.
+
 ## Updating
 
 ```sh

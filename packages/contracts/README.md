@@ -27,3 +27,8 @@ TypeScript client (phase 3) is produced from the API's OpenAPI document.
 
 SSE wire format: `id: <event_id>` / `event: <type>` / `data: <envelope JSON>`. The server
 closes the stream after the terminal event. Resume with the `Last-Event-ID` header or `?after=<id>`.
+
+## Sync change feed
+
+`entity_type` is one of `conversation`, `message`, `project`, `file`, `memory`. A `memory`
+change means the memory list or review queue changed (reload it).

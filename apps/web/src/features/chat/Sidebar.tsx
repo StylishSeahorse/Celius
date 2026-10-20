@@ -23,6 +23,8 @@ interface Props {
   onLogout: () => void;
   pendingApprovals: number;
   onOpenTools: () => void;
+  memoryToReview: number;
+  onOpenMemory: () => void;
 }
 
 export function Sidebar(props: Props) {
@@ -114,9 +116,7 @@ export function Sidebar(props: Props) {
               {c.title || "Untitled"}
             </button>
             <button
-              onClick={() => {
-                if (confirm(`Delete “${c.title || "Untitled"}”?`)) props.onDelete(c.id);
-              }}
+              onClick={() => props.onDelete(c.id)}
               disabled={!props.online}
               aria-label={`Delete ${c.title || "conversation"}`}
               className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded px-1.5 text-muted hover:text-ink focus:opacity-100 md:opacity-0 md:group-hover:opacity-100"
@@ -146,6 +146,22 @@ export function Sidebar(props: Props) {
               aria-label={`${props.pendingApprovals} waiting for approval`}
             >
               {props.pendingApprovals}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={props.onOpenMemory}
+          disabled={!props.online}
+          className="flex w-full items-center gap-2 rounded-lg px-1 py-1 text-left hover:bg-canvas/60 disabled:opacity-40"
+        >
+          <span aria-hidden="true">🧠</span>
+          <span className="flex-1">Memory</span>
+          {props.memoryToReview > 0 && (
+            <span
+              className="rounded-full bg-accent px-1.5 text-xs font-medium text-white"
+              aria-label={`${props.memoryToReview} memories to review`}
+            >
+              {props.memoryToReview}
             </span>
           )}
         </button>
