@@ -115,6 +115,27 @@ revision.
   container's namespaces. The container boundary and limits above still hold. The tools
   panel shows the mode.
 
+### Several people (Phase 10)
+
+- Every query for chats, messages, runs, tool calls, files, uploads, exports, jobs,
+  memories, profiles, schedules and push devices is filtered by owner. Projects are the
+  only shared thing: their instructions and files are visible to members, and nothing
+  else is. `tests/test_isolation.py` proves this with a sweep generated from the API
+  schema: a second user calls every route that takes an id, using the first user's ids,
+  and must be refused with no leaked text and no change. New routes are swept
+  automatically, so a forgotten ownership check fails CI.
+- Invitations are 256-bit random tokens, stored only as SHA-256, single-use, expiring and
+  revocable; the link is shown once. Registration needs one, so there is no open sign-up.
+- Disabling an account revokes its sessions at once (a disabled user's token stops working
+  on the next request). Deleting removes the account and its data, plus its files' content
+  unless another account has the same content. Administrators can't remove their own access,
+  and the last administrator can't be removed.
+- Limits are checked on the server: storage on upload, replies per 24 hours on every send,
+  edit and regeneration, models on every request (others are hidden), tool profiles when a
+  chat runs (a chat set to a wider profile is narrowed).
+- *Accepted*: members of a shared project see each other's usernames and display names,
+  and the owner's.
+
 ### Notifications and previews (Phase 9)
 
 - Push subscriptions are endpoints supplied by the browser, and the worker POSTs to them.

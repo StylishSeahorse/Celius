@@ -90,6 +90,11 @@ export function Sidebar(props: Props) {
                 className={`w-full truncate rounded-lg px-3 py-1.5 pr-14 text-left text-sm ${p.id === projectId ? "bg-canvas font-medium" : "hover:bg-canvas/60"}`}
               >
                 {p.name}
+                {p.shared && (
+                  <span className="ml-1 text-xs text-muted" title={p.owner ? `Shared by ${p.owner}` : "Shared"}>
+                    {p.owner ? `· ${p.owner}` : "· shared"}
+                  </span>
+                )}
               </button>
               <button
                 onClick={() => props.onEditProject(p)}

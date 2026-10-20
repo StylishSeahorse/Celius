@@ -1,6 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 import { ApiError, api } from "../../lib/api";
+import { People } from "./People";
 import { disablePush, enablePush, type PushState, pushState } from "../../lib/notifications";
 
 const button = "rounded-md border border-line px-2.5 py-1 text-sm hover:bg-panel disabled:opacity-40";
@@ -32,7 +33,7 @@ const NAMES: Record<string, string> = {
   disk_backups: "Disk (backups)",
 };
 
-export function AccountPanel({ isAdmin, onClose }: { isAdmin: boolean; onClose: () => void }) {
+export function AccountPanel({ isAdmin, meId, onClose }: { isAdmin: boolean; meId: string; onClose: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -57,6 +58,7 @@ export function AccountPanel({ isAdmin, onClose }: { isAdmin: boolean; onClose: 
         </header>
         <div className="flex-1 space-y-6 overflow-y-auto p-4 text-sm">
           {isAdmin && <SystemStatus />}
+          {isAdmin && <People meId={meId} />}
           <Notifications />
           <PasswordForm />
           <Sessions />

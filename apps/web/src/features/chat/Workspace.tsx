@@ -307,7 +307,7 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
           }}
         />
       )}
-      {accountOpen && <AccountPanel isAdmin={me.is_admin} onClose={() => setAccountOpen(false)} />}
+      {accountOpen && <AccountPanel isAdmin={me.is_admin} meId={me.user_id} onClose={() => setAccountOpen(false)} />}
       {memoryOpen && (
         <MemoryPanel
           projects={projects}
@@ -355,12 +355,19 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
       {projectDialog && (
         <ProjectDialog
           project={projectDialog.project}
+          me={me.username}
           online={online}
           onStorageChanged={refreshStorage}
           onClose={() => setProjectDialog(null)}
           onSave={async (fields) => {
             if (projectDialog.project) {
-              await api.updateProject(projectDialog.project.id, fields);
+              // Memory is the owner's to change; members with edit access send the rest.
+              const { memory_enabled, ...content } = fields;
+              await api.updateProject(
+                projectDialog.project.id,
+                projectDialog.project.role === "owner" ? fields : content,
+              );
+              void memory_enabled;
             } else {
               const created = await api.createProject(fields);
               setProjectId(created.id);
@@ -371,7 +378,7 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
           onDelete={
             projectDialog.project
               ? async () => {
-                  await api.deleteProject(projectDialog.project!.id);
+                  if (projectDialog.project!.role === "owner") await api.deleteProject(projectDialog.project!.id);
                   if (projectId === projectDialog.project!.id) setProjectId(null);
                   await refreshProjects();
                   void refreshList();

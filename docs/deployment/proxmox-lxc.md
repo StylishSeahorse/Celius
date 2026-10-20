@@ -131,6 +131,14 @@ and set in `.env`: `MODEL_ENABLE_EMBEDDINGS=true`,
 `EMBEDDING_BASE_URL=http://<windows-pc-ip>:8081/v1`. Excerpts indexed before that are
 found by keywords; new ones get embeddings. The database image already includes pgvector.
 
+## Adding people
+
+Open your name in the sidebar → **Account → People → Invite someone**, and send the link
+that appears (it works once, for 3 days). The person opens it, picks a username and
+password, and has their own private chats, files and memories. Under **Limits…** you can cap
+their storage, replies per day, models and tool profiles. Projects can be shared from
+**Project settings → Shared with**.
+
 ## Backups and alerts
 
 Before you rely on it, set up backups ([backup-restore.md](../operations/backup-restore.md)):

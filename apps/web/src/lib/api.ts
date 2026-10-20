@@ -90,6 +90,29 @@ export const api = {
     request<Me>("/auth/login", json("POST", { username, password })),
   logout: () => request<void>("/auth/logout", json("POST")),
   me: () => request<Me>("/auth/me"),
+  checkInvitation: (token: string) =>
+    request<{ expires_at: string; note: string | null }>(`/auth/invitations/${encodeURIComponent(token)}`),
+  register: (body: { token: string; username: string; password: string; display_name?: string | null }) =>
+    request<{ access_token: string }>("/auth/register", json("POST", body)),
+  people: () => request<Person[]>("/admin/users"),
+  updatePerson: (id: string, body: Partial<Omit<Person, "id" | "username" | "created_at">>) =>
+    request<Person>(`/admin/users/${id}`, json("PATCH", body)),
+  resetPersonPassword: (id: string, newPassword: string) =>
+    request<void>(`/admin/users/${id}/password`, json("POST", { new_password: newPassword })),
+  deletePerson: (id: string, username: string) =>
+    request<{ files: number; conversations: number }>(
+      `/admin/users/${id}?confirm=${encodeURIComponent(username)}`,
+      json("DELETE"),
+    ),
+  invitations: () => request<Invitation[]>("/admin/invitations"),
+  createInvitation: (body: { note?: string | null; make_admin?: boolean; expires_hours?: number }) =>
+    request<Invitation>("/admin/invitations", json("POST", body)),
+  revokeInvitation: (id: string) => request<void>(`/admin/invitations/${id}`, json("DELETE")),
+  projectMembers: (projectId: string) => request<ProjectMember[]>(`/projects/${projectId}/members`),
+  shareProject: (projectId: string, username: string, role: "read" | "write") =>
+    request<ProjectMember>(`/projects/${projectId}/members/${encodeURIComponent(username)}`, json("PUT", { role })),
+  unshareProject: (projectId: string, username: string) =>
+    request<void>(`/projects/${projectId}/members/${encodeURIComponent(username)}`, json("DELETE")),
   changePassword: (current_password: string, new_password: string) =>
     request<void>("/auth/password", json("POST", { current_password, new_password })),
   sessions: () => request<unknown[]>("/auth/sessions"),
@@ -232,3 +255,35 @@ export const fileUrls = {
   inline: (id: string) => `/api/v1/files/${id}/download?inline=1`,
   thumbnail: (id: string) => `/api/v1/files/${id}/thumbnail`,
 };
+
+export interface Person {
+  id: string;
+  username: string;
+  display_name: string | null;
+  is_admin: boolean;
+  is_active: boolean;
+  created_at: string;
+  last_seen_at: string | null;
+  storage_used_bytes: number;
+  storage_quota_bytes: number | null;
+  daily_message_limit: number | null;
+  allowed_models: string[] | null;
+  allowed_tool_profiles: string[] | null;
+}
+
+export interface Invitation {
+  id: string;
+  note: string | null;
+  make_admin: boolean;
+  state: "open" | "used" | "expired" | "revoked";
+  expires_at: string;
+  created_at: string;
+  used_by: string | null;
+  url: string | null;
+}
+
+export interface ProjectMember {
+  username: string;
+  display_name: string | null;
+  role: "read" | "write";
+}

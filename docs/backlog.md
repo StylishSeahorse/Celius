@@ -160,11 +160,11 @@ Arbitrary shell stays disabled until T-01 is decided and validated.
 
 | ID | Item | Status | Acceptance criteria |
 | --- | --- | --- | --- |
-| A-01 | Invitations | ⬜ | An admin creates a one-time invite link; the invitee chooses a username and password; links expire |
-| A-02 | User management | ⬜ | Admins list, disable, re-enable, reset and delete users; deleting removes their data and files |
-| A-03 | Per-user limits | ⬜ | Storage quota, allowed models, tool profiles available, daily message limit |
-| A-04 | Shared projects | ⬜ | A project owner shares with named users (read or write); shared chats and files follow the project's rights |
-| A-05 | Isolation review | ⬜ | Every route tested with a second user; memories, tools, workspaces and scheduled tasks never cross users |
+| A-01 | Invitations | ✅ | One-time link (shown once, stored only as a hash), 1 hour to 30 days, revocable, optionally for an admin; the invitee picks a username and password |
+| A-02 | User management | ✅ | **Account → People**: last seen, storage; disable (signed out at once), enable, reset password, admin rights, delete with all data (content shared with others kept); the last admin can't be removed |
+| A-03 | Per-user limits | ✅ | Storage quota, replies per 24 hours, allowed models (others hidden and refused), allowed tool profiles (wider ones narrowed at run time) |
+| A-04 | Shared projects | ✅ | Shared by username as "can use" or "can edit"; members use its instructions and files; chats and memories stay private; members can leave |
+| A-05 | Isolation review | ✅ | A second user calls every id route with the first user's ids (generated from the API schema): all refused, nothing leaks, nothing changes; listings empty; recall doesn't cross people in a shared project |
 
 ---
 
