@@ -61,3 +61,14 @@ async def resolve_session(db: AsyncSession, token: str) -> tuple[Session, User] 
 
 async def revoke_session(db: AsyncSession, session_id: uuid.UUID) -> None:
     await db.execute(update(Session).where(Session.id == session_id).values(revoked_at=utcnow()))
+
+
+async def revoke_all(
+    db: AsyncSession, user_id: uuid.UUID, *, except_session: uuid.UUID | None = None
+) -> int:
+    """Sign the user out everywhere (but `except_session`)."""
+    query = update(Session).where(Session.user_id == user_id, Session.revoked_at.is_(None))
+    if except_session is not None:
+        query = query.where(Session.id != except_session)
+    result = await db.execute(query.values(revoked_at=utcnow()))
+    return result.rowcount or 0

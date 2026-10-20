@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     app_single_user_mode: bool = True
     app_session_ttl_hours: int = 24 * 14
     app_cookie_secure: bool | None = None  # defaults to True in production
+    # Login throttling: failures allowed per window, per username and per address.
+    login_window_minutes: int = Field(default=15, ge=1)
+    login_max_failures_per_user: int = Field(default=10, ge=1)
+    login_max_failures_per_ip: int = Field(default=30, ge=1)
 
     # Bootstrap account (single-user mode). Only used to seed the first user.
     bootstrap_username: str | None = None
@@ -136,9 +140,25 @@ class Settings(BaseSettings):
     schedule_min_interval_minutes: int = Field(default=15, ge=1)
     schedule_max_per_user: int = Field(default=20, ge=0)
 
-    # Backups
+    # Backups (infra/scripts/backup.sh writes them; the app only reads their status)
     backup_root: str = "/data/backups"
     backup_retention_days: int = 30
+
+    # Monitoring and alerts (docs/operations/monitoring.md)
+    # POSTed when a check becomes a warning or critical, or recovers. Formats: json
+    # (Home Assistant webhooks, n8n…), ntfy (ntfy.sh topics), text.
+    alert_webhook_url: str | None = None
+    alert_webhook_format: Literal["json", "ntfy", "text"] = "json"
+    alert_repeat_hours: float = Field(default=6, gt=0)
+    alert_disk_warning_percent: float = 15
+    alert_disk_critical_percent: float = 5
+    alert_queue_warning_minutes: float = 10
+    alert_queue_critical_minutes: float = 60
+    alert_failed_jobs_per_day: int = 5
+    alert_backup_warning_hours: float = 26
+    alert_backup_critical_hours: float = 72
+    # Bearer token for GET /api/v1/metrics (Prometheus). Unset: the endpoint is off.
+    metrics_token: SecretStr | None = None
 
     @model_validator(mode="after")
     def _check_production_secrets(self) -> "Settings":

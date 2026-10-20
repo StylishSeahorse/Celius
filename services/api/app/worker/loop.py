@@ -12,6 +12,7 @@ import app.services.files.processing  # noqa: F401 - registers job handlers
 import app.services.memory.jobs  # noqa: F401 - registers job handlers
 from app.config import Settings
 from app.db import SessionFactory
+from app.services import monitoring
 from app.services.files.service import cleanup_expired_uploads
 from app.services.jobs import claim_next_job, recover_stale_jobs, run_job
 from app.services.model_gateway import ModelGateway
@@ -41,6 +42,16 @@ async def _record_sandbox_health(settings: Settings) -> None:
         await anyio.to_thread.run_sync(write_status, settings, health)
     except OSError:
         log.warning("Could not record the sandbox status")
+
+
+async def _monitor(factory, settings: Settings, gateway, worker_id: str) -> None:
+    try:
+        await anyio.to_thread.run_sync(monitoring.record_worker_heartbeat, settings, worker_id)
+        async with factory() as db:
+            for message in await monitoring.alert_on_changes(db, settings, gateway):
+                log.info("Alert sent: %s", message)
+    except Exception:
+        log.exception("Monitoring failed")
 
 
 def make_worker_id() -> str:
@@ -97,6 +108,7 @@ async def run_worker(
                 if expired := await cleanup_expired_uploads(factory, settings):
                     log.info("Expired %d abandoned upload(s)", expired)
                 await _record_sandbox_health(settings)
+                await _monitor(factory, settings, gateway, worker_id)
                 last_maintenance = now
             while len(runs) < settings.model_parallel_requests:
                 run_id = await claim_next_run(factory, worker_id, settings)

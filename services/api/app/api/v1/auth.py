@@ -6,12 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import CurrentAuth
 from app.auth.passwords import hash_password, needs_rehash, verify_password
-from app.auth.sessions import SESSION_COOKIE, create_session, revoke_session
+from app.auth.sessions import SESSION_COOKIE, create_session, revoke_all, revoke_session
+from app.auth.throttle import login_blocked
 from app.config import Settings, get_settings
 from app.db import get_db
 from app.db.base import utcnow
-from app.models import AuditEvent, User
-from app.schemas.auth import LoginRequest, LoginResponse, MeResponse
+from app.models import AuditEvent, Session, User
+from app.schemas.auth import LoginRequest, LoginResponse, MeResponse, PasswordChange
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -36,6 +37,15 @@ async def login(
     db: Annotated[AsyncSession, Depends(get_db)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> LoginResponse:
+    ip = request.client.host if request.client else None
+    if (wait := await login_blocked(db, settings, body.username, ip)) is not None:
+        _audit(db, request, "auth.login_throttled", None, username=body.username[:64])
+        await db.commit()
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "Too many failed sign-in attempts; try again later",
+            headers={"Retry-After": str(wait)},
+        )
     user = await db.scalar(select(User).where(User.username == body.username))
     if not verify_password(user.password_hash if user else None, body.password) or (
         user is not None and not user.is_active
@@ -81,6 +91,63 @@ async def logout(
     _audit(db, request, "auth.logout", auth.user, session_id=str(auth.session.id))
     await db.commit()
     response.delete_cookie(SESSION_COOKIE, path="/")
+
+
+@router.post("/password", status_code=status.HTTP_204_NO_CONTENT)
+async def change_password(
+    body: PasswordChange,
+    auth: CurrentAuth,
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> None:
+    """Change the password; every other session (other devices) is signed out."""
+    if not verify_password(auth.user.password_hash, body.current_password):
+        _audit(db, request, "auth.password_change_failed", auth.user)
+        await db.commit()
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "The current password is wrong")
+    user = await db.get(User, auth.user.id)
+    user.password_hash = hash_password(body.new_password)
+    revoked = await revoke_all(db, user.id, except_session=auth.session.id)
+    _audit(db, request, "auth.password_changed", user, other_sessions_revoked=revoked)
+    await db.commit()
+
+
+@router.get("/sessions")
+async def list_sessions(
+    auth: CurrentAuth, db: Annotated[AsyncSession, Depends(get_db)]
+) -> list[dict]:
+    """Signed-in devices."""
+    rows = (
+        await db.scalars(
+            select(Session)
+            .where(
+                Session.user_id == auth.user.id,
+                Session.revoked_at.is_(None),
+                Session.expires_at > utcnow(),
+            )
+            .order_by(Session.created_at.desc())
+        )
+    ).all()
+    return [
+        {
+            "id": str(row.id),
+            "device_id": row.device_id,
+            "user_agent": row.user_agent,
+            "created_at": row.created_at.isoformat(),
+            "last_seen_at": row.last_seen_at.isoformat() if row.last_seen_at else None,
+            "current": row.id == auth.session.id,
+        }
+        for row in rows
+    ]
+
+
+@router.post("/sessions/revoke-others", status_code=status.HTTP_204_NO_CONTENT)
+async def revoke_other_sessions(
+    auth: CurrentAuth, request: Request, db: Annotated[AsyncSession, Depends(get_db)]
+) -> None:
+    revoked = await revoke_all(db, auth.user.id, except_session=auth.session.id)
+    _audit(db, request, "auth.sessions_revoked", auth.user, count=revoked)
+    await db.commit()
 
 
 @router.get("/me", response_model=MeResponse)

@@ -25,6 +25,7 @@ interface Props {
   onOpenTools: () => void;
   memoryToReview: number;
   onOpenMemory: () => void;
+  onOpenAccount: () => void;
 }
 
 export function Sidebar(props: Props) {
@@ -185,7 +186,13 @@ export function Sidebar(props: Props) {
           </div>
         )}
         <div className="flex items-center justify-between px-1">
-          <span className="truncate">{props.me.display_name ?? props.me.username}</span>
+          <button
+            onClick={props.onOpenAccount}
+            className="truncate hover:underline"
+            title="Account, password and system status"
+          >
+            {props.me.display_name ?? props.me.username}
+          </button>
           <button onClick={props.onLogout} className="text-muted hover:text-ink">
             Sign out
           </button>

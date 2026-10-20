@@ -9,6 +9,7 @@ from app.auth.bootstrap import ensure_bootstrap_user
 from app.config import Settings, get_settings
 from app.db import get_sessionmaker
 from app.errors import install_error_handlers
+from app.security import SecurityMiddleware
 from app.services.model_gateway import get_model_gateway
 from app.static import mount_web_app
 
@@ -34,6 +35,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url=None if settings.app_env == "production" else "/api/openapi.json",
     )
     install_error_handlers(app)
+    app.add_middleware(SecurityMiddleware, settings=settings)
     app.include_router(v1_router)
     mount_web_app(app, settings.static_root)  # last: it catches every other path
     return app

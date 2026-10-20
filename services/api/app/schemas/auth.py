@@ -24,3 +24,8 @@ class MeResponse(BaseModel):
     is_admin: bool
     single_user_mode: bool
     capabilities: dict[str, bool]
+
+
+class PasswordChange(BaseModel):
+    current_password: str = Field(min_length=1, max_length=1024)
+    new_password: str = Field(min_length=12, max_length=1024)

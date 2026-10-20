@@ -62,6 +62,8 @@ services:
     volumes:
       - app-data:/data/app
       - workspaces:/data/workspaces
+      # Written by infra/scripts/backup.sh on the host; read here for the backup-age check.
+      - ${BACKUP_DIR:-../backups}:/data/backups:ro
     # Bound to loopback only: the existing reverse proxy terminates TLS and forwards here.
     ports:
       - "${API_BIND_ADDRESS:-127.0.0.1}:${API_PORT:-8000}:8000"
@@ -83,6 +85,8 @@ services:
     volumes:
       - app-data:/data/app
       - workspaces:/data/workspaces
+      # Written by infra/scripts/backup.sh on the host; read here for the backup-age check.
+      - ${BACKUP_DIR:-../backups}:/data/backups:ro
     # sandbox: the worker sends code there. egress: model server and web tools.
     networks: [backend, egress, sandbox]
     environment:

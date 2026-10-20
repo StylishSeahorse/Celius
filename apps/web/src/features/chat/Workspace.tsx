@@ -7,6 +7,7 @@ import { outbox } from "../../offline/outbox";
 import { startSync } from "../../offline/sync";
 import { useOnline } from "../../offline/useOnline";
 import { desktop } from "../../lib/desktop";
+import { AccountPanel } from "../account/AccountPanel";
 import { DeleteConversationDialog } from "../memory/DeleteConversationDialog";
 import { MemoryPanel } from "../memory/MemoryPanel";
 import { ToolsPanel } from "../tools/ToolsPanel";
@@ -38,6 +39,7 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const [draftToolProfile, setDraftToolProfile] = useState<string | null>(null);
   const [draftMemory, setDraftMemory] = useState(true);
   const [memoryOpen, setMemoryOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [memoryToReview, setMemoryToReview] = useState(0);
   const [deleting, setDeleting] = useState<ConversationSummary | null>(null);
   const [storage, setStorage] = useState<StorageUsage | null>(null);
@@ -253,6 +255,10 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
             setToolsOpen(true);
             setSidebarOpen(false);
           }}
+          onOpenAccount={() => {
+            setAccountOpen(true);
+            setSidebarOpen(false);
+          }}
           memoryToReview={memoryToReview}
           onOpenMemory={() => {
             setMemoryOpen(true);
@@ -289,6 +295,7 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
           }}
         />
       )}
+      {accountOpen && <AccountPanel isAdmin={me.is_admin} onClose={() => setAccountOpen(false)} />}
       {memoryOpen && (
         <MemoryPanel
           projects={projects}

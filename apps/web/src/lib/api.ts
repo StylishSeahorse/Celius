@@ -90,6 +90,12 @@ export const api = {
     request<Me>("/auth/login", json("POST", { username, password })),
   logout: () => request<void>("/auth/logout", json("POST")),
   me: () => request<Me>("/auth/me"),
+  changePassword: (current_password: string, new_password: string) =>
+    request<void>("/auth/password", json("POST", { current_password, new_password })),
+  sessions: () => request<unknown[]>("/auth/sessions"),
+  revokeOtherSessions: () => request<void>("/auth/sessions/revoke-others", json("POST")),
+  status: () =>
+    request<{ status: string; checks: unknown[]; alerts: unknown }>("/status"),
   models: () => request<ModelList>("/models"),
 
   listConversations: (opts: { q?: string; projectId?: string | null } = {}) => {
