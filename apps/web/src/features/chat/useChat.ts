@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ApiError, api, isNetworkError } from "../../lib/api";
+import { notifyInBackground } from "../../lib/desktop";
 import { newId } from "../../lib/ids";
 import { followRun } from "../../lib/sse";
 import type { ConversationDetail, ConversationSummary, Run, RunEvent, ToolCall } from "../../lib/types";
@@ -78,6 +79,8 @@ export function useChat({ conversationId, draft, onConversationCreated, onChange
   const streamAbort = useRef<AbortController | null>(null);
   const liveRef = useRef<LiveRun | null>(null);
   liveRef.current = live;
+  const detailRef = useRef<ConversationDetail | null>(null);
+  detailRef.current = detail;
   const idRef = useRef(conversationId);
   idRef.current = conversationId;
   const callbacks = useRef({ onChanged });
@@ -110,6 +113,10 @@ export function useChat({ conversationId, draft, onConversationCreated, onChange
     followRun(run.id, {
       signal: controller.signal,
       onEvent: (event) => {
+        const title = detailRef.current?.title || "Celius";
+        if (event.type === "run.completed") notifyInBackground(title, liveRef.current?.text || "Your reply is ready.");
+        if (event.type === "run.failed") notifyInBackground(title, "The reply failed.");
+        if (event.type === "tool_call.awaiting_approval") notifyInBackground(title, "A tool is waiting for your approval.");
         setLive((current) => applyEvent(current, event));
         // Saved steps and tool results show from the server's copy of the message.
         if (RELOAD_EVENTS.has(event.type) && !reload) {

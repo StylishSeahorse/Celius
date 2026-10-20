@@ -37,5 +37,12 @@ export const desktop = internals
         return file;
       },
       openExternal: (url: string) => void internals.invoke("open_external", { url }).catch(() => window.open(url, "_blank")),
+      notify: (title: string, body: string) => internals.invoke<void>("notify", { title, body }).catch(() => undefined),
     }
   : null;
+
+/** In the desktop app, a native notification when the window isn't in front (S-12). */
+export function notifyInBackground(title: string, body: string) {
+  if (!desktop || (document.visibilityState === "visible" && document.hasFocus())) return;
+  void desktop.notify(title, body.replace(/\s+/g, " ").trim().slice(0, 200));
+}

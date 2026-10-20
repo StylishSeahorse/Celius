@@ -6,6 +6,11 @@
 //!   the folder commands below and opening http(s) links in the system browser.
 //! - Folder access is read-only, limited to folders the user approved in the native
 //!   folder picker, and every path is checked by [`folders::resolve_within`].
+//! - Notifications: the server's pages may show a native notification (title and body
+//!   only, length-limited) when a reply finishes while the window is in the background.
+//!
+//! Closing the window keeps Celius in the tray, so replies can still notify; quit from the
+//! tray or the Celius menu.
 
 mod config;
 mod folders;
@@ -15,8 +20,10 @@ use std::sync::Mutex;
 
 use tauri::ipc::{CapabilityBuilder, Response};
 use tauri::menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
-use tauri::{AppHandle, Manager, State, Url};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{AppHandle, Manager, State, Url, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_opener::OpenerExt;
 
 use config::{Config, Root};
@@ -34,6 +41,7 @@ const SERVER_PERMISSIONS: &[&str] = &[
     "allow-list-dir",
     "allow-read-file",
     "allow-open-external",
+    "allow-notify",
 ];
 
 struct AppState {
@@ -173,11 +181,33 @@ fn open_external(app: AppHandle, url: String) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+/// A native notification ("Your reply is ready"). Text only, clipped.
+#[tauri::command]
+fn notify(app: AppHandle, title: String, body: String) -> Result<(), String> {
+    let title: String = title.chars().take(120).collect();
+    let body: String = body.chars().take(300).collect();
+    app.notification()
+        .builder()
+        .title(if title.is_empty() { "Celius".into() } else { title })
+        .body(body)
+        .show()
+        .map_err(|e| e.to_string())
+}
+
+fn show_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             get_server,
             set_server,
@@ -186,7 +216,8 @@ pub fn run() {
             remove_root,
             list_dir,
             read_file,
-            open_external
+            open_external,
+            notify
         ])
         .setup(|app| {
             let config_path = app.path().app_config_dir()?.join("config.json");
@@ -225,7 +256,43 @@ pub fn run() {
                 .build()?;
             let menu = MenuBuilder::new(app).items(&[&celius, &edit]).build()?;
             app.set_menu(menu)?;
+
+            let show = MenuItemBuilder::with_id("tray-show", "Show Celius").build(app)?;
+            let exit = MenuItemBuilder::with_id("tray-quit", "Quit Celius").build(app)?;
+            let tray_menu = MenuBuilder::new(app).items(&[&show, &exit]).build()?;
+            let mut tray = TrayIconBuilder::with_id("main")
+                .tooltip("Celius")
+                .menu(&tray_menu)
+                .show_menu_on_left_click(false)
+                .on_menu_event(|app, event| match event.id().as_ref() {
+                    "tray-show" => show_window(app),
+                    "tray-quit" => app.exit(0),
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        show_window(tray.app_handle());
+                    }
+                });
+            if let Some(icon) = app.default_window_icon() {
+                tray = tray.icon(icon.clone());
+            }
+            tray.build(app)?;
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            // Closing hides to the tray, so a reply that finishes later can still notify.
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "main" {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
         })
         .on_menu_event(|app, event| {
             let Some(window) = app.get_webview_window("main") else {

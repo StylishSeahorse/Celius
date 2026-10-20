@@ -149,10 +149,10 @@ Arbitrary shell stays disabled until T-01 is decided and validated.
 
 | ID | Item | Status | Acceptance criteria |
 | --- | --- | --- | --- |
-| S-10 | Push notifications for finished replies | ⬜ | Web Push (VAPID keys generated on first start); opt-in per device; sent only when no tab has the chat open; works for the installed Android PWA |
-| U-10 | Previews for PDFs and Office files | ⬜ | First-page image for PDFs (and Office documents via PDF conversion where available) shown like image thumbnails |
-| S-11 | Share into Celius from Android | ⬜ | PWA share target: text, links and files shared from other apps open a new chat with them attached |
-| S-12 | Desktop app notifications and tray | ⬜ | Native notification when a reply finishes in the background; tray icon to show/hide |
+| S-10 | Push notifications for finished replies | ✅ | Web Push (RFC 8291/8292; keys derived from `APP_SECRET_KEY`); opt-in per device; replies, failures and approvals; not shown for the chat on screen; only the browser vendors' push services accepted |
+| U-10 | Previews for PDFs and Office files | ✅ | PDF first page rendered by pdfium in a limited subprocess; Office files show their embedded preview picture (no LibreOffice); shown as cards in the chat |
+| S-11 | Share into Celius from Android | ✅ | PWA share target: text, links and files shared from other apps open a new chat with them attached |
+| S-12 | Desktop app notifications and tray | ✅ | Native notification when a reply finishes or needs approval while the window is in the background; closing keeps it in the tray |
 
 ## Phase 10 — Multiple users (family)
 

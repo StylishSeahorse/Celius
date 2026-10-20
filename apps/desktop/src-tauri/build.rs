@@ -11,6 +11,7 @@ fn main() {
             "list_dir",
             "read_file",
             "open_external",
+            "notify",
         ]),
     ))
     .expect("failed to run tauri-build");

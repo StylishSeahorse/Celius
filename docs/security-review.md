@@ -115,6 +115,23 @@ revision.
   container's namespaces. The container boundary and limits above still hold. The tools
   panel shows the mode.
 
+### Notifications and previews (Phase 9)
+
+- Push subscriptions are endpoints supplied by the browser, and the worker POSTs to them.
+  So only `https` URLs on the browser vendors' push services are accepted (FCM, Mozilla,
+  Apple, WNS; `PUSH_ALLOWED_HOSTS` to change). Look-alike hosts, LAN addresses and plain
+  http are refused (`test_push.py`), so a subscription can't turn the worker into a request
+  forwarder. Messages are encrypted to the device (RFC 8291) and signed with a VAPID key
+  derived from `APP_SECRET_KEY`. A device that the push service reports as gone (404/410) or
+  that was subscribed under another key (403) is forgotten.
+- PDF previews run pdfium, native code, on untrusted files. That happens in a subprocess
+  limited to 768 MB of memory, 20 s of CPU and 30 s overall, with no environment. A crash
+  or a hang costs only that file's preview, never the upload. Office previews never
+  render the document: they decode the embedded picture with Pillow (pixel limit) and
+  re-encode it.
+- The desktop app's `notify` command is granted only to the connected server's origin, and
+  it shows plain text clipped to 120/300 characters.
+
 ### Tools and prompt injection
 
 - Every tool has a risk level. Profiles decide allow, ask or deny, and denies always win,
