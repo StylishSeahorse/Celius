@@ -55,10 +55,10 @@ call() {
 
 step "create data"
 call POST /conversations -H 'Content-Type: application/json' -d '{"title": "Before the backup"}' >/dev/null
-head -c 200000 /dev/urandom >"$backups/upload.bin"
+head -c 150000 /dev/urandom | base64 >"$backups/upload.bin" # an accepted type (text) of random content
 size="$(stat -c %s "$backups/upload.bin")"
 upload="$(call POST /files/uploads -H 'Content-Type: application/json' \
-  -d "{\"filename\": \"data.bin\", \"size\": $size}" | json 'd["id"]')"
+  -d "{\"filename\": \"data.txt\", \"size\": $size}" | json 'd["id"]')"
 call PUT "/files/uploads/$upload/content" --data-binary "@$backups/upload.bin" >/dev/null
 file_id="$(call POST "/files/uploads/$upload/complete" | json 'd["id"]')"
 call POST /memories -H 'Content-Type: application/json' \
