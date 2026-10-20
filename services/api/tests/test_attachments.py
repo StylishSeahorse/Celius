@@ -60,7 +60,7 @@ async def test_attachment_text_reaches_the_model(
 
     await run_all()
     content = user_message(fake.requests[0])["content"]
-    assert content.startswith('<attachment name="notes.md" type="text" truncated="false">')
+    assert content.startswith('<attachment name="notes.md" type="text">')
     assert "The secret word is PELICAN." in content
     assert content.endswith("What's the word?")
     system = fake.requests[0]["messages"][0]["content"]
@@ -336,3 +336,84 @@ async def test_exports_are_validated_and_private(client, auth_headers):
         headers=auth_headers,
     )
     assert missing.status_code == 404
+
+
+# ---------------------------------------------------------------------- long documents
+
+
+def _long_document() -> bytes:
+    paragraphs = [
+        f"Section {i}. " + " ".join(f"filler{i}x{j}" for j in range(40)) for i in range(400)
+    ]
+    paragraphs[1] = "Introduction: this report covers the annual lighthouse survey."
+    paragraphs[311] = "The keeper's budget for lamp oil was 4,200 crowns in the final year."
+    return "\n\n".join(paragraphs).encode()  # ~150,000 characters
+
+
+async def test_a_long_document_is_cut_to_fit_the_context_keeping_the_relevant_part(
+    client, auth_headers, sessionmaker, settings, fake, run_all
+):
+    fake.context_tokens = 32_768
+    document = _long_document()
+    file = await ready_file(client, auth_headers, sessionmaker, settings, "survey.md", document)
+    conv = await new_conversation(client, auth_headers)
+    await send(
+        client,
+        auth_headers,
+        conv["id"],
+        content="What was the budget for lamp oil?",
+        attachment_ids=[file["id"]],
+    )
+    await run_all()
+
+    assert len(fake.requests) == 1  # no context_overflow: the run reached the model
+    content = user_message(fake.requests[0])["content"]
+    assert 'excerpt="true"' in content and f'total_chars="{len(document)}"' in content
+    assert "4,200 crowns" in content  # the relevant passage
+    assert "annual lighthouse survey" in content  # and the beginning
+    assert "not shown" in content
+    # Within the attachment share of the window (about 3 characters per token).
+    assert len(content) < 32_768 * 3 * settings.attachment_context_share + 2000
+    # Tools can read the rest.
+    assert "read_file" in content and "attachments/survey.md" in content
+
+
+async def test_read_file_pages_through_long_text(
+    client, auth_headers, sessionmaker, gateway, settings, fake, run_all
+):
+    import os
+
+    conv = await new_conversation(client, auth_headers, tool_profile="standard")
+    root = f"{settings.workspace_root}/{conv['id']}"
+    os.makedirs(root, exist_ok=True)
+    with open(f"{root}/big.txt", "w") as handle:
+        handle.write("a" * 25_000 + "MARKER" + "b" * 25_000)
+    settings.tool_max_result_chars = 20_000
+    fake.turns = [
+        [{"name": "read_file", "arguments": {"path": "big.txt", "offset": 20_000}}],
+        "ok",
+    ]
+    await send(client, auth_headers, conv["id"], content="read it")
+    await run_all()
+    result = fake.requests[-1]["messages"][-1]["content"]
+    assert result.startswith(
+        "[big.txt: characters 20,000–40,000; more follows, continue with offset=40000]"
+    )
+    assert "MARKER" in result
+
+
+async def test_earlier_attachments_shrink_to_an_excerpt(
+    client, auth_headers, sessionmaker, settings, fake, run_all
+):
+    fake.context_tokens = 32_768
+    file = await ready_file(
+        client, auth_headers, sessionmaker, settings, "survey.md", _long_document()
+    )
+    conv = await new_conversation(client, auth_headers)
+    await send(client, auth_headers, conv["id"], content="Summarise", attachment_ids=[file["id"]])
+    await run_all()
+    first = len(user_message(fake.requests[0])["content"])
+    await send(client, auth_headers, conv["id"], content="Thanks, and something else?")
+    await run_all()
+    earlier = [m for m in fake.requests[1]["messages"] if m["role"] == "user"][0]["content"]
+    assert len(earlier) < settings.attachment_history_chars + 1500 < first

@@ -110,27 +110,55 @@ builtin(
 
 class ReadFileArgs(BaseModel):
     path: str = Field(description="File path inside the workspace")
-    max_chars: int = Field(default=50_000, ge=100, le=READ_LIMIT)
+    offset: int = Field(default=0, ge=0, description="Character position to start from")
+    max_chars: int = Field(default=30_000, ge=100, le=READ_LIMIT)
 
 
 async def _read_file(ctx: ToolContext, args: ReadFileArgs) -> ToolOutput:
+    limit = min(args.max_chars, ctx.settings.tool_max_result_chars)
     try:
         data, size = await anyio.to_thread.run_sync(
-            ws.read_bytes, ctx.workspace, args.path, args.max_chars * 4
+            ws.read_bytes, ctx.workspace, args.path, (args.offset + limit) * 4 + 4
         )
     except ws.WorkspaceError as exc:
         return _error(str(exc))
     if b"\x00" in data[:8192]:
-        return _error(f"{args.path} is a binary file ({size} bytes); use run_python to inspect it")
-    text, cut = _cap(data.decode("utf-8", errors="replace"), args.max_chars)
-    return ToolOutput(content=text, data={"path": args.path, "size": size, "truncated": cut})
+        hint = (
+            " (its extracted text may be next to it as .txt)"
+            if args.path.startswith(f"{ws.ATTACHMENTS_DIR}/")
+            else ""
+        )
+        return _error(
+            f"{args.path} is a binary file ({size} bytes){hint}; use run_python to inspect it"
+        )
+    text = data.decode("utf-8", errors="replace")
+    piece = text[args.offset : args.offset + limit]
+    end = args.offset + len(piece)
+    more = end < len(text) or len(data) < size
+    header = (
+        f"[{args.path}: characters {args.offset:,}–{end:,}"
+        + (f"; more follows, continue with offset={end}]" if more else "; end of file]")
+        if args.offset or more
+        else ""
+    )
+    return ToolOutput(
+        content=f"{header}\n{piece}" if header else piece,
+        data={
+            "path": args.path,
+            "size": size,
+            "offset": args.offset,
+            "end": end,
+            "truncated": more,
+        },
+    )
 
 
 builtin(
     ToolSpec(
         name="read_file",
         label="Read file",
-        description="Read a text file from the workspace.",
+        description="Read a text file from the workspace, in pieces for long files (offset). "
+        "Text extracted from attached documents is at attachments/<name>.txt.",
         risk="read",
         handler=_read_file,
         args_model=ReadFileArgs,

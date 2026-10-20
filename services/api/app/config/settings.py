@@ -70,8 +70,14 @@ class Settings(BaseSettings):
     # Files
     upload_session_ttl_minutes: int = Field(default=60, ge=1)
     max_extracted_text_chars: int = Field(default=500_000, ge=1000)
-    # How much of one attachment's text goes into a prompt (the rest is cut with a note).
+    # Most of one attachment's text that goes into a prompt. Longer documents are sent as
+    # their beginning plus the passages most relevant to the question; tools can read the
+    # rest from the workspace.
     max_attachment_prompt_chars: int = Field(default=60_000, ge=1000)
+    # Share of the context window the newest message's attachments may use together.
+    attachment_context_share: float = Field(default=0.4, ge=0.05, le=0.8)
+    # Excerpt kept from files attached to earlier messages (already answered).
+    attachment_history_chars: int = Field(default=3000, ge=0)
     # Share of the context budget that project knowledge files may use.
     project_files_context_share: float = Field(default=0.3, ge=0, le=0.9)
     archive_max_entries: int = Field(default=10_000, ge=1)

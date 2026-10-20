@@ -23,6 +23,7 @@ the model is still processing the prompt.
 """
 
 import asyncio
+import json
 import logging
 import time
 import uuid
@@ -41,6 +42,7 @@ from app.errors import AppError
 from app.models import (
     FINAL_TOOL_CALL_STATUSES,
     Conversation,
+    FileKind,
     FileStatus,
     Message,
     MessagePart,
@@ -55,7 +57,13 @@ from app.models import (
 )
 from app.schemas.events import RunEventType
 from app.services.audit import audit
-from app.services.context import CHARS_PER_TOKEN, HistoryItem, build_context, context_budget
+from app.services.context import (
+    CHARS_PER_TOKEN,
+    HistoryItem,
+    build_context,
+    context_budget,
+    estimate_tokens,
+)
 from app.services.conversations import load_parts, message_ancestry, message_text
 from app.services.files.service import storage_for
 from app.services.memory.embeddings import Embedder
@@ -931,19 +939,48 @@ async def _prepare(
                 context_tokens, max_tokens, settings.context_safety_margin_tokens
             )
 
+            toolset = None
+            if tool_calling:
+                toolset = await build_toolset(db, conversation, settings, sandbox=sandbox)
+                if not toolset.offered:
+                    toolset = None
+            if budget is not None and toolset is not None:
+                # Tool definitions are part of the prompt too.
+                budget = max(budget - estimate_tokens(json.dumps(toolset.openai())), 256)
+
             path = await message_ancestry(db, conversation.id, run.trigger_message_id)
             parts = await load_parts(db, path)
             attachments = await load_attachments(db, path, parts)
             latest_user = next((m for m in reversed(path) if m.role == MessageRole.user), None)
+            query = message_text(parts[latest_user.id]) if latest_user else ""
+            # The newest message's files share a part of the context; files on earlier
+            # messages (already answered) get a short excerpt each.
+            latest_files = len(attachments.get(latest_user.id, [])) if latest_user else 0
+            attachment_chars = (
+                int(budget * settings.attachment_context_share * CHARS_PER_TOKEN)
+                if budget
+                else settings.max_attachment_prompt_chars * max(latest_files, 1)
+            )
+            readable = toolset is not None and "read_file" in toolset.offered
             history: list[HistoryItem] = []
             for message in path:
                 text = message_text(parts[message.id])
                 if message.role == MessageRole.user:
+                    files = attachments.get(message.id, [])
+                    is_latest = message is latest_user
+                    per_file = (
+                        attachment_chars // max(len(files), 1)
+                        if is_latest
+                        else settings.attachment_history_chars
+                    )
                     prefix, images = await attachment_content(
-                        attachments.get(message.id, []),
+                        files,
                         settings,
-                        send_images=message is latest_user,
+                        send_images=is_latest,
                         vision=vision,
+                        char_limit=min(per_file, settings.max_attachment_prompt_chars),
+                        query=text if is_latest else "",
+                        full_text_in_workspace=readable,
                     )
                     history.append(HistoryItem("user", f"{prefix}\n\n{text}".strip(), images))
                 elif message.role == MessageRole.assistant and (
@@ -976,7 +1013,7 @@ async def _prepare(
                         retrieved = await retrieve(
                             db,
                             conversation,
-                            message_text(parts[latest_user.id]),
+                            query,
                             settings,
                             embedder,
                         )
@@ -993,11 +1030,6 @@ async def _prepare(
             if memory := memory_prompt_block(retrieved, memory_budget):
                 system_prompt += "\n\n" + memory
 
-            toolset = None
-            if tool_calling:
-                toolset = await build_toolset(db, conversation, settings, sandbox=sandbox)
-                if not toolset.offered:
-                    toolset = None
             if toolset is not None:
                 system_prompt += (
                     "\n\n"
@@ -1160,8 +1192,20 @@ async def _copy_attachments(settings: Settings, conversation_id: uuid.UUID, atta
         name = f"{ws.ATTACHMENTS_DIR}/{file.relative_path or file.filename}"
         try:
             await anyio.to_thread.run_sync(ws.copy_in, root, name, store.blob(file.sha256))
+            # The extracted text next to it, so tools can read what the prompt left out.
+            if file.text_content and file.kind != FileKind.text:
+                await anyio.to_thread.run_sync(
+                    _write_text_copy, root, f"{name}.txt", file.text_content
+                )
         except (ws.WorkspaceError, OSError, ValueError):
             log.warning("Could not copy attachment %s into the workspace", file.id)
+
+
+def _write_text_copy(root, name: str, text: str) -> None:
+    try:
+        ws.write_bytes(root, name, text.encode(), overwrite=False)
+    except ws.WorkspaceError:
+        pass  # already there
 
 
 async def _finish(
