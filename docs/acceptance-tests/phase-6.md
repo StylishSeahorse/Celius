@@ -17,7 +17,7 @@ Exit gate: **retrieval scope, exclusion and deletion tests pass.**
 | API tests on SQLite | 211 passed (1 skipped: the PostgreSQL-only migration test) |
 | Memory and migration tests on PostgreSQL (pgvector 0.6) | all passed |
 | Web unit tests and typecheck | 16 passed |
-| Playwright, desktop + Pixel 7 | see the commit for the latest run |
+| Playwright, desktop + Pixel 7 | 57 passed, 1 skipped (folder picking on the phone viewport) |
 
 ## Manual (on the real deployment)
 
