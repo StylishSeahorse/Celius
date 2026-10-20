@@ -33,7 +33,7 @@ test("a suggested memory waits for review, then is used and shown", async ({ pag
   const panel = await openMemory(page);
   await panel.getByRole("button", { name: /To review/ }).click();
   const item = panel.getByTestId("memory").filter({ hasText: fact });
-  await item.getByRole("button", { name: "Remember" }).click();
+  await item.getByRole("button", { name: "Remember", exact: true }).click();
   await expect(item).toHaveCount(0);
   await panel.getByRole("button", { name: "Remembered" }).click();
   await expect(panel.getByTestId("memory").filter({ hasText: fact })).toBeVisible();

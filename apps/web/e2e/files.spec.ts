@@ -104,6 +104,8 @@ test("conversations export to Markdown and code blocks download", async ({ page 
   const marker = `export-${Date.now()}`;
   await send(page, marker);
   await expect(lastReply(page)).toContainText(marker);
+  // Download only once the whole code block has streamed in.
+  await expect(lastReply(page)).toContainText("print('hello from the fake model')");
 
   const [code] = await Promise.all([
     page.waitForEvent("download"),

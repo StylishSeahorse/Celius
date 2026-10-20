@@ -29,6 +29,8 @@ export function MemoryPanel({
   const [tab, setTab] = useState<Tab>(initialTab ?? "remembered");
   const [settings, setSettings] = useState<MemorySettings | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Bumped when a memory is added, so the list below shows it.
+  const [version, setVersion] = useState(0);
 
   const reloadSettings = useCallback(() => {
     api.memorySettings().then(setSettings, (err) => setError(message(err)));
@@ -92,8 +94,14 @@ export function MemoryPanel({
           )}
           {tab === "remembered" && (
             <>
-              <AddMemory projects={projects} onAdded={changed} />
-              <MemoryList status="active" projects={projects} onChanged={changed} onOpenConversation={onOpenConversation} />
+              <AddMemory
+                projects={projects}
+                onAdded={() => {
+                  setVersion((v) => v + 1);
+                  changed();
+                }}
+              />
+              <MemoryList key={version} status="active" projects={projects} onChanged={changed} onOpenConversation={onOpenConversation} />
             </>
           )}
           {tab === "settings" && settings && (
