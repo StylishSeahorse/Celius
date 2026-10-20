@@ -247,11 +247,20 @@ async def collect(db: AsyncSession, settings: Settings, gateway=None) -> list[Ch
             if hours > settings.alert_backup_warning_hours
             else "ok"
         )
+        summary = f"last one {_age(age)} ago"
+        if not last.get("copied_off_host"):
+            # A backup on the same disk doesn't survive losing the machine.
+            level = level if level == "critical" else "warning"
+            summary += (
+                ", but the off-host copy failed"
+                if last.get("offsite_target")
+                else ", only on this machine (set BACKUP_OFFSITE_TARGET)"
+            )
         checks.append(
             Check(
                 "backup",
                 level,
-                f"last one {_age(age)} ago",
+                summary,
                 round(hours, 1),
                 {
                     "archive": last.get("archive"),

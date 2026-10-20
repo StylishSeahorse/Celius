@@ -6,7 +6,8 @@
 name: celius
 
 x-api-env: &api-env
-  env_file: ../.env
+  # Restore drills point this at their own copy (infra/scripts/restore-drill.sh).
+  env_file: ${CELIUS_ENV_FILE:-../.env}
   environment:
     DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-celius}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-celius}
     REDIS_URL: redis://redis:6379/0

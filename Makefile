@@ -4,7 +4,8 @@ COMPOSE_DEV := docker compose -f infra/compose.dev.yaml
 DEV_DB := postgresql+asyncpg://celius:celius@localhost:5432/celius
 
 .PHONY: gen-api desktop install dev-deps dev-api dev-worker dev-web fake-llama migrate migration test test-api-pg \
-	test-web test-sandbox lint format e2e up down logs
+	test-web test-sandbox lint format e2e up down logs \
+	backup restore restore-drill upgrade rollback status
 
 install:            ## Install API and web dependencies
 	cd $(API) && uv sync
@@ -74,3 +75,23 @@ down:
 
 logs:
 	$(COMPOSE_PROD) logs -f api
+
+# --- Operations (docs/operations/) ---
+
+backup:             ## Encrypted backup of the database, files and settings
+	infra/scripts/backup.sh
+
+restore:            ## Restore a backup: make restore ARCHIVE=backups/celius-....tar.enc
+	infra/scripts/restore.sh "$(ARCHIVE)"
+
+restore-drill:      ## Prove the newest backup restores, in a throwaway copy of the stack
+	infra/scripts/restore-drill.sh $(ARCHIVE)
+
+upgrade:            ## Backup, then upgrade: make upgrade [REV=v1.2.0]
+	infra/scripts/upgrade.sh $(REV)
+
+rollback:           ## Undo the last upgrade
+	infra/scripts/rollback.sh
+
+status:             ## Health checks, as on the status page
+	$(COMPOSE_PROD) exec api python -m app.ops.status

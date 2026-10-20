@@ -123,6 +123,7 @@ jobs:
           echo "SANDBOX_EGRESS_TOKEN=ci-egress-token-0123456789" >> .env
           docker compose -f infra/compose.yaml --env-file .env config -q
           docker compose -f infra/compose.dev.yaml config -q
+          rm .env
       - name: Build image (API + worker + web)
         run: docker build -f infra/docker/Dockerfile.api -t celius-api:ci .
       - name: Build the sandbox image
@@ -143,6 +144,11 @@ jobs:
           assert result['stdout'] == '42\\n', result
           "
           docker rm -f sb
+      - name: Clean deployment, backup, disaster, restore, drill, rollback (release gate)
+        env:
+          CELIUS_API_IMAGE: celius-api:ci
+          CELIUS_SANDBOX_IMAGE: celius-sandbox:ci
+        run: infra/scripts/test-clean-deployment.sh
 
   desktop:
     runs-on: windows-latest

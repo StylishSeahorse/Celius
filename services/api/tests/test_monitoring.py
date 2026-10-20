@@ -13,12 +13,16 @@ from app.models import Run, User
 from app.services import monitoring
 
 
-def write_backup_status(settings, hours_ago: float) -> None:
+def write_backup_status(settings, hours_ago: float, **extra) -> None:
     root = Path(settings.backup_root)
     root.mkdir(parents=True, exist_ok=True)
-    (root / "last-success.json").write_text(
-        json.dumps({"finished_at": time.time() - hours_ago * 3600, "archive": "celius-x.tar.enc"})
-    )
+    status = {
+        "finished_at": time.time() - hours_ago * 3600,
+        "archive": "celius-x.tar.enc",
+        "offsite_target": True,
+        "copied_off_host": True,
+    }
+    (root / "last-success.json").write_text(json.dumps(status | extra))
 
 
 async def checks_by_name(sessionmaker, settings, gateway=None) -> dict:
@@ -65,6 +69,14 @@ async def test_worker_heartbeat_and_backup_age(sessionmaker, settings, tmp_path)
     assert (await checks_by_name(sessionmaker, settings))["backup"].level == "warning"
     write_backup_status(settings, hours_ago=100)
     assert (await checks_by_name(sessionmaker, settings))["backup"].level == "critical"
+
+    # Recent, but never left the machine: losing the disk would lose it too.
+    write_backup_status(settings, hours_ago=1, offsite_target=False, copied_off_host=False)
+    backup = (await checks_by_name(sessionmaker, settings))["backup"]
+    assert backup.level == "warning" and "only on this machine" in backup.summary
+    write_backup_status(settings, hours_ago=1, copied_off_host=False)
+    backup = (await checks_by_name(sessionmaker, settings))["backup"]
+    assert backup.level == "warning" and "off-host copy failed" in backup.summary
 
 
 async def test_a_stuck_queue_is_reported(client, auth_headers, sessionmaker, settings):
