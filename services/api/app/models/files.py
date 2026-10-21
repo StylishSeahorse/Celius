@@ -33,6 +33,8 @@ class FileKind(enum.StrEnum):
     presentation = "presentation"  # .pptx
     text = "text"  # plain text, markdown, code, csv, json…
     archive = "archive"  # .zip
+    audio = "audio"  # mp3, m4a, wav, ogg, opus, flac, aac, webm audio
+    video = "video"  # mp4, mov, webm, mkv, avi, ogv
     export = "export"  # produced by the export job
 
 

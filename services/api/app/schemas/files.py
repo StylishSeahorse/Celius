@@ -59,3 +59,4 @@ class StorageUsage(BaseModel):
     used_bytes: int
     limit_bytes: int
     max_upload_bytes: int
+    max_media_upload_bytes: int  # audio and video

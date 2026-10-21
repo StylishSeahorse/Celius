@@ -18,6 +18,26 @@ const PDF = Buffer.from(
   "base64",
 );
 
+/** One second of a 440 Hz tone: 8 kHz, 16-bit mono PCM in a WAV container. */
+function wav(seconds = 1, rate = 8000): Buffer {
+  const samples = seconds * rate;
+  const out = Buffer.alloc(44 + samples * 2);
+  out.write("RIFF", 0);
+  out.writeUInt32LE(36 + samples * 2, 4);
+  out.write("WAVEfmt ", 8);
+  out.writeUInt32LE(16, 16); // fmt chunk size
+  out.writeUInt16LE(1, 20); // PCM
+  out.writeUInt16LE(1, 22); // mono
+  out.writeUInt32LE(rate, 24);
+  out.writeUInt32LE(rate * 2, 28); // bytes per second
+  out.writeUInt16LE(2, 32); // block align
+  out.writeUInt16LE(16, 34); // bits per sample
+  out.write("data", 36);
+  out.writeUInt32LE(samples * 2, 40);
+  for (let i = 0; i < samples; i++) out.writeInt16LE(Math.round(8000 * Math.sin((2 * Math.PI * 440 * i) / rate)), 44 + i * 2);
+  return out;
+}
+
 function fixture(dir: string, name: string, content: string | Buffer): string {
   const path = join(dir, name);
   mkdirSync(join(path, ".."), { recursive: true });
@@ -107,6 +127,27 @@ test("a PDF shows a preview of its first page", async ({ page }, info) => {
   await expect(image).toBeVisible();
   // The thumbnail really loaded (not a broken image).
   await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(512);
+});
+
+test("an audio file plays in the chat and can be sought", async ({ page }, info) => {
+  const path = fixture(info.outputPath("files"), "tone.wav", wav());
+  await attach(page, [path]);
+  await send(page, "What is this recording?");
+  await expect(lastReply(page)).toContainText("tone.wav");
+  const player = chat(page).getByTestId("media-attachment");
+  await expect(player).toContainText("tone.wav");
+  const audio = player.locator("audio");
+  await expect(audio).toHaveAttribute("src", /\/download\?inline=1$/);
+  // The browser really loaded it: its length is known, and jumping ahead works (range requests).
+  await expect.poll(() => audio.evaluate((a: HTMLAudioElement) => Math.round(a.duration * 10) / 10)).toBe(1);
+  const position = await audio.evaluate(
+    (a: HTMLAudioElement) =>
+      new Promise<number>((resolve) => {
+        a.addEventListener("seeked", () => resolve(a.currentTime), { once: true });
+        a.currentTime = 0.5;
+      }),
+  );
+  expect(position).toBeCloseTo(0.5, 1);
 });
 
 test("a file that isn't what its name says is refused", async ({ page }, info) => {

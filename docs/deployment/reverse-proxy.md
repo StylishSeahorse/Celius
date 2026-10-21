@@ -18,7 +18,9 @@ Remove `BOOTSTRAP_PASSWORD` from `.env` once the first login works.
 
 - Forward `X-Forwarded-For` / `X-Forwarded-Proto` headers. Uvicorn runs with `--proxy-headers`.
 - **Disable buffering** on `/api/v1/runs/*/events` (SSE). Allow idle reads of at least 300 s.
-- Set the request body limit to at least `MAX_UPLOAD_BYTES`, and stream uploads
+- Set the request body limit to at least 8 MB (the web app sends files larger than 4 MB in
+  4 MB pieces, so audio and video up to `MAX_MEDIA_UPLOAD_BYTES` never need more; scripts
+  that upload in one request need `MAX_UPLOAD_BYTES`), and stream uploads
   (`PUT /api/v1/files/uploads/*/content`) rather than buffering them in the proxy.
 - Do not expose the llama.cpp server through the proxy.
 

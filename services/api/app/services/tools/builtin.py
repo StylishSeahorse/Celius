@@ -28,12 +28,14 @@ from app.models import (
     Message,
     MessagePart,
     StoredFile,
+    User,
 )
 from app.services.files import quota
 from app.services.files.paths import UnsafePath, safe_filename
-from app.services.files.service import storage_for
+from app.services.files.service import max_size_for, storage_for
 from app.services.files.sniff import FileRejected, detect
 from app.services.jobs import enqueue_job
+from app.services.limits import storage_limit
 from app.services.memory.embeddings import Embedder
 from app.services.memory.retrieval import prompt_block as memory_prompt_block
 from app.services.memory.retrieval import retrieve, usage_part
@@ -217,15 +219,16 @@ async def _attach_file(ctx: ToolContext, args: AttachFileArgs) -> ToolOutput:
     try:
         try:
             size = await anyio.to_thread.run_sync(
-                ws.copy_out, ctx.workspace, args.path, tmp, settings.max_upload_bytes
+                ws.copy_out, ctx.workspace, args.path, tmp, max_size_for(filename, settings)
             )
             detected = await anyio.to_thread.run_sync(detect, tmp, filename)
         except (ws.WorkspaceError, FileRejected) as exc:
             return _error(str(exc))
         sha256 = await anyio.to_thread.run_sync(_sha256, tmp)
         async with ctx.factory() as db:
+            owner = await db.get(User, ctx.owner_id)
             try:
-                await quota.reserve(db, ctx.owner_id, size, settings.max_user_storage_bytes)
+                await quota.reserve(db, ctx.owner_id, size, storage_limit(owner, settings))
             except Exception:
                 return _error("Not enough storage space left to attach this file")
             await anyio.to_thread.run_sync(storage_for(settings).write_new, tmp, sha256)

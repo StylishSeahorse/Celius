@@ -27,7 +27,8 @@ RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-dev
 
 FROM python:3.12-slim
 # git: the git_clone tool downloads repositories (the checkout itself runs in the sandbox).
-RUN apt-get update && apt-get install -y --no-install-recommends git \
+# ffmpeg: duration, codecs and a still frame of uploaded audio and video.
+RUN apt-get update && apt-get install -y --no-install-recommends git ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 RUN groupadd --system --gid 10001 app && useradd --system --uid 10001 --gid app app \
     && mkdir -p /data/app /data/workspaces && chown -R app:app /data

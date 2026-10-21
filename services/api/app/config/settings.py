@@ -72,12 +72,17 @@ class Settings(BaseSettings):
 
     # Limits
     max_upload_bytes: int = 50 * 1024 * 1024
+    # Audio and video files are larger; they have their own limit (storage quotas still apply).
+    max_media_upload_bytes: int = Field(default=2 * 1024 * 1024 * 1024, ge=1)
     max_user_storage_bytes: int = 10 * 1024 * 1024 * 1024
 
     # Files
     upload_session_ttl_minutes: int = Field(default=60, ge=1)
     # Preview images for PDFs (first page) and Office files (their embedded preview).
     file_previews: bool = True
+    # Audio and video: duration and codecs read with ffprobe, a still frame of a video with
+    # ffmpeg (both in a limited subprocess). Without them the files still upload and play.
+    media_probe: bool = True
     max_extracted_text_chars: int = Field(default=500_000, ge=1000)
     # Most of one attachment's text that goes into a prompt. Longer documents are sent as
     # their beginning plus the passages most relevant to the question; tools can read the

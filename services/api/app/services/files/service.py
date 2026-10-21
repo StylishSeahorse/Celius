@@ -32,6 +32,7 @@ from app.services.files.paths import UnsafePath, safe_filename, safe_relative_pa
 from app.services.files.scan import ScanUnavailable, clamd_scan
 from app.services.files.sniff import (
     IMAGE_TYPES,
+    MEDIA,
     OFFICE,
     TEXT_EXTENSIONS,
     FileRejected,
@@ -43,7 +44,16 @@ from app.services.jobs import enqueue_job
 from app.services.sync import record_sync
 
 ZIP_KINDS = {FileKind.archive, FileKind.document, FileKind.spreadsheet, FileKind.presentation}
-KNOWN_EXTENSIONS = TEXT_EXTENSIONS | set(IMAGE_TYPES) | set(OFFICE) | {"pdf", "zip", "txt", ""}
+KNOWN_EXTENSIONS = (
+    TEXT_EXTENSIONS | set(IMAGE_TYPES) | set(OFFICE) | set(MEDIA) | {"pdf", "zip", "txt", ""}
+)
+
+
+def max_size_for(filename: str, settings: Settings) -> int:
+    """Audio and video have their own, larger limit; the real type is checked at the end."""
+    if extension_of(filename) in MEDIA:
+        return max(settings.max_media_upload_bytes, settings.max_upload_bytes)
+    return settings.max_upload_bytes
 
 
 def storage_for(settings: Settings) -> Storage:
@@ -129,12 +139,13 @@ async def create_upload(
         relative_path = safe_relative_path(data.relative_path)
     except UnsafePath as exc:
         raise AppError(422, "unsafe_path", str(exc)) from exc
-    if data.size > settings.max_upload_bytes:
+    limit = max_size_for(filename, settings)
+    if data.size > limit:
         raise AppError(
             413,
             "file_too_large",
-            f"Files can be at most {settings.max_upload_bytes} bytes",
-            max_upload_bytes=settings.max_upload_bytes,
+            f"Files like this can be at most {limit} bytes",
+            max_upload_bytes=limit,
         )
     if extension_of(filename) not in KNOWN_EXTENSIONS:
         raise AppError(

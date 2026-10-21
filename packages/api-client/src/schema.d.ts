@@ -1693,7 +1693,7 @@ export interface components {
          * FileKind
          * @enum {string}
          */
-        FileKind: "image" | "pdf" | "document" | "spreadsheet" | "presentation" | "text" | "archive" | "export";
+        FileKind: "image" | "pdf" | "document" | "spreadsheet" | "presentation" | "text" | "archive" | "audio" | "video" | "export";
         /** FileOut */
         FileOut: {
             /**
@@ -2645,6 +2645,8 @@ export interface components {
         StorageUsage: {
             /** Limit Bytes */
             limit_bytes: number;
+            /** Max Media Upload Bytes */
+            max_media_upload_bytes: number;
             /** Max Upload Bytes */
             max_upload_bytes: number;
             /** Used Bytes */

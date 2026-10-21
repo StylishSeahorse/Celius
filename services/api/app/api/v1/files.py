@@ -22,6 +22,7 @@ from app.schemas.files import (
 from app.services.access import deletable_file, readable_file, require_project
 from app.services.files import quota
 from app.services.files import service as svc
+from app.services.files.sniff import MEDIA
 from app.services.limits import storage_limit
 
 router = APIRouter(prefix="/files", tags=["files"])
@@ -30,7 +31,9 @@ DB = Annotated[AsyncSession, Depends(get_db)]
 AppSettings = Annotated[Settings, Depends(get_settings)]
 
 # Types a browser may display in place. Everything else is always a download.
-INLINE_SAFE = {"image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf"}
+INLINE_SAFE = {"image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf"} | {
+    media_type for _, media_type, _ in MEDIA.values()
+}
 
 
 @router.post("/uploads", response_model=UploadOut, status_code=status.HTTP_201_CREATED)
@@ -119,6 +122,7 @@ async def storage_usage(auth: CurrentAuth, db: DB, settings: AppSettings) -> Sto
         used_bytes=await quota.usage(db, auth.user.id),
         limit_bytes=storage_limit(auth.user, settings),
         max_upload_bytes=settings.max_upload_bytes,
+        max_media_upload_bytes=max(settings.max_media_upload_bytes, settings.max_upload_bytes),
     )
 
 

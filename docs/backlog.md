@@ -166,6 +166,12 @@ Arbitrary shell stays disabled until T-01 is decided and validated.
 | A-04 | Shared projects | ✅ | Shared by username as "can use" or "can edit"; members use its instructions and files; chats and memories stay private; members can leave |
 | A-05 | Isolation review | ✅ | A second user calls every id route with the first user's ids (generated from the API schema): all refused, nothing leaks, nothing changes; listings empty; recall doesn't cross people in a shared project |
 
+## Additions
+
+| ID | Item | Status | Acceptance criteria |
+| --- | --- | --- | --- |
+| U-13 | Audio and video uploads | ✅ | mp3, m4a, aac, wav, flac, ogg, opus, weba; mp4, m4v, mov, webm, mkv, ogv, avi. Accepted only when the bytes are that kind of container; own size limit (`MAX_MEDIA_UPLOAD_BYTES`, 2 GB); duration, codecs and a still frame read by ffprobe/ffmpeg in a limited subprocess; plays in the chat with seeking (range requests); the model is told what the file is and tools get it in the workspace. No transcription yet |
+
 ---
 
 ## Remaining assumptions (configurable until verified)

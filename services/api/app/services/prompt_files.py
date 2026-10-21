@@ -18,6 +18,7 @@ from sqlalchemy.orm import undefer
 from app.config import Settings
 from app.models import FileKind, FileStatus, Message, MessagePart, StoredFile
 from app.services.files.extract import vision_image
+from app.services.files.media import describe
 from app.services.files.service import storage_for
 from app.services.memory.retrieval import keyword_score, terms
 
@@ -34,6 +35,23 @@ def _attrs(file: StoredFile, **extra: object) -> str:
 
 def _placeholder(file: StoredFile, note: str) -> str:
     return f"<attachment {_attrs(file)}>[{note}]</attachment>"
+
+
+def _media_block(file: StoredFile, in_workspace: bool) -> str:
+    noun = "an audio recording" if file.kind == FileKind.audio else "a video"
+    what = describe(file.meta)
+    name = file.relative_path or file.filename
+    where = (
+        f" The file is in the workspace as attachments/{name}; tools can work with it "
+        "(ffmpeg is available when running code)."
+        if in_workspace
+        else ""
+    )
+    return _placeholder(
+        file,
+        f"{noun}{f' ({what})' if what else ''}; you can't listen to or watch it, only read "
+        f"its details, and the user can play it in the chat.{where}",
+    )
 
 
 def _text_block(
@@ -188,6 +206,8 @@ async def attachment_content(
                 blocks.append(_placeholder(file, "an image; the current model can't view images"))
             else:
                 blocks.append(_placeholder(file, "an image shown earlier in the conversation"))
+        elif file.kind in (FileKind.audio, FileKind.video):
+            blocks.append(_media_block(file, full_text_in_workspace))
         elif file.text_content:
             limit = char_limit if char_limit is not None else settings.max_attachment_prompt_chars
             blocks.append(

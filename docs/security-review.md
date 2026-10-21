@@ -150,6 +150,13 @@ revision.
   or a hang costs only that file's preview, never the upload. Office previews never
   render the document: they decode the embedded picture with Pillow (pixel limit) and
   re-encode it.
+- Audio and video (added after Phase 10) are accepted only when their first bytes are the
+  container their name says (RIFF/WAVE, Ogg, FLAC, EBML, ISO BMFF, ID3/MPEG frames, AVI), and
+  are sent to browsers with the type chosen by the server, `nosniff` and a sandbox CSP.
+  ffprobe and ffmpeg, native code on untrusted files, run like pdfium: a subprocess with
+  1 GB of memory, 20 s of CPU, 30 s overall, one thread, no environment, and only the
+  `file` protocol, so a file can't make them fetch URLs or follow playlists. A failure costs
+  the duration and the still, never the upload.
 - The desktop app's `notify` command is granted only to the connected server's origin, and
   it shows plain text clipped to 120/300 characters.
 

@@ -121,6 +121,10 @@ export function AttachmentList({ message, align = "end" }: { message: Message; a
               />
             </a>
           </li>
+        ) : f.kind === "audio" || f.kind === "video" ? (
+          <li key={f.file_id} className="w-full max-w-md">
+            <MediaAttachment file={f} />
+          </li>
         ) : f.has_thumbnail ? (
           <li key={f.file_id}>
             <a
@@ -161,6 +165,42 @@ export function AttachmentList({ message, align = "end" }: { message: Message; a
         ),
       )}
     </ul>
+  );
+}
+
+/** Audio and video play in place; seeking works (the server answers range requests). */
+function MediaAttachment({ file }: { file: FilePartData }) {
+  const [unplayable, setUnplayable] = useState(false);
+  const name = file.relative_path ?? file.filename;
+  const common = {
+    src: fileUrls.inline(file.file_id),
+    controls: true,
+    preload: "metadata" as const,
+    onError: () => setUnplayable(true),
+    "aria-label": name,
+  };
+  return (
+    <figure className="space-y-1 rounded-lg border border-line bg-canvas p-2" data-testid="media-attachment">
+      {unplayable ? (
+        <p className="px-1 text-sm text-muted">This browser can't play this {file.kind} file. Download it to play it.</p>
+      ) : file.kind === "video" ? (
+        <video
+          {...common}
+          playsInline
+          poster={file.has_thumbnail ? fileUrls.thumbnail(file.file_id) : undefined}
+          className="max-h-80 w-full rounded-md bg-black"
+        />
+      ) : (
+        <audio {...common} className="w-full" />
+      )}
+      <figcaption className="flex items-center gap-2 px-1 text-xs text-muted">
+        <span className="truncate">{name}</span>
+        <span className="shrink-0">{formatBytes(file.size_bytes)}</span>
+        <a href={fileUrls.download(file.file_id)} download className="ml-auto shrink-0 hover:text-ink hover:underline">
+          Download
+        </a>
+      </figcaption>
+    </figure>
   );
 }
 

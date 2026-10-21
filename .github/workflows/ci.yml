@@ -25,6 +25,8 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.12"
+      - name: ffmpeg (audio and video files)
+        run: command -v ffprobe || (sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg)
       - run: uv sync --frozen
       - run: uv run ruff check .
       - run: uv run ruff format --check .
@@ -103,6 +105,8 @@ jobs:
       - run: pnpm install --frozen-lockfile && pnpm build
       - run: cd services/api && uv sync --frozen && uv run alembic upgrade head
       - run: cd apps/web && npx playwright install --with-deps chromium
+      - name: ffmpeg (audio and video files)
+        run: command -v ffprobe || (sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg)
       - run: infra/scripts/e2e-stack.sh
       - run: cd apps/web && npx playwright test
       - if: failure()
@@ -127,6 +131,10 @@ jobs:
           rm .env
       - name: Build image (API + worker + web)
         run: docker build -f infra/docker/Dockerfile.api -t celius-api:ci .
+      - name: The API image can read audio and video
+        run: |
+          docker run --rm --entrypoint python celius-api:ci -c \
+            "from app.services.files import media; assert media.available(), 'no ffmpeg'"
       - name: Build the sandbox image
         run: docker build -f infra/docker/Dockerfile.sandbox -t celius-sandbox:ci .
       - name: The sandbox image runs code and has no network

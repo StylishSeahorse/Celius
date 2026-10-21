@@ -133,6 +133,52 @@ OFFICE = {
 }
 
 
+# Extension -> (kind, media type, container signatures it may have). The media type sent to
+# browsers is chosen here, from the extension, only after the bytes matched a container.
+MEDIA = {
+    "mp3": (FileKind.audio, "audio/mpeg", ("mp3",)),
+    "m4a": (FileKind.audio, "audio/mp4", ("iso",)),
+    "aac": (FileKind.audio, "audio/aac", ("adts", "iso")),
+    "wav": (FileKind.audio, "audio/wav", ("wave",)),
+    "flac": (FileKind.audio, "audio/flac", ("flac",)),
+    "ogg": (FileKind.audio, "audio/ogg", ("ogg",)),
+    "oga": (FileKind.audio, "audio/ogg", ("ogg",)),
+    "opus": (FileKind.audio, "audio/ogg", ("ogg",)),
+    "weba": (FileKind.audio, "audio/webm", ("ebml",)),
+    "mp4": (FileKind.video, "video/mp4", ("iso",)),
+    "m4v": (FileKind.video, "video/mp4", ("iso",)),
+    "mov": (FileKind.video, "video/quicktime", ("iso", "qt")),
+    "webm": (FileKind.video, "video/webm", ("ebml",)),
+    "mkv": (FileKind.video, "video/x-matroska", ("ebml",)),
+    "ogv": (FileKind.video, "video/ogg", ("ogg",)),
+    "avi": (FileKind.video, "video/x-msvideo", ("avi",)),
+}
+
+
+def _containers(head: bytes) -> set[str]:
+    """Media containers the first bytes are consistent with."""
+    found: set[str] = set()
+    if head[:4] == b"RIFF" and head[8:12] == b"WAVE":
+        found.add("wave")
+    if head[:4] == b"RIFF" and head[8:12] == b"AVI ":
+        found.add("avi")
+    if head[:4] == b"OggS":
+        found.add("ogg")
+    if head[:4] == b"fLaC":
+        found.add("flac")
+    if head[:4] == b"\x1a\x45\xdf\xa3":  # EBML: Matroska and WebM
+        found.add("ebml")
+    if head[4:8] == b"ftyp":  # ISO base media: MP4, M4A, MOV, 3GP
+        found.add("iso")
+    if head[4:8] in (b"moov", b"mdat", b"wide", b"free", b"skip", b"pnot"):  # older QuickTime
+        found.add("qt")
+    if head[:3] == b"ID3" or (len(head) > 1 and head[0] == 0xFF and head[1] & 0xE0 == 0xE0):
+        found.add("mp3")  # an ID3 tag, or an MPEG audio frame header
+    if len(head) > 1 and head[0] == 0xFF and head[1] & 0xF6 == 0xF0:
+        found.add("adts")  # raw AAC
+    return found
+
+
 class FileRejected(ValueError):
     def __init__(self, code: str, message: str):
         super().__init__(message)
@@ -196,6 +242,12 @@ def detect(path: Path, filename: str) -> Detected:
         kind, media_type, folder = OFFICE[ext]
         if not is_zip or not _zip_has(path, "[Content_Types].xml", folder):
             raise FileRejected("file_type_mismatch", f"{filename} is not a valid .{ext} file")
+        return Detected(kind, media_type)
+    if ext in MEDIA:
+        kind, media_type, containers = MEDIA[ext]
+        if not _containers(head) & set(containers):
+            noun = "audio" if kind == FileKind.audio else "video"
+            raise FileRejected("file_type_mismatch", f"{filename} is not a valid {noun} file")
         return Detected(kind, media_type)
     if ext == "zip":
         if not is_zip:

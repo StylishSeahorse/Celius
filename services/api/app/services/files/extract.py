@@ -10,6 +10,7 @@ from pathlib import Path
 
 from app.models import FileKind
 from app.services.files.archives import ArchiveLimits, inspect_zip
+from app.services.files.media import media_info
 from app.services.files.previews import office_preview, pdf_preview
 from app.services.files.sniff import FileRejected
 
@@ -63,7 +64,14 @@ def extract(
     limits: ArchiveLimits,
     max_pixels: int,
     previews: bool = True,
+    media: bool = True,
 ) -> Extracted:
+    if kind in (FileKind.audio, FileKind.video):
+        # No text to extract (no transcription): what's in it, and a still for the chat.
+        if not media:
+            return Extracted()
+        meta, still = media_info(path, video=kind == FileKind.video)
+        return Extracted(meta=meta, thumbnail=still if previews else None)
     result = _extract(path, kind, max_chars=max_chars, limits=limits, max_pixels=max_pixels)
     if previews and result.thumbnail is None:
         if kind == FileKind.pdf:

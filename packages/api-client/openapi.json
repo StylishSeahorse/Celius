@@ -740,6 +740,8 @@
           "presentation",
           "text",
           "archive",
+          "audio",
+          "video",
           "export"
         ],
         "title": "FileKind",
@@ -3578,6 +3580,10 @@
             "title": "Limit Bytes",
             "type": "integer"
           },
+          "max_media_upload_bytes": {
+            "title": "Max Media Upload Bytes",
+            "type": "integer"
+          },
           "max_upload_bytes": {
             "title": "Max Upload Bytes",
             "type": "integer"
@@ -3590,7 +3596,8 @@
         "required": [
           "used_bytes",
           "limit_bytes",
-          "max_upload_bytes"
+          "max_upload_bytes",
+          "max_media_upload_bytes"
         ],
         "title": "StorageUsage",
         "type": "object"

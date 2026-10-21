@@ -37,6 +37,7 @@ async def process_file(factory: SessionFactory, settings: Settings, job: Job) ->
                 limits=archive_limits(settings),
                 max_pixels=settings.image_max_pixels,
                 previews=settings.file_previews,
+                media=settings.media_probe,
             )
         )
         if result.thumbnail:
