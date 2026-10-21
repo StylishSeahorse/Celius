@@ -13,9 +13,18 @@ the browser tests.**
 | `apps/web/e2e/people.spec.ts` (desktop and Pixel 7) | The admin creates an invitation in **Account → People**. A second browser joins with it; the link then shows as used. The admin shares a project; the member sees it marked with the owner's name and can't edit it. The admin disables the account and the member is signed out |
 | SQLite test database | Foreign keys now enforced, as in PostgreSQL |
 
-## Results
+## Results, 2026-10-21 (CI run 34)
 
-Filled in from the CI run on the Phase 10 head.
+| Check | Result |
+| --- | --- |
+| API tests on SQLite and PostgreSQL, including the isolation sweep (370 passed, 6 skipped locally on PostgreSQL) | passed |
+| Playwright, desktop + Pixel 7, including the people flow (73 passed, 1 skipped: folder picking on the phone viewport) | passed |
+| Windows installers, release gate, sandbox tests | passed |
+
+The exit gate is met. Runs 32 and 33 were red on two unreliable e2e tests (a sidebar
+check made before the page had rendered after a reload; Chromium sometimes dropping a
+just-shown notification from `getNotifications`). Both tests were fixed, not retried:
+the people test passed 30 of 30 and the push test 200 of 200 locally.
 
 ## Manual
 
