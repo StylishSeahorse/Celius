@@ -74,38 +74,47 @@ async function deliverPush(page: Page, data: { tag: string } & Record<string, st
   await cdp.send("ServiceWorker.enable");
   const registrationId = await registration;
   const origin = new URL(page.url()).origin;
+  // Record what the service worker says before sending anything, so nothing is missed.
+  await page.evaluate(() => {
+    const w = window as unknown as { __pushes?: string[] };
+    if (w.__pushes) return;
+    w.__pushes = [];
+    navigator.serviceWorker.addEventListener("message", (event) => {
+      if (event.data?.type === "celius:push") w.__pushes!.push(event.data.tag);
+    });
+  });
+  const arrived = () =>
+    page.evaluate((tag) => (window as unknown as { __pushes: string[] }).__pushes.includes(tag), data.tag);
   for (let attempt = 0; attempt < 5; attempt++) {
-    const received = page.evaluate(
-      (tag) =>
-        new Promise<boolean>((resolve) => {
-          const timer = setTimeout(() => resolve(false), 2000);
-          navigator.serviceWorker.addEventListener("message", function onMessage(event) {
-            if (event.data?.type === "celius:push" && event.data.tag === tag) {
-              clearTimeout(timer);
-              navigator.serviceWorker.removeEventListener("message", onMessage);
-              resolve(true);
-            }
-          });
-        }),
-      data.tag,
-    );
     await cdp.send("ServiceWorker.deliverPushMessage", { origin, registrationId, data: JSON.stringify(data) });
-    if (await received) {
-      await cdp.detach();
-      return;
+    for (let waited = 0; waited < 2000; waited += 100) {
+      if (await arrived()) {
+        await cdp.detach();
+        return;
+      }
+      await page.waitForTimeout(100);
     }
   }
   throw new Error("the service worker never received the push");
 }
 
-function shownNotifications(page: Page) {
-  return page.evaluate(async () =>
-    (await (await navigator.serviceWorker.ready).getNotifications()).map((n) => ({
-      title: n.title,
-      body: n.body,
-      tag: n.tag,
-    })),
-  );
+/**
+ * Record the notifications the service worker shows. Asking the browser afterwards
+ * (`getNotifications`) is unreliable: Chromium sometimes forgets a notification it has just
+ * displayed, so the calls themselves are recorded instead.
+ */
+async function recordNotifications(page: Page) {
+  const worker = page.context().serviceWorkers()[0] ?? (await page.context().waitForEvent("serviceworker"));
+  await worker.evaluate(() => {
+    const sw = self as unknown as { registration: ServiceWorkerRegistration; __shown: unknown[] };
+    sw.__shown = [];
+    const show = sw.registration.showNotification.bind(sw.registration);
+    sw.registration.showNotification = (title: string, options?: NotificationOptions) => {
+      sw.__shown.push({ title, body: options?.body, tag: options?.tag });
+      return show(title, options);
+    };
+  });
+  return () => worker.evaluate(() => (self as unknown as { __shown: unknown[] }).__shown);
 }
 
 test("turning notifications on registers this device with the server", async ({ page }) => {
@@ -132,6 +141,7 @@ test("a push shows a notification, except for the chat on screen", async ({ page
   await send(page, "Hello");
   await expect(lastReply(page)).toContainText("Hello");
   const open = conversationIdOf(page)!;
+  const shown = await recordNotifications(page);
 
   // A reply in the conversation being looked at: nothing to notify.
   await deliverPush(page, { title: "This chat", body: "Already visible", tag: open, url: `/#/c/${open}` });
@@ -139,5 +149,5 @@ test("a push shows a notification, except for the chat on screen", async ({ page
   const other = "00000000-0000-4000-8000-000000000001";
   await deliverPush(page, { title: "Garden", body: "Tomatoes in May", tag: other, url: `/#/c/${other}` });
 
-  await expect.poll(() => shownNotifications(page)).toEqual([{ title: "Garden", body: "Tomatoes in May", tag: other }]);
+  await expect.poll(shown).toEqual([{ title: "Garden", body: "Tomatoes in May", tag: other }]);
 });

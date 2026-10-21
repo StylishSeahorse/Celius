@@ -13,7 +13,10 @@ export async function login(page: Page) {
 
 export async function openSidebar(page: Page) {
   const sidebar = page.getByRole("navigation", { name: "Conversations" });
-  if (!(await sidebar.isVisible())) await page.getByLabel("Open conversations").click();
+  const opener = page.getByLabel("Open conversations");
+  // Wait for the app to render (e.g. after a reload) before deciding which one is there.
+  await expect(sidebar.or(opener).first()).toBeVisible();
+  if (!(await sidebar.isVisible())) await opener.click();
   return sidebar;
 }
 
