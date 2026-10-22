@@ -7,7 +7,7 @@ import { desktop } from "../../lib/desktop";
 import type { Message } from "../../lib/types";
 import { formatBytes } from "../../lib/uploads";
 import type { OutboxItem } from "../../offline/outbox";
-import { ToolCallCard } from "../tools/ToolCallCard";
+import { ToolCallCard, toolLabel } from "../tools/ToolCallCard";
 import type { LiveRun } from "./useChat";
 
 function partText(message: Message, type: string) {
@@ -348,10 +348,86 @@ function MemoryUsed({ data }: { data: MemoryUse }) {
 }
 
 function Reasoning({ text }: { text: string }) {
+  return <p className="whitespace-pre-wrap border-l-2 border-line pl-3 text-muted">{text}</p>;
+}
+
+type Part = Message["parts"][number];
+type Call = NonNullable<Message["tool_calls"]>[number];
+
+/**
+ * A reply is shown as its answer (the text after the last tool call), with everything
+ * that led to it (reasoning, tool calls and what was said between them) folded into one
+ * panel. Tool calls waiting for approval stay outside it, so they can't be missed.
+ */
+function splitReply(parts: Part[]) {
+  let lastTool = -1;
+  parts.forEach((p, i) => {
+    if (p.type === "tool_call") lastTool = i;
+  });
+  const work: { part: Part; index: number }[] = [];
+  const answer: { part: Part; index: number }[] = [];
+  parts.forEach((part, index) => {
+    if (part.type === "reasoning" || part.type === "tool_call") work.push({ part, index });
+    else if (part.type === "text") (index < lastTool ? work : answer).push({ part, index });
+    else answer.push({ part, index });
+  });
+  return { work, answer };
+}
+
+const capitalise = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+function WorkPanel({
+  items,
+  callOf,
+  liveReasoning,
+  inProgress,
+  onToolDecided,
+}: {
+  items: { part: Part; index: number }[];
+  callOf: (part: Part) => Call | undefined;
+  liveReasoning: string;
+  inProgress: boolean;
+  onToolDecided?: () => void;
+}) {
+  const calls = items.map((i) => callOf(i.part)).filter((c): c is Call => !!c);
+  const thought = liveReasoning !== "" || items.some((i) => i.part.type === "reasoning" && i.part.text);
+  if (!calls.length && !thought) return null;
+  const running = calls.find((c) => c.status === "running" || c.status === "approved");
+  const failed = calls.filter((c) => ["failed", "refused", "denied", "expired", "interrupted"].includes(c.status)).length;
+  const summary = [
+    thought && !inProgress ? "Reasoning" : null,
+    calls.length ? `used ${calls.length} ${calls.length === 1 ? "tool" : "tools"}` : null,
+    failed ? `${failed} didn't work` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const activity = running ? `Running ${toolLabel(running.tool_name)}…` : liveReasoning ? "Thinking…" : "Working…";
+
   return (
-    <details className="rounded-lg border border-line px-3 py-2 text-sm text-muted">
-      <summary className="cursor-pointer select-none">Reasoning</summary>
-      <p className="mt-2 whitespace-pre-wrap">{text}</p>
+    <details className="group/work rounded-lg border border-line text-sm" data-testid="work-panel">
+      <summary className="flex cursor-pointer select-none items-center gap-2 px-3 py-2 text-muted">
+        <span aria-hidden="true" className="transition-transform group-open/work:rotate-90">
+          ›
+        </span>
+        {inProgress && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" aria-hidden="true" />}
+        <span>{capitalise(inProgress ? [activity, summary].filter(Boolean).join(" · ") : summary)}</span>
+      </summary>
+      <div className="space-y-2 border-t border-line px-3 py-2">
+        {items.map(({ part, index }) => {
+          if (part.type === "reasoning") return part.text ? <Reasoning key={index} text={part.text} /> : null;
+          if (part.type === "text")
+            return part.text ? (
+              <div key={index} className="text-muted">
+                <AssistantMarkdown text={part.text} />
+              </div>
+            ) : null;
+          const call = callOf(part);
+          return call && call.status !== "pending_approval" ? (
+            <ToolCallCard key={index} call={call} onDecided={onToolDecided} />
+          ) : null;
+        })}
+        {liveReasoning && <Reasoning text={liveReasoning} />}
+      </div>
     </details>
   );
 }
@@ -375,24 +451,35 @@ export function MessageView({
   const status = isLive ? live.status : message.status;
   const inProgress = ["queued", "running", "reconnecting", "pending", "streaming"].includes(status);
   const calls = new Map((message.tool_calls ?? []).map((c) => [c.id, c]));
+  const callOf = (part: Part) => {
+    const id = (part.data as { tool_call_id?: string } | null)?.tool_call_id ?? "";
+    return (isLive && live.toolCalls[id]) || calls.get(id);
+  };
+  const { work, answer } = splitReply(message.parts);
   const hasSteps = message.parts.some((p) => p.type !== "text" || p.text);
   const waiting = inProgress && !(isLive && (live.text || live.reasoning));
 
   return (
     <div className="group space-y-2">
-      {message.parts.map((part, index) => {
-        if (part.type === "reasoning" && part.text) return <Reasoning key={index} text={part.text} />;
+      <WorkPanel
+        items={work}
+        callOf={callOf}
+        liveReasoning={isLive ? live.reasoning : ""}
+        inProgress={inProgress}
+        onToolDecided={onToolDecided}
+      />
+      {work.map(({ part, index }) => {
+        const call = part.type === "tool_call" ? callOf(part) : undefined;
+        return call?.status === "pending_approval" ? (
+          <ToolCallCard key={index} call={call} onDecided={onToolDecided} />
+        ) : null;
+      })}
+      {answer.map(({ part, index }) => {
         if (part.type === "text" && part.text) return <AssistantMarkdown key={index} text={part.text} />;
         if (part.type === "memory" && part.data) return <MemoryUsed key={index} data={part.data as unknown as MemoryUse} />;
-        if (part.type === "tool_call") {
-          const id = (part.data as { tool_call_id?: string } | null)?.tool_call_id ?? "";
-          const call = (isLive && live.toolCalls[id]) || calls.get(id);
-          return call ? <ToolCallCard key={index} call={call} onDecided={onToolDecided} /> : null;
-        }
         return null;
       })}
       {!inProgress && <AttachmentList message={message} align="start" />}
-      {isLive && live.reasoning && <Reasoning text={live.reasoning} />}
       {isLive && live.text && <AssistantMarkdown text={live.text} />}
       {status === "awaiting_approval" ? (
         <p className="text-sm text-amber-700 dark:text-amber-400" aria-live="polite">

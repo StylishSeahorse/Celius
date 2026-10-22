@@ -1456,6 +1456,11 @@
       },
       "MemoryCreate": {
         "properties": {
+          "always_use": {
+            "default": false,
+            "title": "Always Use",
+            "type": "boolean"
+          },
           "content": {
             "maxLength": 1000,
             "minLength": 3,
@@ -1492,6 +1497,10 @@
       },
       "MemoryOut": {
         "properties": {
+          "always_use": {
+            "title": "Always Use",
+            "type": "boolean"
+          },
           "content": {
             "title": "Content",
             "type": "string"
@@ -1588,6 +1597,7 @@
           "source_conversation_id",
           "last_used_at",
           "use_count",
+          "always_use",
           "created_at",
           "updated_at"
         ],
@@ -1679,6 +1689,17 @@
       },
       "MemoryUpdate": {
         "properties": {
+          "always_use": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Always Use"
+          },
           "content": {
             "anyOf": [
               {

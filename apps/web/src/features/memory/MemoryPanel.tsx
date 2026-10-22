@@ -94,6 +94,11 @@ export function MemoryPanel({
           )}
           {tab === "remembered" && (
             <>
+              <p className="text-xs text-muted">
+                A memory is given to a chat only when it's relevant to what you ask. Tick{" "}
+                <em>Always use</em> for the few that should shape every reply, like your name or
+                how you like answers.
+              </p>
               <AddMemory
                 projects={projects}
                 onAdded={() => {
@@ -181,6 +186,7 @@ function MemoryList({
             onReject={status === "proposed" ? () => act(api.rejectMemory(m.id)) : undefined}
             onSave={status === "active" ? (content) => act(api.updateMemory(m.id, { content })) : undefined}
             onDelete={status === "active" ? () => act(api.deleteMemory(m.id)) : undefined}
+            onAlways={(always_use) => act(api.updateMemory(m.id, { always_use }))}
           />
         ))}
       </ul>
@@ -195,6 +201,7 @@ function MemoryItem({
   onReject,
   onSave,
   onDelete,
+  onAlways,
   onOpenConversation,
 }: {
   memory: Memory;
@@ -203,6 +210,7 @@ function MemoryItem({
   onReject?: () => void;
   onSave?: (content: string) => void;
   onDelete?: () => void;
+  onAlways: (always: boolean) => void;
   onOpenConversation: (id: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -229,7 +237,14 @@ function MemoryItem({
         )}
         {memory.use_count ? ` · used ${memory.use_count}×` : ""}
       </p>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <label
+          className="mr-auto flex items-center gap-1 text-xs text-muted"
+          title="On: given to every chat. Off: only when it's relevant to what you ask."
+        >
+          <input type="checkbox" checked={memory.always_use} onChange={(e) => onAlways(e.target.checked)} />
+          Always use
+        </label>
         {onApprove && (
           <button className={primary} onClick={() => onApprove(editing && text !== memory.content ? text : undefined)}>
             {editing ? "Save & remember" : "Remember"}
@@ -261,12 +276,15 @@ function MemoryItem({
 function AddMemory({ projects, onAdded }: { projects: Project[]; onAdded: () => void }) {
   const [text, setText] = useState("");
   const [scope, setScope] = useState("global");
+  const [always, setAlways] = useState(false);
   const [error, setError] = useState<string | null>(null);
   async function add() {
     setError(null);
     try {
       await api.createMemory(
-        scope === "global" ? { content: text, scope: "global" } : { content: text, scope: "project", project_id: scope },
+        scope === "global"
+          ? { content: text, scope: "global", always_use: always }
+          : { content: text, scope: "project", project_id: scope, always_use: always },
       );
       setText("");
       onAdded();
@@ -293,6 +311,10 @@ function AddMemory({ projects, onAdded }: { projects: Project[]; onAdded: () => 
             </option>
           ))}
         </select>
+        <label className="flex items-center gap-1 text-xs text-muted" title="Off: only when it's relevant to what you ask.">
+          <input type="checkbox" checked={always} onChange={(e) => setAlways(e.target.checked)} />
+          Use in every chat
+        </label>
         <span className="flex-1" />
         <button className={primary} disabled={text.trim().length < 3} onClick={() => void add()}>
           Add

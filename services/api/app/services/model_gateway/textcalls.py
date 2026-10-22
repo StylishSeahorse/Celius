@@ -9,6 +9,8 @@ block), and the call arrives as plain text. These formats are recognised:
     [TOOL_CALLS][{"name": "x", "arguments": {...}}]                        Mistral
 
 Only names of offered tools are accepted, so ordinary prose is never mistaken for a call.
+Markup that can't be run (a tool that isn't offered, or tools already switched off for the
+reply) is removed with `strip`, so it never shows up in the chat.
 """
 
 import json
@@ -24,6 +26,15 @@ _XML_PARAMETER = re.compile(
     r"<parameter=([\w.\-]+)>\s*(.*?)\s*(?:</parameter>|(?=<parameter=)|$)", re.DOTALL
 )
 _MISTRAL = re.compile(r"\[TOOL_CALLS\]\s*(\[.*\])", re.DOTALL)
+# Any call-shaped block, whatever it names. A bare <function=x> counts only when parameters
+# or a closing tag follow, so prose that mentions the syntax is left alone.
+_ANY_CALL = re.compile(
+    r"<tool_call>.*?(?:</tool_call>|$)"
+    r"|<function=[\w.\-]+>(?=\s*(?:<parameter=|</function>)).*?(?:</function>\s*|$)"
+    r"|\[TOOL_CALLS\]\s*\[.*?\](?=\s*(?:$|\n))",
+    re.DOTALL,
+)
+_CALL_NAME = re.compile(r'<function=([\w.\-]+)>|"name"\s*:\s*"([\w.\-]+)"')
 
 
 @dataclass
@@ -40,6 +51,25 @@ def _value(raw: str):
         except json.JSONDecodeError:
             return text
     return text  # numbers and booleans are coerced by the tool's argument model
+
+
+def has_markup(text: str) -> bool:
+    return "<tool_call>" in text or "<function=" in text or "[TOOL_CALLS]" in text
+
+
+def strip(text: str) -> tuple[str, list[str]]:
+    """`text` without any call markup, and the tool names that markup mentioned."""
+    names: list[str] = []
+    for block in _ANY_CALL.findall(text):
+        for match in _CALL_NAME.finditer(block):
+            name = match.group(1) or match.group(2)
+            if name not in names:
+                names.append(name)
+    if not names and not _ANY_CALL.search(text):
+        return text, []
+    cleaned = _ANY_CALL.sub("", text)
+    cleaned = re.sub(r"</?tool_call>", "", cleaned)
+    return re.sub(r"\n{3,}", "\n\n", cleaned).strip(), names
 
 
 def extract(text: str, offered: set[str]) -> tuple[list[TextCall], str]:

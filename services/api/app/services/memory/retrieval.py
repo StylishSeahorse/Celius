@@ -9,8 +9,10 @@ Scope rules (tested in tests/test_memory.py):
   memory off and projects with memory off are never searched.
 - Nothing at all when memory is off for this chat.
 
-Ranking is by meaning (embeddings, when configured) plus word overlap; without embeddings
-it is word overlap alone.
+Selection: memories marked "always use" (who the user is, how they want answers) reach
+every chat in scope. Every other memory is given only when it is relevant to the message:
+close in meaning (embeddings, when configured, at least MEMORY_MIN_SIMILARITY) or sharing
+enough of its words. Unrelated memories are left out, however few there are.
 """
 
 import math
@@ -78,6 +80,8 @@ STOPWORDS = {
 }
 CANDIDATES = 300
 MIN_RECALL_SCORE = 0.35
+MIN_KEYWORD_SCORE = 0.2  # e.g. one of the message's two key words, in a short memory
+ALWAYS_MAX = 10
 EXCERPT_CHARS = 1500
 
 
@@ -161,7 +165,7 @@ async def _rank(
         )
         for row in (await db.scalars(query.limit(CANDIDATES))).all():
             rows.setdefault(row.id, row)
-    scored = []
+    scored: list[tuple[float, object, float | None, float]] = []
     for row in rows.values():
         semantic = None
         if (
@@ -170,8 +174,8 @@ async def _rank(
             and row.embedding_model == embedding_model
         ):
             semantic = cosine(vector, list(row.embedding))
-        text = getattr(row, text_column.key)
-        scored.append((_hybrid(semantic, keyword_score(query_terms, text)), row))
+        keyword = keyword_score(query_terms, getattr(row, text_column.key))
+        scored.append((_hybrid(semantic, keyword), row, semantic, keyword))
     scored.sort(key=lambda pair: pair[0], reverse=True)
     return scored[:limit]
 
@@ -202,18 +206,33 @@ async def retrieve(
             else false(),
         ),
     ]
-    total = await db.scalar(select(func.count()).select_from(Memory).where(*in_scope)) or 0
-    limit = settings.memory_prompt_max_items
-    if total <= limit:
-        # Few enough: all of them, most recently confirmed first.
-        memories = (
-            await db.scalars(select(Memory).where(*in_scope).order_by(Memory.updated_at.desc()))
-        ).all()
-    else:
-        ranked = await _rank(
-            db, Memory, in_scope, Memory.content, query_terms, vector, embedding_model, limit
+    always = (
+        await db.scalars(
+            select(Memory)
+            .where(*in_scope, Memory.always_use.is_(True))
+            .order_by(Memory.updated_at.desc())
+            .limit(ALWAYS_MAX)
         )
-        memories = [row for _, row in ranked]
+    ).all()
+    relevant: list[Memory] = []
+    if settings.memory_prompt_max_items and (query_terms or vector is not None):
+        ranked = await _rank(
+            db,
+            Memory,
+            [*in_scope, Memory.always_use.is_(False)],
+            Memory.content,
+            query_terms,
+            vector,
+            embedding_model,
+            settings.memory_prompt_max_items * 3,
+        )
+        for _, memory, semantic, keyword in ranked:
+            close = semantic is not None and semantic >= settings.memory_min_similarity
+            if close or keyword >= MIN_KEYWORD_SCORE:
+                relevant.append(memory)
+            if len(relevant) >= settings.memory_prompt_max_items:
+                break
+    memories = [*always, *relevant]
 
     recalled: list[Recalled] = []
     if settings.memory_recall_chunks and (query_terms or vector is not None):
@@ -248,7 +267,7 @@ async def retrieve(
         )
         titles: dict[uuid.UUID, str] = {}
         seen_conversations: dict[uuid.UUID, int] = {}
-        for score, chunk in ranked:
+        for score, chunk, *_ in ranked:
             if score < MIN_RECALL_SCORE or len(recalled) >= settings.memory_recall_chunks:
                 continue
             if seen_conversations.get(chunk.conversation_id, 0) >= 2:

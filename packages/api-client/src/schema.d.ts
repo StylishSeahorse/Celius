@@ -1955,6 +1955,11 @@ export interface components {
         };
         /** MemoryCreate */
         MemoryCreate: {
+            /**
+             * Always Use
+             * @default false
+             */
+            always_use: boolean;
             /** Content */
             content: string;
             /** Project Id */
@@ -1968,6 +1973,8 @@ export interface components {
         };
         /** MemoryOut */
         MemoryOut: {
+            /** Always Use */
+            always_use: boolean;
             /** Content */
             content: string;
             /**
@@ -2035,6 +2042,8 @@ export interface components {
         MemoryStatus: "proposed" | "active" | "rejected";
         /** MemoryUpdate */
         MemoryUpdate: {
+            /** Always Use */
+            always_use?: boolean | null;
             /** Content */
             content?: string | null;
             /** Project Id */

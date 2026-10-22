@@ -37,6 +37,12 @@ test("python runs in the sandbox under the developer profile", async ({ page }) 
   const card = chat(page).getByTestId("tool-call");
   await expect(card).toHaveAttribute("data-status", "completed");
   await expect(lastReply(page)).toContainText("42");
+  // The steps are folded away under the answer until asked for.
+  const work = chat(page).getByTestId("work-panel").last();
+  await expect(work).toContainText("Used 1 tool");
+  await expect(card).toBeHidden();
+  await work.locator("summary").click();
+  await expect(card).toBeVisible();
   await card.getByRole("button").first().click(); // expand
   await expect(card).toContainText("print(6 * 7)");
 });

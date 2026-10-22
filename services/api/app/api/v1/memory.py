@@ -58,6 +58,7 @@ def _out(memory: Memory, titles: dict[uuid.UUID, str] | None = None) -> MemoryOu
         source_conversation_title=(titles or {}).get(memory.source_conversation_id),
         last_used_at=memory.last_used_at,
         use_count=memory.use_count,
+        always_use=memory.always_use,
         created_at=memory.created_at,
         updated_at=memory.updated_at,
     )
@@ -181,6 +182,7 @@ async def create_memory(
             scope=body.scope,
             project_id=body.project_id,
             embedder=embedder,
+            always_use=body.always_use,
         )
     finally:
         if embedder:
@@ -202,6 +204,8 @@ async def update_memory(
         memory.project_id = (
             (body.project_id or memory.project_id) if body.scope == "project" else None
         )
+    if body.always_use is not None:
+        memory.always_use = body.always_use
     if body.content is not None and body.content != memory.content:
         embedder = await _with_embedder(settings)
         try:

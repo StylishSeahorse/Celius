@@ -112,7 +112,7 @@ Arbitrary shell stays disabled until T-01 is decided and validated.
 | ID | Item | Status | Acceptance criteria |
 | --- | --- | --- | --- |
 | R-01 | pgvector + embedding provider config, keyword fallback | ✅ | [ADR 0009](adr/0009-memory-and-recall.md): optional `/v1/embeddings` endpoint; pgvector cosine ranking on PostgreSQL; word ranking without embeddings or when the server is down (tested) |
-| R-02 | Memory proposal extraction with review queue | ✅ | Worker job proposes up to 3 facts per reply; `remember` tool proposes too; proposals never used until approved (or edited and approved); rejected text erased and not proposed again; duplicates dropped |
+| R-02 | Memory proposal extraction with review queue | ✅ | Worker job proposes up to 2 facts per reply, seeing what is already remembered (empty is the normal answer; task details excluded; messages under three words skipped); `remember` tool proposes too; proposals never used until approved (or edited and approved); rejected text erased and not proposed again; duplicates dropped |
 | R-03 | Memory edit/exclude/disable (global, project, conversation) | ✅ | Global and project scopes; switches per user, project and chat (incognito from the first message); excluded chats never indexed or recalled; recall stays within the project boundary |
 | R-04 | Dependency-aware deletion | ✅ | Deleting a memory or "forget everything" removes rows and embeddings at once; deleting a chat removes its excerpts and, if ticked, the memories learned from it; the UI says what deletion can't erase |
 | R-05 | Memory with the real models | ⬜ | Check extraction quality with the deployed model; choose and benchmark an embedding model on the 3060 (or CPU) |
@@ -170,6 +170,9 @@ Arbitrary shell stays disabled until T-01 is decided and validated.
 
 | ID | Item | Status | Acceptance criteria |
 | --- | --- | --- | --- |
+| R-07 | Selective memory | ✅ | "Always use" memories reach every chat in scope (at most 10); others only when relevant to the message (embedding similarity ≥ `MEMORY_MIN_SIMILARITY`, or shared words), at most 8; extraction marks which is which; toggle in the memory panel |
+| T-11 | Tool calls written as text never shown raw | ✅ | Recovered when the tools are offered (also from the reasoning, never run twice next to a real call); otherwise removed, with a note: the step limit was reached ("continue" carries on), or the tool isn't available. `TOOL_MAX_ITERATIONS` 12 → 25 |
+| U-14 | Work panel | ✅ | A reply shows its answer; reasoning, tool calls and what was said between them fold into one panel (closed; live status while working: "Running python…"); approvals stay outside it |
 | U-13 | Audio and video uploads | ✅ | mp3, m4a, aac, wav, flac, ogg, opus, weba; mp4, m4v, mov, webm, mkv, ogv, avi. Accepted only when the bytes are that kind of container; own size limit (`MAX_MEDIA_UPLOAD_BYTES`, 2 GB); duration, codecs and a still frame read by ffprobe/ffmpeg in a limited subprocess; plays in the chat with seeking (range requests); the model is told what the file is and tools get it in the workspace. No transcription yet |
 
 ---

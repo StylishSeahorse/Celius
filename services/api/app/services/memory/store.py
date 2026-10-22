@@ -124,6 +124,7 @@ async def add_memory(
     message_id: uuid.UUID | None = None,
     embedder: Embedder | None = None,
     status: MemoryStatus | None = None,
+    always_use: bool = False,
 ) -> Memory | None:
     """Create a memory. From the model it is a proposal when review is required.
     Returns None for an empty or duplicate one."""
@@ -158,6 +159,7 @@ async def add_memory(
         embedding=vector,
         embedding_model=model,
         reviewed_at=utcnow() if status == MemoryStatus.active and source == "user" else None,
+        always_use=always_use,
     )
     db.add(memory)
     await db.flush()

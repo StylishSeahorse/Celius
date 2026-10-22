@@ -945,6 +945,11 @@ class RememberArgs(BaseModel):
     scope: Literal["global", "project"] = Field(
         default="global", description="project: only for chats in this chat's project"
     )
+    always: bool = Field(
+        default=False,
+        description="true only if it should shape every reply (their name, the language, "
+        "tone or length they want); false if it matters only when its subject comes up",
+    )
 
 
 async def _remember(ctx: ToolContext, args: RememberArgs) -> ToolOutput:
@@ -966,6 +971,7 @@ async def _remember(ctx: ToolContext, args: RememberArgs) -> ToolOutput:
                 conversation_id=ctx.conversation_id,
                 message_id=ctx.message_id,
                 embedder=embedder,
+                always_use=args.always,
             )
         finally:
             if embedder is not None:
@@ -985,9 +991,10 @@ builtin(
     ToolSpec(
         name="remember",
         label="Remember",
-        description="Propose a lasting fact about the user (a preference, their setup, an "
-        "ongoing project) to remember in future chats. Only when they would clearly want it "
-        "kept; never secrets or sensitive details.",
+        description="Propose a lasting fact about the user to remember in future, unrelated "
+        "chats: who they are, a lasting preference, their setup. Rarely needed: only when "
+        "they ask you to remember something or state a lasting preference. Never details "
+        "of the current task, secrets or sensitive details.",
         risk="read",
         handler=_remember,
         args_model=RememberArgs,

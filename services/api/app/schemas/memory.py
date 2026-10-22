@@ -18,18 +18,21 @@ class MemoryOut(BaseModel):
     source_conversation_title: str | None = None
     last_used_at: datetime | None
     use_count: int
+    always_use: bool
     created_at: datetime
     updated_at: datetime
 
 
 class MemoryCreate(BaseModel):
     content: str = Field(min_length=3, max_length=1000)
+    always_use: bool = False
     scope: Literal["global", "project"] = "global"
     project_id: uuid.UUID | None = None
 
 
 class MemoryUpdate(BaseModel):
     content: str | None = Field(default=None, min_length=3, max_length=1000)
+    always_use: bool | None = None
     scope: Literal["global", "project"] | None = None
     project_id: uuid.UUID | None = None
 

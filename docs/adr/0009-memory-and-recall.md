@@ -46,6 +46,19 @@ A chat never recalls itself. Deleted chats, chats with memory off and projects w
 memory off are filtered in the query, even though their excerpts are also removed when
 that happens.
 
+### Within scope, only what is relevant (revised 2026-10-22)
+At first every memory in scope was given to every chat while there were 30 or fewer. In
+use that filled prompts with unrelated facts. Now:
+- Memories marked **always use** (who the user is, how they want answers) reach every chat
+  in scope, at most 10.
+- Any other memory is given only when it is relevant to the message: cosine similarity of
+  at least `MEMORY_MIN_SIMILARITY` (0.55) with embeddings, or enough shared words
+  (keyword score 0.2) with or without them. At most `MEMORY_PROMPT_MAX_ITEMS` (8). A
+  message unrelated to anything remembered gets no memories.
+- Extraction is told what is already remembered, that an empty answer is normal, and what
+  not to keep (details of the task at hand, what the assistant did, guesses). It proposes
+  at most 2 facts, marks each as always use or not, and skips messages under three words.
+
 ### Switches at three levels
 - **User**: memory on or off, suggestions on or off, review on or off.
 - **Project**: memory on or off.

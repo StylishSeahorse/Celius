@@ -226,9 +226,17 @@ export const api = {
     request<MemorySettings>("/memory/settings", json("PUT", body)),
   memories: (status: "active" | "proposed", q?: string) =>
     request<Memory[]>(`/memories?status=${status}${q ? `&q=${encodeURIComponent(q)}` : ""}`),
-  createMemory: (body: { content: string; scope: "global" | "project"; project_id?: string | null }) =>
+  createMemory: (body: {
+    content: string;
+    scope: "global" | "project";
+    project_id?: string | null;
+    always_use?: boolean;
+  }) =>
     request<Memory>("/memories", json("POST", body)),
-  updateMemory: (id: string, body: { content?: string; scope?: "global" | "project"; project_id?: string | null }) =>
+  updateMemory: (
+    id: string,
+    body: { content?: string; scope?: "global" | "project"; project_id?: string | null; always_use?: boolean },
+  ) =>
     request<Memory>(`/memories/${id}`, json("PATCH", body)),
   approveMemory: (id: string, content?: string) =>
     request<Memory>(`/memories/${id}/approve`, json("POST", content ? { content } : {})),

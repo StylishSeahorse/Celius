@@ -74,6 +74,8 @@ from app.services.memory.retrieval import Retrieved, retrieve, usage_part
 from app.services.memory.retrieval import prompt_block as memory_prompt_block
 from app.services.model_gateway import ChatMessage, ChatRequest, ModelGateway, ModelGatewayError
 from app.services.model_gateway.textcalls import extract as extract_text_calls
+from app.services.model_gateway.textcalls import has_markup
+from app.services.model_gateway.textcalls import strip as strip_text_calls
 from app.services.prompt_files import (
     DATA_NOT_INSTRUCTIONS,
     attachment_content,
@@ -499,8 +501,11 @@ class _Loop:
                 log.warning("Run %s: lease lost, abandoning without writing results", p.run_id)
                 return
             self._add_usage(state.usage)
-            if not state.tool_calls and p.request.tools and p.toolset:
-                _recover_text_calls(state, set(p.toolset.offered))
+            unrun = _tidy_text_calls(
+                state, set(p.toolset.offered) if p.toolset and p.request.tools else set()
+            )
+            if unrun and not state.tool_calls:
+                state.text.append(self._unrun_note(unrun))
             if state.tool_calls and p.request.tools and not state.cancel_requested:
                 rows = await self._record_step(state)
                 if rows is None:
@@ -523,6 +528,20 @@ class _Loop:
             last = p.request.messages[-1]
             if last.role == "tool" and isinstance(last.content, str):
                 last.content = f"{last.content}\n\n{LIMIT_NOTE}"
+
+    def _unrun_note(self, names: list[str]) -> str:
+        """Shown instead of tool-call markup the model wrote but that can't run."""
+        p, settings = self.p, self.settings
+        listed = ", ".join(names)
+        if p.toolset is not None and (
+            p.iterations >= settings.tool_max_iterations
+            or p.tool_ms >= settings.tool_max_run_seconds * 1000
+        ):
+            return (
+                f"\n\n*(Stopped before running {listed}: this reply used all of its tool "
+                "steps. Send “continue” to carry on.)*"
+            )
+        return f"\n\n*(Tried to use {listed}, which isn't available in this chat.)*"
 
     def _add_usage(self, usage: dict[str, Any] | None) -> None:
         for key, value in (usage or {}).items():
@@ -915,22 +934,42 @@ class _Loop:
         )
 
 
-def _recover_text_calls(state: _StreamState, offered: set[str]) -> None:
-    """The model wrote its tool call as text (llama-server didn't parse it): use it as a
-    call anyway, and keep only the prose as the step's text."""
+def _tidy_text_calls(state: _StreamState, offered: set[str]) -> list[str]:
+    """Tool calls the model wrote as text (llama-server didn't parse them).
+
+    When the step has no structured calls and the tools are offered, they are used as calls
+    (from the text, or from the reasoning when the answer is empty). Whatever markup is
+    left is removed from the visible text; returns the names it mentioned but couldn't run.
+    """
     text = "".join(state.text)
-    if "<tool_call>" not in text and "<function=" not in text and "[TOOL_CALLS]" not in text:
-        return
-    calls, cleaned = extract_text_calls(text, offered)
-    if not calls:
-        return
-    log.info("Recovered %d tool call(s) written as text", len(calls))
-    state.text = [cleaned] if cleaned else []
-    state.pending_text = ""  # clients reload the step's saved text
-    state.tool_calls = {
-        i: {"id": "", "name": call.name, "arguments": call.arguments}
-        for i, call in enumerate(calls)
-    }
+    reasoning = "".join(state.reasoning)
+    if not has_markup(text) and not has_markup(reasoning):
+        return []
+    if not state.tool_calls and offered:
+        calls, cleaned = extract_text_calls(text, offered)
+        source = "text"
+        if not calls and not text.strip():
+            calls, cleaned = extract_text_calls(reasoning, offered)
+            source = "reasoning"
+        if calls:
+            log.info("Recovered %d tool call(s) written as %s", len(calls), source)
+            if source == "text":
+                state.text = [cleaned] if cleaned else []
+            else:
+                state.reasoning = [cleaned] if cleaned else []
+            state.pending_text = ""  # clients reload the step's saved text
+            state.tool_calls = {
+                i: {"id": "", "name": call.name, "arguments": call.arguments}
+                for i, call in enumerate(calls)
+            }
+            return []
+    cleaned, names = strip_text_calls(text)
+    if cleaned != text:
+        state.text = [cleaned] if cleaned else []
+        state.pending_text = ""
+    if has_markup(reasoning):
+        state.reasoning = [strip_text_calls(reasoning)[0]]
+    return names
 
 
 def _network_note(toolset: Toolset, settings: Settings) -> str:

@@ -3,7 +3,19 @@ import uuid
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Index, Integer, String, Text, Uuid
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    Uuid,
+    false,
+)
 from sqlalchemy.orm import Mapped, deferred, mapped_column
 
 from app.db.base import Base, Timestamps, UUIDPrimaryKey
@@ -50,6 +62,11 @@ class Memory(UUIDPrimaryKey, Timestamps, Base):
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     use_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    # Given to every chat in scope (who the user is, how they want answers). Otherwise a
+    # memory is given only when it is relevant to the message.
+    always_use: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), nullable=False
+    )
 
 
 class MemoryChunk(UUIDPrimaryKey, Base):

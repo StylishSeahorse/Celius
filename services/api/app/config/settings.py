@@ -121,10 +121,13 @@ class Settings(BaseSettings):
     embedding_model: str | None = None
     embedding_api_key: SecretStr | None = None
     # How much memory goes into a prompt.
-    memory_prompt_max_items: int = Field(default=30, ge=0, le=200)
+    # At most this many memories relevant to the message (plus up to 10 "always use" ones).
+    memory_prompt_max_items: int = Field(default=8, ge=0, le=200)
+    # How close in meaning a memory must be to the message to be given (with embeddings).
+    memory_min_similarity: float = Field(default=0.55, ge=0, le=1)
     memory_recall_chunks: int = Field(default=4, ge=0, le=20)
     memory_context_share: float = Field(default=0.15, ge=0, le=0.5)
-    memory_extraction_max_per_turn: int = Field(default=3, ge=0, le=10)
+    memory_extraction_max_per_turn: int = Field(default=2, ge=0, le=10)
 
     # Tools (ADR 0008)
     # Profile for conversations that don't pick one (users can change their own default).
@@ -143,7 +146,7 @@ class Settings(BaseSettings):
     # Comma-separated host suffixes (e.g. "github.com,python.org"). Empty: any public host.
     tool_web_allowlist: str = ""
     tool_web_max_bytes: int = Field(default=5 * 1024 * 1024, ge=1024)
-    tool_max_iterations: int = Field(default=12, ge=1, le=100)
+    tool_max_iterations: int = Field(default=25, ge=1, le=100)
     tool_max_run_seconds: int = Field(default=900, ge=10)
     tool_call_timeout_seconds: int = Field(default=120, ge=1, le=3600)
     tool_memory_mb: int = Field(default=1024, ge=64)
