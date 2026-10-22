@@ -26,17 +26,18 @@ jobs:
         with:
           python-version: "3.12"
       - name: ffmpeg (audio and video files)
-        timeout-minutes: 6
+        timeout-minutes: 8
         run: |
           command -v ffprobe && exit 0
-          for attempt in 1 2 3; do
-            timeout 120 sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update &&
-              timeout 180 sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 \
-                install -y --no-install-recommends ffmpeg && exit 0
-            echo "apt attempt $attempt failed; retrying"
-            sleep 10
-          done
-          exit 1
+          # A static build from GitHub (fast from Actions); apt's mirror has been slow.
+          url=https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz
+          if curl -fsSL --retry 3 --max-time 180 "$url" -o /tmp/ffmpeg.tar.xz; then
+            sudo tar -xJf /tmp/ffmpeg.tar.xz -C /usr/local/bin --strip-components=2 --wildcards '*/bin/ffmpeg' '*/bin/ffprobe'
+            ffprobe -version | head -1 && exit 0
+          fi
+          echo "static ffmpeg unavailable; falling back to apt"
+          timeout 120 sudo apt-get -o Acquire::Retries=3 update &&
+            timeout 300 sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends ffmpeg
       - run: uv sync --frozen
       - run: uv run ruff check .
       - run: uv run ruff format --check .
@@ -116,17 +117,18 @@ jobs:
       - run: cd services/api && uv sync --frozen && uv run alembic upgrade head
       - run: cd apps/web && npx playwright install --with-deps chromium
       - name: ffmpeg (audio and video files)
-        timeout-minutes: 6
+        timeout-minutes: 8
         run: |
           command -v ffprobe && exit 0
-          for attempt in 1 2 3; do
-            timeout 120 sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update &&
-              timeout 180 sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 \
-                install -y --no-install-recommends ffmpeg && exit 0
-            echo "apt attempt $attempt failed; retrying"
-            sleep 10
-          done
-          exit 1
+          # A static build from GitHub (fast from Actions); apt's mirror has been slow.
+          url=https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz
+          if curl -fsSL --retry 3 --max-time 180 "$url" -o /tmp/ffmpeg.tar.xz; then
+            sudo tar -xJf /tmp/ffmpeg.tar.xz -C /usr/local/bin --strip-components=2 --wildcards '*/bin/ffmpeg' '*/bin/ffprobe'
+            ffprobe -version | head -1 && exit 0
+          fi
+          echo "static ffmpeg unavailable; falling back to apt"
+          timeout 120 sudo apt-get -o Acquire::Retries=3 update &&
+            timeout 300 sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends ffmpeg
       - run: infra/scripts/e2e-stack.sh
       - run: cd apps/web && npx playwright test
       - if: failure()
