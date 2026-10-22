@@ -241,3 +241,22 @@ async def test_the_model_is_told_what_the_media_is(
     assert content.startswith('<attachment name="talk.mp3" type="audio">')
     assert "an audio recording (0:02, mp3)" in content
     assert "can't listen to or watch it" in content
+
+
+def test_ffmpeg_outside_usr_bin_is_found(tmp_path, monkeypatch, clips):
+    """The child's PATH is minimal; the program is resolved with the service's own, so a
+    static build in /usr/local/bin (or Homebrew's) is the one that runs."""
+    real = shutil.which("ffprobe")
+    if real is None:
+        pytest.skip("ffmpeg is not installed")
+    bin_dir = tmp_path / "local-bin"
+    bin_dir.mkdir()
+    marker = tmp_path / "ran"
+    wrapper = bin_dir / "ffprobe"
+    wrapper.write_text(f'#!/bin/sh\ntouch "{marker}"\nexec "{real}" "$@"\n')
+    wrapper.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}:/usr/bin:/bin")
+    path = tmp_path / "a.mp3"
+    path.write_bytes(clips["mp3"])
+    assert media.probe(path)["audio_codec"] == "mp3"
+    assert marker.exists()

@@ -32,6 +32,12 @@ def _limits() -> None:  # in the child, before exec
 
 
 def _run(args: list[str]) -> bytes | None:
+    # Resolved here, with the service's PATH: the child gets a minimal environment, and
+    # ffmpeg may live outside /usr/bin (a static build in /usr/local/bin, Homebrew…).
+    program = shutil.which(args[0])
+    if program is None:
+        return None
+    args = [program, *args[1:]]
     try:
         result = subprocess.run(
             args,
