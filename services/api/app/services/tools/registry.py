@@ -56,6 +56,8 @@ class ToolSpec:
     needs_sandbox: bool = False
     needs_network: bool = False
     label: str = ""
+    # Why the tool can't be offered on this server (None: it can), e.g. a missing API key.
+    unavailable_on: Callable[[Settings], str | None] | None = None
 
     def parameters(self) -> dict[str, Any]:
         if self.schema is not None:

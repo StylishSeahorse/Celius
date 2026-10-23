@@ -114,6 +114,15 @@ activity → Permissions** shows "Running".
 - **Web tools** (`web_fetch`, `git_clone`) run in the worker and refuse private and LAN
   addresses, always. To restrict them further, set `TOOL_WEB_ALLOWLIST` (for example
   `github.com,python.org`), or turn them off with `TOOL_NETWORK_ENABLED=false`.
+- **Web search** (`web_search`) uses [Exa](https://exa.ai). Put an API key from
+  dashboard.exa.ai in `EXA_API_KEY` and restart; the tool then appears under **Tools &
+  activity → Permissions**. Each search returns titles, links and the passages most
+  relevant to the question; the model opens a page with `web_fetch` when it needs more.
+  Searches use Exa credit, and the query (only the query and filters, nothing else) is
+  sent to Exa. Like the other web tools it asks first under the standard profile
+  ("Always allow" in a chat stops that). `TOOL_WEB_ALLOWLIST` doesn't apply to it: the
+  search itself only reaches Exa, and the pages it finds are opened with `web_fetch`,
+  which does follow the allowlist.
 - **Permissions.** New chats use `TOOL_DEFAULT_PROFILE` (`standard`: asks before anything
   that writes, runs code or uses the web). Change your default, edit profiles and see the
   approval inbox under **Tools & activity**.

@@ -3,11 +3,11 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { fileUrls } from "../../lib/api";
-import { desktop } from "../../lib/desktop";
 import type { Message } from "../../lib/types";
 import { formatBytes } from "../../lib/uploads";
 import type { OutboxItem } from "../../offline/outbox";
 import { ToolCallCard, toolLabel } from "../tools/ToolCallCard";
+import { ExternalLink } from "./ExternalLink";
 import type { LiveRun } from "./useChat";
 
 function partText(message: Message, type: string) {
@@ -15,24 +15,6 @@ function partText(message: Message, type: string) {
     .filter((p) => p.type === type)
     .map((p) => p.text ?? "")
     .join("");
-}
-
-// Links in replies never navigate the app itself away; the desktop app opens them in the
-// system browser.
-function ExternalLink({ node: _node, ...props }: React.ComponentProps<"a"> & { node?: unknown }) {
-  return (
-    <a
-      {...props}
-      target="_blank"
-      rel="noopener noreferrer"
-      onClick={(event) => {
-        if (desktop && props.href) {
-          event.preventDefault();
-          desktop.openExternal(props.href);
-        }
-      }}
-    />
-  );
 }
 
 const EXTENSIONS: Record<string, string> = {

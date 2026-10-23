@@ -146,6 +146,12 @@ class Settings(BaseSettings):
     # Comma-separated host suffixes (e.g. "github.com,python.org"). Empty: any public host.
     tool_web_allowlist: str = ""
     tool_web_max_bytes: int = Field(default=5 * 1024 * 1024, ge=1024)
+    # Web search (the web_search tool) through Exa. Without a key the tool isn't offered.
+    exa_api_key: SecretStr | None = None
+    exa_base_url: str = "https://api.exa.ai"
+    web_search_max_results: int = Field(default=8, ge=1, le=25)
+    # Excerpts per result most relevant to the query (Exa "highlights"), in characters.
+    web_search_excerpt_chars: int = Field(default=1200, ge=200, le=10000)
     tool_max_iterations: int = Field(default=25, ge=1, le=100)
     tool_max_run_seconds: int = Field(default=900, ge=10)
     tool_call_timeout_seconds: int = Field(default=120, ge=1, le=3600)

@@ -102,6 +102,12 @@ revision.
   token from `/proc`.
 - The worker's own web tools (`web_fetch`, `git_clone`) use the same rules. Every redirect
   is re-checked, and the size is capped.
+- `web_search` sends the model's query and filters to Exa (`EXA_BASE_URL`, guarded like
+  any destination, so it can't be pointed at the LAN) with the server's key, never shown
+  to the model or the browser. It is a `network` tool, so profiles ask before it as they
+  do for `web_fetch`: a prompt-injected page can't quietly exfiltrate chat content through
+  queries in the standard profile. Results are bounded (`WEB_SEARCH_MAX_RESULTS`,
+  `WEB_SEARCH_EXCERPT_CHARS`, 2 MB answer) and labelled as data, not instructions.
 - Escape tests: `services/sandbox/tests/test_runner.py` (background processes, fork bombs,
   memory, output floods, timeouts, workspace escape, environment),
   `tests/test_egress.py` (credential, private destinations, DNS rebinding, ports), and

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ApiError, api, workspaceUrl } from "../../lib/api";
 import type { ToolCall } from "../../lib/types";
 import { formatBytes } from "../../lib/uploads";
+import { ExternalLink } from "../chat/ExternalLink";
 
 const STATUS_LABEL: Record<string, string> = {
   pending_approval: "Needs your approval",
@@ -40,6 +41,20 @@ function mainCode(call: ToolCall): { label: string; code: string } | null {
   if (typeof args.command === "string") return { label: "Shell", code: args.command };
   if (Array.isArray(args.args)) return { label: "git", code: `git ${(args.args as string[]).join(" ")}` };
   return null;
+}
+
+const hostOf = (url: string) => {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return "";
+  }
+};
+
+interface SearchResult {
+  title: string;
+  url: string;
+  published: string | null;
 }
 
 interface ChangedFile {
@@ -184,8 +199,26 @@ function ResultView({ call, result }: { call: ToolCall; result: Record<string, u
   if (typeof result.stdout === "string" && result.stdout) blocks.push(["Output", result.stdout]);
   if (typeof result.stderr === "string" && result.stderr) blocks.push(["Errors", result.stderr]);
   if (typeof result.error === "string") blocks.push(["Error", result.error]);
+  const found = Array.isArray(result.results) ? (result.results as SearchResult[]) : null;
   return (
     <div className="space-y-1">
+      {found && (
+        <ol className="list-decimal space-y-1 pl-5 text-xs" aria-label="Search results">
+          {found.map((r) => (
+            <li key={r.url}>
+              <ExternalLink className="underline" href={r.url}>
+                {r.title}
+              </ExternalLink>
+              <span className="text-muted">
+                {" "}
+                {hostOf(r.url)}
+                {r.published ? ` · ${r.published}` : ""}
+              </span>
+            </li>
+          ))}
+          {!found.length && <li className="list-none text-muted">No results</li>}
+        </ol>
+      )}
       {typeof result.url === "string" && (
         <p className="truncate text-xs text-muted">
           {String(result.status ?? "")} {result.url as string}

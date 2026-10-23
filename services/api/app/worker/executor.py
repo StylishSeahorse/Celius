@@ -28,7 +28,7 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import anyio
@@ -1107,7 +1107,9 @@ async def _prepare(
                     note = tool_notes.get(message.id)
                     history.append(HistoryItem("assistant", f"{note}\n\n{text}" if note else text))
 
-            system_prompt = settings.default_system_prompt
+            # The model can't know the date, and needs it for anything recent (web searches).
+            today = datetime.now(UTC).strftime("%A %d %B %Y")
+            system_prompt = f"{settings.default_system_prompt}\n\nToday's date is {today} (UTC)."
             project_block = ""
             if conversation.project_id:
                 project = await db.get(Project, conversation.project_id)

@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import app.services.tools.builtin  # noqa: F401 - registers the built-in tools
+import app.services.tools.websearch  # noqa: F401 - registers web_search
 from app.config import Settings
 from app.models import Conversation, McpServer, UserSettings
 from app.services.memory.store import memory_active_for
@@ -59,6 +60,8 @@ async def available_tools(
             unavailable[name] = "The sandbox is not configured"
         elif spec.needs_network and not settings.tool_network_enabled:
             unavailable[name] = "Web access is turned off on this server"
+        elif spec.unavailable_on and (reason := spec.unavailable_on(settings)):
+            unavailable[name] = reason
     return known, unavailable
 
 
