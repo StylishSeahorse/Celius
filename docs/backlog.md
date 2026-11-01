@@ -65,7 +65,7 @@ Status key: ✅ done in repo · 🔶 partially done · ⬜ not started
 | S-07 | PWA (manifest, icons, service worker) | ✅ | Installable; app shell and saved conversations open offline (needs HTTPS or localhost) |
 | S-08 | Tauri v2 Windows wrapper | 🔶 | Connect page, menu, no IPC for remote pages; compiles on Linux; CI builds NSIS + MSI on Windows. **Authenticode signing not set up** (needs a certificate); Windows build not yet run |
 | S-09 | Open reply links in the system browser from the desktop app | ✅ | Done in phase 4 (see U-06 area) |
-| S-10 | Push notifications for finished replies | ⬜ | Optional; Web Push needs HTTPS and a VAPID key |
+| S-10 | Push notifications for finished replies | ✅ | Done in Phase 9 (see below) |
 
 ## Phase 4 — Files and workspaces
 
@@ -83,7 +83,7 @@ Status key: ✅ done in repo · 🔶 partially done · ⬜ not started
 | U-08 | Reasoning (thinking) on/off/auto per conversation | ✅ | `chat_template_kwargs.enable_thinking`; per-reply override; template support detected |
 | S-09 | Reply links open in the system browser from the desktop app | ✅ | `open_external`, http(s) only |
 | U-09 | Code-block Copy/Download | ✅ | Client-side, language → file extension |
-| U-10 | Previews for PDFs and Office files (page images) | ⬜ | Thumbnails exist for images only |
+| U-10 | Previews for PDFs and Office files (page images) | ✅ | Done in Phase 9 (see below) |
 | U-11 | Resumable chunked uploads | ✅ | Phase 8: 4 MB chunks with `Content-Range`; resume from `GET /files/uploads/{id}` after a dropped connection |
 | U-12 | Server-side project workspaces (extract archives to disk) | ⬜ | Needed by tools in phase 5; containment helper `resolve_within` already in place |
 
