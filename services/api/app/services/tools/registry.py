@@ -58,6 +58,8 @@ class ToolSpec:
     label: str = ""
     # Why the tool can't be offered on this server (None: it can), e.g. a missing API key.
     unavailable_on: Callable[[Settings], str | None] | None = None
+    # Rarely needed: left out for models with a small context window (compact toolset).
+    optional: bool = False
 
     def parameters(self) -> dict[str, Any]:
         if self.schema is not None:

@@ -11,6 +11,7 @@ import { type Shared, takeShared } from "../../lib/share";
 import { AccountPanel } from "../account/AccountPanel";
 import { DeleteConversationDialog } from "../memory/DeleteConversationDialog";
 import { MemoryPanel } from "../memory/MemoryPanel";
+import { SkillsPanel } from "../skills/SkillsPanel";
 import { ToolsPanel } from "../tools/ToolsPanel";
 import { ChatView } from "./ChatView";
 import { FolderBrowser } from "./FolderBrowser";
@@ -40,6 +41,8 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const [draftToolProfile, setDraftToolProfile] = useState<string | null>(null);
   const [draftMemory, setDraftMemory] = useState(true);
   const [memoryOpen, setMemoryOpen] = useState(false);
+  const [skillsOpen, setSkillsOpen] = useState(false);
+  const [skillsToReview, setSkillsToReview] = useState(0);
   const [accountOpen, setAccountOpen] = useState(false);
   const [memoryToReview, setMemoryToReview] = useState(0);
   const [deleting, setDeleting] = useState<ConversationSummary | null>(null);
@@ -92,6 +95,7 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
 
   const refreshMemory = useCallback(() => {
     api.memorySettings().then((m) => setMemoryToReview(m.counts?.proposed ?? 0)).catch(() => undefined);
+    api.skillSettings().then((s) => setSkillsToReview(s.pending ?? 0)).catch(() => undefined);
   }, []);
   useEffect(() => {
     refreshMemory();
@@ -200,7 +204,7 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
       startSync((changes: SyncChange[], resync: boolean) => {
         const { refreshList, refreshProjects, refreshStorage, refreshApprovals, refreshMemory, chat, selectedId, select } =
           latest.current;
-        if (changes.some((c) => c.entity_type === "memory")) refreshMemory();
+        if (changes.some((c) => c.entity_type === "memory" || c.entity_type === "skill")) refreshMemory();
         void refreshList();
         if (changes.some((c) => c.entity_type === "message")) refreshApprovals();
         if (changes.some((c) => c.entity_type === "file")) {
@@ -285,6 +289,11 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
             setMemoryOpen(true);
             setSidebarOpen(false);
           }}
+          skillsToReview={skillsToReview}
+          onOpenSkills={() => {
+            setSkillsOpen(true);
+            setSidebarOpen(false);
+          }}
         />
       </aside>
       {sidebarOpen && (
@@ -329,6 +338,15 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
           }}
           onClose={() => {
             setMemoryOpen(false);
+            refreshMemory();
+          }}
+        />
+      )}
+      {skillsOpen && (
+        <SkillsPanel
+          onChanged={refreshMemory}
+          onClose={() => {
+            setSkillsOpen(false);
             refreshMemory();
           }}
         />

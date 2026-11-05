@@ -3,13 +3,14 @@
 import uuid
 from dataclasses import dataclass, field
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import app.services.tools.builtin  # noqa: F401 - registers the built-in tools
+import app.services.tools.skills  # noqa: F401 - registers the skill tools
 import app.services.tools.websearch  # noqa: F401 - registers web_search
 from app.config import Settings
-from app.models import Conversation, McpServer, UserSettings
+from app.models import Conversation, McpServer, Skill, UserSettings
 from app.services.memory.store import memory_active_for
 from app.services.tools.mcp import server_headers, specs_for
 from app.services.tools.policy import (
@@ -21,6 +22,17 @@ from app.services.tools.policy import (
 from app.services.tools.registry import BUILTIN, ToolSpec
 
 MEMORY_TOOLS = ("remember", "search_memory")
+# Offered only once the user has a skill: until then they could do nothing, and every
+# tool definition costs prompt space on small local models (progressive disclosure).
+# skill_create, skill_update, skill_test and skill_publish stay offered: a run that creates
+# its first skill needs them right away (the toolset is fixed for the run).
+SKILL_TOOLS_NEEDING_SKILLS = (
+    "skill_search",
+    "skill_read",
+    "skill_validate",
+    "skill_deprecate",
+    "skill_history",
+)
 
 
 @dataclass
@@ -65,14 +77,35 @@ async def available_tools(
     return known, unavailable
 
 
+COMPACT_REASON = "Left out to save space in this model's small context window"
+NOT_PERMISSION_REASONS = ("No skills saved yet", COMPACT_REASON)
+
+
 async def build_toolset(
-    db: AsyncSession, conversation: Conversation, settings: Settings, *, sandbox: bool
+    db: AsyncSession,
+    conversation: Conversation,
+    settings: Settings,
+    *,
+    sandbox: bool,
+    context_tokens: int | None = None,
 ) -> Toolset:
     profile = await conversation_profile(db, conversation, settings)
     known, unavailable = await available_tools(db, conversation.owner_id, settings, sandbox=sandbox)
     if not await memory_active_for(db, conversation, settings):
         for name in MEMORY_TOOLS:
             unavailable.setdefault(name, "Memory is off for this chat")
+    has_skills = await db.scalar(
+        select(func.count())
+        .select_from(Skill)
+        .where(Skill.owner_id == conversation.owner_id, Skill.status != "deprecated")
+    )
+    if not has_skills:
+        for name in SKILL_TOOLS_NEEDING_SKILLS:
+            unavailable.setdefault(name, "No skills saved yet")
+    if context_tokens and context_tokens < settings.tool_compact_below_context_tokens:
+        for name, spec in known.items():
+            if spec.optional:
+                unavailable.setdefault(name, COMPACT_REASON)
     offered = {
         name: spec
         for name, spec in known.items()

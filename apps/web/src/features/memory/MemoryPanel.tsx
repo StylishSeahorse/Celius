@@ -1,9 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { ApiError, api } from "../../lib/api";
-import type { Memory, MemorySettings, Project } from "../../lib/types";
+import { ApiError, api, type MemoryCategory } from "../../lib/api";
+import type { Memory, MemoryConflict, MemorySettings, Project } from "../../lib/types";
 
-type Tab = "review" | "remembered" | "settings";
+type Tab = "review" | "conflicts" | "remembered" | "settings";
+
+const CATEGORIES: [MemoryCategory, string, string][] = [
+  ["user", "About you", "Who you are, your preferences and how you work"],
+  ["semantic", "Facts", "Lasting facts about your systems, projects and decisions"],
+  ["episodic", "Events", "Things that happened: problems solved, decisions taken"],
+  ["procedural", "How-tos", "Short ways of doing things (longer ones become skills)"],
+];
+const categoryLabel = (c: string) => CATEGORIES.find(([key]) => key === c)?.[1] ?? c;
 
 const button = "rounded-md border border-line px-2.5 py-1 text-sm hover:bg-panel disabled:opacity-40";
 const primary = "rounded-md bg-accent px-3 py-1 text-sm text-white hover:bg-accent-strong disabled:opacity-40";
@@ -31,9 +39,11 @@ export function MemoryPanel({
   const [error, setError] = useState<string | null>(null);
   // Bumped when a memory is added, so the list below shows it.
   const [version, setVersion] = useState(0);
+  const [conflicts, setConflicts] = useState<MemoryConflict[]>([]);
 
   const reloadSettings = useCallback(() => {
     api.memorySettings().then(setSettings, (err) => setError(message(err)));
+    api.memoryConflicts().then(setConflicts, () => setConflicts([]));
   }, []);
   useEffect(reloadSettings, [reloadSettings]);
   useEffect(() => {
@@ -68,6 +78,7 @@ export function MemoryPanel({
           {(
             [
               ["review", `To review${proposed ? ` (${proposed})` : ""}`],
+              ["conflicts", `Conflicts${conflicts.length ? ` (${conflicts.length})` : ""}`],
               ["remembered", "Remembered"],
               ["settings", "Settings"],
             ] as [Tab, string][]
@@ -91,6 +102,15 @@ export function MemoryPanel({
           )}
           {tab === "review" && (
             <MemoryList status="proposed" projects={projects} onChanged={changed} onOpenConversation={onOpenConversation} />
+          )}
+          {tab === "conflicts" && (
+            <Conflicts
+              conflicts={conflicts}
+              onResolved={() => {
+                setVersion((v) => v + 1);
+                changed();
+              }}
+            />
           )}
           {tab === "remembered" && (
             <>
@@ -136,10 +156,11 @@ function MemoryList({
 }) {
   const [items, setItems] = useState<Memory[] | null>(null);
   const [query, setQuery] = useState("");
+  const [category, setCategory] = useState<MemoryCategory | "">("");
   const [error, setError] = useState<string | null>(null);
   const reload = useCallback(() => {
-    api.memories(status, query || undefined).then(setItems, (err) => setError(message(err)));
-  }, [status, query]);
+    api.memories(status, query || undefined, category || undefined).then(setItems, (err) => setError(message(err)));
+  }, [status, query, category]);
   useEffect(() => {
     const timer = setTimeout(reload, query ? 250 : 0);
     return () => clearTimeout(timer);
@@ -156,14 +177,29 @@ function MemoryList({
   return (
     <div className="space-y-2">
       {status === "active" && (
-        <input
-          type="search"
-          className={input}
-          placeholder="Search memories"
-          aria-label="Search memories"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
+        <div className="flex gap-2">
+          <input
+            type="search"
+            className={input}
+            placeholder="Search memories"
+            aria-label="Search memories"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <select
+            className="rounded-md border border-line bg-canvas px-2 py-1 text-sm"
+            value={category}
+            onChange={(e) => setCategory(e.target.value as MemoryCategory | "")}
+            aria-label="Kind of memory"
+          >
+            <option value="">All kinds</option>
+            {CATEGORIES.map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
       )}
       {error && <p role="alert" className="text-red-600 dark:text-red-400">{error}</p>}
       {items && !items.length && (
@@ -225,6 +261,30 @@ function MemoryItem({
       ) : (
         <p>{memory.content}</p>
       )}
+      <p className="flex flex-wrap gap-1 text-xs">
+        <span className="rounded bg-panel px-1.5" data-testid="memory-kind">
+          {categoryLabel(memory.category ?? "user")}
+          {memory.category === "episodic" && (memory.occurred_at ?? memory.created_at)
+            ? ` · ${new Date(memory.occurred_at ?? memory.created_at).toLocaleDateString()}`
+            : ""}
+        </span>
+        {(memory.confidence ?? 1) < 0.8 && (
+          <span className="rounded bg-panel px-1.5" title="Inferred, not something you said directly">
+            unconfirmed
+          </span>
+        )}
+        {(memory.importance ?? 0.5) >= 0.8 && <span className="rounded bg-panel px-1.5">important</span>}
+        {memory.entities?.map((e) => (
+          <span key={e.id} className="rounded border border-line px-1.5 text-muted" title={e.kind}>
+            {e.name}
+          </span>
+        ))}
+        {!!memory.open_conflicts && (
+          <span className="rounded bg-amber-100 px-1.5 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
+            conflicts with another memory
+          </span>
+        )}
+      </p>
       <p className="text-xs text-muted">
         {scope} · {source}
         {memory.source_conversation_id && (
@@ -277,14 +337,15 @@ function AddMemory({ projects, onAdded }: { projects: Project[]; onAdded: () => 
   const [text, setText] = useState("");
   const [scope, setScope] = useState("global");
   const [always, setAlways] = useState(false);
+  const [category, setCategory] = useState<MemoryCategory>("user");
   const [error, setError] = useState<string | null>(null);
   async function add() {
     setError(null);
     try {
       await api.createMemory(
         scope === "global"
-          ? { content: text, scope: "global", always_use: always }
-          : { content: text, scope: "project", project_id: scope, always_use: always },
+          ? { content: text, scope: "global", always_use: always, category }
+          : { content: text, scope: "project", project_id: scope, always_use: always, category },
       );
       setText("");
       onAdded();
@@ -308,6 +369,18 @@ function AddMemory({ projects, onAdded }: { projects: Project[]; onAdded: () => 
           {projects.map((p) => (
             <option key={p.id} value={p.id}>
               Only in {p.name}
+            </option>
+          ))}
+        </select>
+        <select
+          className="rounded-md border border-line bg-canvas px-2 py-1 text-sm"
+          value={category}
+          onChange={(e) => setCategory(e.target.value as MemoryCategory)}
+          aria-label="Kind"
+        >
+          {CATEGORIES.map(([key, label, help]) => (
+            <option key={key} value={key} title={help}>
+              {label}
             </option>
           ))}
         </select>
@@ -353,6 +426,33 @@ function Settings({
       {toggle("enabled", "Use memory", "Celius remembers what you approve and recalls your earlier chats. Off: nothing is remembered or used.")}
       {toggle("auto_extract", "Suggest things to remember", "After each reply the model looks for lasting facts about you (uses some model time).")}
       {toggle("require_review", "Ask me before remembering", "Suggestions wait in To review until you approve them.")}
+      <fieldset className="space-y-1">
+        <legend className="text-sm">What suggestions may cover</legend>
+        {CATEGORIES.map(([key, label, help]) => {
+          const chosen = settings.extract_categories ?? [];
+          return (
+            <label key={key} className="flex items-start gap-2 text-xs">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={chosen.includes(key)}
+                onChange={(e) =>
+                  void api
+                    .updateMemorySettings({
+                      extract_categories: e.target.checked
+                        ? [...chosen, key]
+                        : chosen.filter((c) => c !== key),
+                    })
+                    .then(onSaved, (err) => setError(message(err)))
+                }
+              />
+              <span>
+                {label} <span className="text-muted">({help})</span>
+              </span>
+            </label>
+          );
+        })}
+      </fieldset>
       <p className="text-xs text-muted">
         {settings.counts?.active ?? 0} remembered · {settings.counts?.proposed ?? 0} to review · {settings.counts?.excerpts ?? 0} chat
         excerpts for recall · search: {settings.embeddings ? "by meaning and words" : "by words (no embedding model configured)"}
@@ -389,5 +489,46 @@ function Settings({
       </section>
       {error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{error}</p>}
     </div>
+  );
+}
+
+function Conflicts({ conflicts, onResolved }: { conflicts: MemoryConflict[]; onResolved: () => void }) {
+  const [error, setError] = useState<string | null>(null);
+  if (!conflicts.length)
+    return (
+      <p className="py-6 text-center text-muted">
+        No conflicts. When a new memory seems to disagree with one Celius already has, both appear here.
+      </p>
+    );
+  const resolve = (id: string, decision: "keep_new" | "keep_old" | "keep_both") =>
+    void api.resolveConflict(id, decision).then(onResolved, (err) => setError(message(err)));
+  return (
+    <ul className="space-y-2">
+      {error && <p role="alert" className="text-red-600 dark:text-red-400">{error}</p>}
+      {conflicts.map((c) => (
+        <li key={c.id} className="space-y-2 rounded-lg border border-line p-3" data-testid="conflict">
+          <p className="text-xs text-muted">{c.reason}</p>
+          <p>
+            <span className="text-xs text-muted">Earlier: </span>
+            {c.other.content}
+          </p>
+          <p>
+            <span className="text-xs text-muted">{c.memory.status === "proposed" ? "Suggested: " : "Newer: "}</span>
+            {c.memory.content}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button className={primary} onClick={() => resolve(c.id, "keep_new")}>
+              Keep the newer
+            </button>
+            <button className={button} onClick={() => resolve(c.id, "keep_old")}>
+              Keep the earlier
+            </button>
+            <button className={button} onClick={() => resolve(c.id, "keep_both")}>
+              Both are true
+            </button>
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }

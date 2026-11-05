@@ -155,6 +155,62 @@
         "title": "ApproveToolCall",
         "type": "object"
       },
+      "ConflictOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "memory": {
+            "$ref": "#/components/schemas/MemoryOut"
+          },
+          "other": {
+            "$ref": "#/components/schemas/MemoryOut"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "reason",
+          "status",
+          "memory",
+          "other",
+          "created_at"
+        ],
+        "title": "ConflictOut",
+        "type": "object"
+      },
+      "ConflictResolve": {
+        "properties": {
+          "decision": {
+            "enum": [
+              "keep_new",
+              "keep_old",
+              "keep_both"
+            ],
+            "title": "Decision",
+            "type": "string"
+          }
+        },
+        "required": [
+          "decision"
+        ],
+        "title": "ConflictResolve",
+        "type": "object"
+      },
       "ConversationCreate": {
         "properties": {
           "id": {
@@ -655,6 +711,149 @@
           }
         },
         "title": "DenyToolCall",
+        "type": "object"
+      },
+      "EntityBrief": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "name"
+        ],
+        "title": "EntityBrief",
+        "type": "object"
+      },
+      "EntityDetail": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "memories": {
+            "title": "Memories",
+            "type": "integer"
+          },
+          "memory_items": {
+            "items": {
+              "$ref": "#/components/schemas/MemoryOut"
+            },
+            "title": "Memory Items",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "relations": {
+            "items": {
+              "$ref": "#/components/schemas/RelationOut"
+            },
+            "title": "Relations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "name",
+          "description",
+          "memories",
+          "memory_items",
+          "relations"
+        ],
+        "title": "EntityDetail",
+        "type": "object"
+      },
+      "EntityIn": {
+        "properties": {
+          "kind": {
+            "default": "other",
+            "maxLength": 32,
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "EntityIn",
+        "type": "object"
+      },
+      "EntityOut": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "memories": {
+            "title": "Memories",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "name",
+          "description",
+          "memories"
+        ],
+        "title": "EntityOut",
         "type": "object"
       },
       "ExportCreate": {
@@ -1461,11 +1660,55 @@
             "title": "Always Use",
             "type": "boolean"
           },
+          "category": {
+            "default": "user",
+            "enum": [
+              "user",
+              "semantic",
+              "episodic",
+              "procedural"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
           "content": {
             "maxLength": 1000,
             "minLength": 3,
             "title": "Content",
             "type": "string"
+          },
+          "entities": {
+            "items": {
+              "$ref": "#/components/schemas/EntityIn"
+            },
+            "maxItems": 8,
+            "title": "Entities",
+            "type": "array"
+          },
+          "importance": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Importance"
+          },
+          "occurred_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurred At"
           },
           "project_id": {
             "anyOf": [
@@ -1478,6 +1721,18 @@
               }
             ],
             "title": "Project Id"
+          },
+          "replaces": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replaces"
           },
           "scope": {
             "default": "global",
@@ -1501,6 +1756,27 @@
             "title": "Always Use",
             "type": "boolean"
           },
+          "attributes": {
+            "additionalProperties": true,
+            "title": "Attributes",
+            "type": "object"
+          },
+          "category": {
+            "default": "user",
+            "enum": [
+              "user",
+              "semantic",
+              "episodic",
+              "procedural"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "confidence": {
+            "default": 1.0,
+            "title": "Confidence",
+            "type": "number"
+          },
           "content": {
             "title": "Content",
             "type": "string"
@@ -1510,10 +1786,22 @@
             "title": "Created At",
             "type": "string"
           },
+          "entities": {
+            "items": {
+              "$ref": "#/components/schemas/EntityBrief"
+            },
+            "title": "Entities",
+            "type": "array"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "importance": {
+            "default": 0.5,
+            "title": "Importance",
+            "type": "number"
           },
           "last_used_at": {
             "anyOf": [
@@ -1526,6 +1814,23 @@
               }
             ],
             "title": "Last Used At"
+          },
+          "occurred_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurred At"
+          },
+          "open_conflicts": {
+            "default": 0,
+            "title": "Open Conflicts",
+            "type": "integer"
           },
           "project_id": {
             "anyOf": [
@@ -1577,6 +1882,18 @@
           "status": {
             "$ref": "#/components/schemas/MemoryStatus"
           },
+          "superseded_by_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Superseded By Id"
+          },
           "updated_at": {
             "format": "date-time",
             "title": "Updated At",
@@ -1604,6 +1921,40 @@
         "title": "MemoryOut",
         "type": "object"
       },
+      "MemorySearchHit": {
+        "properties": {
+          "keyword": {
+            "title": "Keyword",
+            "type": "number"
+          },
+          "memory": {
+            "$ref": "#/components/schemas/MemoryOut"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          },
+          "semantic": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Semantic"
+          }
+        },
+        "required": [
+          "memory",
+          "score",
+          "semantic",
+          "keyword"
+        ],
+        "title": "MemorySearchHit",
+        "type": "object"
+      },
       "MemorySettings": {
         "properties": {
           "auto_extract": {
@@ -1624,6 +1975,19 @@
           "enabled": {
             "title": "Enabled",
             "type": "boolean"
+          },
+          "extract_categories": {
+            "items": {
+              "enum": [
+                "user",
+                "semantic",
+                "episodic",
+                "procedural"
+              ],
+              "type": "string"
+            },
+            "title": "Extract Categories",
+            "type": "array"
           },
           "require_review": {
             "title": "Require Review",
@@ -1663,6 +2027,26 @@
             ],
             "title": "Enabled"
           },
+          "extract_categories": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "user",
+                    "semantic",
+                    "episodic",
+                    "procedural"
+                  ],
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extract Categories"
+          },
           "require_review": {
             "anyOf": [
               {
@@ -1682,7 +2066,8 @@
         "enum": [
           "proposed",
           "active",
-          "rejected"
+          "rejected",
+          "superseded"
         ],
         "title": "MemoryStatus",
         "type": "string"
@@ -1700,6 +2085,23 @@
             ],
             "title": "Always Use"
           },
+          "category": {
+            "anyOf": [
+              {
+                "enum": [
+                  "user",
+                  "semantic",
+                  "episodic",
+                  "procedural"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
           "content": {
             "anyOf": [
               {
@@ -1712,6 +2114,34 @@
               }
             ],
             "title": "Content"
+          },
+          "entities": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EntityIn"
+                },
+                "maxItems": 8,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entities"
+          },
+          "importance": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Importance"
           },
           "project_id": {
             "anyOf": [
@@ -3007,6 +3437,69 @@
         "title": "RegisterRequest",
         "type": "object"
       },
+      "RelationCreate": {
+        "properties": {
+          "relation": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Relation",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/EntityIn"
+          },
+          "target": {
+            "$ref": "#/components/schemas/EntityIn"
+          }
+        },
+        "required": [
+          "source",
+          "relation",
+          "target"
+        ],
+        "title": "RelationCreate",
+        "type": "object"
+      },
+      "RelationOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "memory_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Id"
+          },
+          "relation": {
+            "title": "Relation",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/EntityBrief"
+          },
+          "target": {
+            "$ref": "#/components/schemas/EntityBrief"
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "relation",
+          "target",
+          "memory_id"
+        ],
+        "title": "RelationOut",
+        "type": "object"
+      },
       "RunOut": {
         "properties": {
           "conversation_id": {
@@ -3595,6 +4088,584 @@
         "title": "ScheduleUpdate",
         "type": "object"
       },
+      "SkillDetail": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "current": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SkillVersionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "failure_count": {
+            "title": "Failure Count",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "latest_version": {
+            "title": "Latest Version",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "origin": {
+            "title": "Origin",
+            "type": "string"
+          },
+          "pending_versions": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Pending Versions",
+            "type": "array"
+          },
+          "published_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published Version"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "success_count": {
+            "title": "Success Count",
+            "type": "integer"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "use_count": {
+            "title": "Use Count",
+            "type": "integer"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/SkillVersionBrief"
+            },
+            "title": "Versions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "status",
+          "origin",
+          "tags",
+          "published_version",
+          "latest_version",
+          "use_count",
+          "success_count",
+          "failure_count",
+          "last_used_at",
+          "created_at",
+          "updated_at",
+          "versions",
+          "current"
+        ],
+        "title": "SkillDetail",
+        "type": "object"
+      },
+      "SkillEventOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "detail": {
+            "additionalProperties": true,
+            "title": "Detail",
+            "type": "object"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "kind",
+          "outcome",
+          "run_id",
+          "duration_ms",
+          "detail",
+          "created_at"
+        ],
+        "title": "SkillEventOut",
+        "type": "object"
+      },
+      "SkillFeedback": {
+        "properties": {
+          "note": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Note",
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "success",
+              "failure",
+              "corrected"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome"
+        ],
+        "title": "SkillFeedback",
+        "type": "object"
+      },
+      "SkillFiles": {
+        "properties": {
+          "changelog": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changelog"
+          },
+          "files": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 40,
+            "minProperties": 1,
+            "title": "Files",
+            "type": "object"
+          }
+        },
+        "required": [
+          "files"
+        ],
+        "title": "SkillFiles",
+        "type": "object"
+      },
+      "SkillOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "failure_count": {
+            "title": "Failure Count",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "latest_version": {
+            "title": "Latest Version",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "origin": {
+            "title": "Origin",
+            "type": "string"
+          },
+          "pending_versions": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Pending Versions",
+            "type": "array"
+          },
+          "published_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published Version"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "success_count": {
+            "title": "Success Count",
+            "type": "integer"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "use_count": {
+            "title": "Use Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "status",
+          "origin",
+          "tags",
+          "published_version",
+          "latest_version",
+          "use_count",
+          "success_count",
+          "failure_count",
+          "last_used_at",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "SkillOut",
+        "type": "object"
+      },
+      "SkillSettings": {
+        "properties": {
+          "auto_generate": {
+            "title": "Auto Generate",
+            "type": "boolean"
+          },
+          "pending": {
+            "default": 0,
+            "title": "Pending",
+            "type": "integer"
+          },
+          "trust": {
+            "enum": [
+              "conservative",
+              "balanced",
+              "autonomous"
+            ],
+            "title": "Trust",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trust",
+          "auto_generate"
+        ],
+        "title": "SkillSettings",
+        "type": "object"
+      },
+      "SkillSettingsUpdate": {
+        "properties": {
+          "auto_generate": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Generate"
+          },
+          "trust": {
+            "anyOf": [
+              {
+                "enum": [
+                  "conservative",
+                  "balanced",
+                  "autonomous"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trust"
+          }
+        },
+        "title": "SkillSettingsUpdate",
+        "type": "object"
+      },
+      "SkillVersionBrief": {
+        "properties": {
+          "changelog": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changelog"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "string"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "test": {
+            "additionalProperties": true,
+            "title": "Test",
+            "type": "object"
+          },
+          "validation": {
+            "additionalProperties": true,
+            "title": "Validation",
+            "type": "object"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "status",
+          "created_by",
+          "changelog",
+          "validation",
+          "test",
+          "created_at",
+          "published_at"
+        ],
+        "title": "SkillVersionBrief",
+        "type": "object"
+      },
+      "SkillVersionOut": {
+        "properties": {
+          "changelog": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changelog"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "string"
+          },
+          "files": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "object"
+          },
+          "frontmatter": {
+            "additionalProperties": true,
+            "title": "Frontmatter",
+            "type": "object"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "source_conversation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Conversation Id"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "test": {
+            "additionalProperties": true,
+            "title": "Test",
+            "type": "object"
+          },
+          "validation": {
+            "additionalProperties": true,
+            "title": "Validation",
+            "type": "object"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "status",
+          "created_by",
+          "changelog",
+          "validation",
+          "test",
+          "created_at",
+          "published_at",
+          "files",
+          "frontmatter",
+          "source_conversation_id"
+        ],
+        "title": "SkillVersionOut",
+        "type": "object"
+      },
       "StorageUsage": {
         "properties": {
           "limit_bytes": {
@@ -3686,7 +4757,8 @@
               "message",
               "project",
               "file",
-              "memory"
+              "memory",
+              "skill"
             ],
             "title": "Entity Type",
             "type": "string"
@@ -6571,6 +7643,25 @@
               ],
               "title": "Q"
             }
+          },
+          {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
           }
         ],
         "responses": {
@@ -6639,6 +7730,103 @@
           }
         },
         "summary": "Create Memory",
+        "tags": [
+          "memory"
+        ]
+      }
+    },
+    "/api/v1/memories/search": {
+      "get": {
+        "description": "Hybrid search (meaning, words, recency, importance) over active memories.",
+        "operationId": "search_api_v1_memories_search_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "maxLength": 500,
+              "minLength": 2,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "in": "query",
+            "name": "project_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MemorySearchHit"
+                  },
+                  "title": "Response Search Api V1 Memories Search Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search",
         "tags": [
           "memory"
         ]
@@ -6815,6 +8003,321 @@
           }
         },
         "summary": "Reject Memory",
+        "tags": [
+          "memory"
+        ]
+      }
+    },
+    "/api/v1/memory/conflicts": {
+      "get": {
+        "operationId": "list_conflicts_api_v1_memory_conflicts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "open",
+              "pattern": "^(open|resolved)$",
+              "title": "Status",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ConflictOut"
+                  },
+                  "title": "Response List Conflicts Api V1 Memory Conflicts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Conflicts",
+        "tags": [
+          "memory"
+        ]
+      }
+    },
+    "/api/v1/memory/conflicts/{conflict_id}/resolve": {
+      "post": {
+        "operationId": "resolve_conflict_api_v1_memory_conflicts__conflict_id__resolve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conflict_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conflict Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConflictResolve"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resolve Conflict",
+        "tags": [
+          "memory"
+        ]
+      }
+    },
+    "/api/v1/memory/entities": {
+      "get": {
+        "operationId": "list_entities_api_v1_memory_entities_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EntityOut"
+                  },
+                  "title": "Response List Entities Api V1 Memory Entities Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Entities",
+        "tags": [
+          "memory"
+        ]
+      }
+    },
+    "/api/v1/memory/entities/{entity_id}": {
+      "get": {
+        "operationId": "entity_detail_api_v1_memory_entities__entity_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entity_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Entity Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntityDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Entity Detail",
+        "tags": [
+          "memory"
+        ]
+      }
+    },
+    "/api/v1/memory/reembed": {
+      "post": {
+        "description": "Re-embed memories and excerpts made with another embedding model (or none), e.g.\nafter changing EMBEDDING_MODEL. Until it finishes they are still found by keyword.",
+        "operationId": "reembed_api_v1_memory_reembed_post",
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Reembed Api V1 Memory Reembed Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Reembed",
+        "tags": [
+          "memory"
+        ]
+      }
+    },
+    "/api/v1/memory/relations": {
+      "get": {
+        "operationId": "list_relations_api_v1_memory_relations_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RelationOut"
+                  },
+                  "title": "Response List Relations Api V1 Memory Relations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Relations",
+        "tags": [
+          "memory"
+        ]
+      },
+      "post": {
+        "operationId": "create_relation_api_v1_memory_relations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RelationCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Relation",
+        "tags": [
+          "memory"
+        ]
+      }
+    },
+    "/api/v1/memory/relations/{relation_id}": {
+      "delete": {
+        "operationId": "delete_relation_api_v1_memory_relations__relation_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "relation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Relation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Relation",
         "tags": [
           "memory"
         ]
@@ -7981,6 +9484,841 @@
         "summary": "Run Schedule Now",
         "tags": [
           "automation"
+        ]
+      }
+    },
+    "/api/v1/skills": {
+      "get": {
+        "operationId": "list_skills_api_v1_skills_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^(candidate|active|deprecated|pending)$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SkillOut"
+                  },
+                  "title": "Response List Skills Api V1 Skills Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Skills",
+        "tags": [
+          "skills"
+        ]
+      },
+      "post": {
+        "operationId": "create_skill_api_v1_skills_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillFiles"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Skill",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/api/v1/skills/import": {
+      "post": {
+        "description": "A zip of one skill directory (SKILL.md at its root or in one top folder), sent as\nthe request body (application/zip). Imported skills are untrusted: they are validated\nand stay candidates until the user publishes them.",
+        "operationId": "import_skill_api_v1_skills_import_post",
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Import Skill",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/api/v1/skills/settings": {
+      "get": {
+        "operationId": "get_skill_settings_api_v1_skills_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillSettings"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Skill Settings",
+        "tags": [
+          "skills"
+        ]
+      },
+      "put": {
+        "operationId": "update_skill_settings_api_v1_skills_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillSettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillSettings"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Skill Settings",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/api/v1/skills/{skill_id}": {
+      "delete": {
+        "operationId": "delete_skill_api_v1_skills__skill_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "skill_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Skill Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Skill",
+        "tags": [
+          "skills"
+        ]
+      },
+      "get": {
+        "operationId": "get_skill_api_v1_skills__skill_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "skill_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Skill Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Skill",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/api/v1/skills/{skill_id}/deprecate": {
+      "post": {
+        "operationId": "deprecate_skill_api_v1_skills__skill_id__deprecate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "skill_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Skill Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Deprecate Skill",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/api/v1/skills/{skill_id}/events": {
+      "get": {
+        "operationId": "skill_events_api_v1_skills__skill_id__events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "skill_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Skill Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SkillEventOut"
+                  },
+                  "title": "Response Skill Events Api V1 Skills  Skill Id  Events Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Skill Events",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/api/v1/skills/{skill_id}/export": {
+      "get": {
+        "description": "The skill as a standard directory in a zip: <name>/SKILL.md, <name>/scripts/...",
+        "operationId": "export_skill_api_v1_skills__skill_id__export_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "skill_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Skill Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Skill",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/api/v1/skills/{skill_id}/feedback": {
+      "post": {
+        "operationId": "skill_feedback_api_v1_skills__skill_id__feedback_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "skill_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Skill Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillFeedback"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Skill Feedback",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/api/v1/skills/{skill_id}/restore": {
+      "post": {
+        "operationId": "restore_skill_api_v1_skills__skill_id__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "skill_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Skill Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restore Skill",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/api/v1/skills/{skill_id}/versions": {
+      "post": {
+        "operationId": "add_skill_version_api_v1_skills__skill_id__versions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "skill_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Skill Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillFiles"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Skill Version",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/api/v1/skills/{skill_id}/versions/{version}": {
+      "get": {
+        "operationId": "get_skill_version_api_v1_skills__skill_id__versions__version__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "skill_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Skill Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillVersionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Skill Version",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/api/v1/skills/{skill_id}/versions/{version}/publish": {
+      "post": {
+        "description": "Approve a pending version, publish a candidate, or roll back to a retired one.",
+        "operationId": "publish_version_api_v1_skills__skill_id__versions__version__publish_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "skill_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Skill Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Publish Version",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/api/v1/skills/{skill_id}/versions/{version}/reject": {
+      "post": {
+        "operationId": "reject_version_api_v1_skills__skill_id__versions__version__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "skill_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Skill Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject Version",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/api/v1/skills/{skill_id}/versions/{version}/test": {
+      "post": {
+        "operationId": "test_version_api_v1_skills__skill_id__versions__version__test_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "skill_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Skill Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Test Version Api V1 Skills  Skill Id  Versions  Version  Test Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Test Version",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/api/v1/skills/{skill_id}/versions/{version}/validate": {
+      "post": {
+        "operationId": "validate_version_api_v1_skills__skill_id__versions__version__validate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "skill_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Skill Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillVersionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Validate Version",
+        "tags": [
+          "skills"
         ]
       }
     },

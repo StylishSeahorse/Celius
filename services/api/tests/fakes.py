@@ -34,6 +34,9 @@ class FakeLlama:
         self.memory_reply = '{"memories": []}'
         self.extraction_requests: list[dict[str, Any]] = []
         self.embedding_requests: list[list[str]] = []
+        # Answer to skill generation requests (skill.propose).
+        self.skill_reply = "NONE"
+        self.skill_requests: list[dict[str, Any]] = []
         self.embeddings_fail = False
 
     def handler(self, request: httpx.Request) -> httpx.Response:
@@ -72,6 +75,13 @@ class FakeLlama:
                 return httpx.Response(
                     200,
                     content=_text_stream(self.memory_reply),
+                    headers={"content-type": "text/event-stream"},
+                )
+            if isinstance(system, str) and system.startswith("You turn finished work"):
+                self.skill_requests.append(body)
+                return httpx.Response(
+                    200,
+                    content=_text_stream(self.skill_reply),
                     headers={"content-type": "text/event-stream"},
                 )
             self.requests.append(body)

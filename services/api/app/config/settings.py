@@ -178,6 +178,9 @@ class Settings(BaseSettings):
     tool_call_timeout_seconds: int = Field(default=120, ge=1, le=3600)
     tool_memory_mb: int = Field(default=1024, ge=64)
     tool_max_result_chars: int = Field(default=20_000, ge=500)
+    # Models with a smaller context window than this get a compact toolset: tools marked
+    # optional (rarely needed management tools) are left out to save prompt space.
+    tool_compact_below_context_tokens: int = Field(default=16_384, ge=0)
     tool_approval_ttl_minutes: int = Field(default=60, ge=1)
     mcp_timeout_seconds: float = Field(default=30, gt=0)
     schedule_min_interval_minutes: int = Field(default=15, ge=1)

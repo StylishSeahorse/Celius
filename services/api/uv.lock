@@ -198,6 +198,7 @@ dependencies = [
     { name = "pypdfium2" },
     { name = "python-docx" },
     { name = "python-pptx" },
+    { name = "pyyaml" },
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -207,7 +208,6 @@ dev = [
     { name = "aiosqlite" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
-    { name = "pyyaml" },
     { name = "respx" },
     { name = "ruff" },
 ]
@@ -230,6 +230,7 @@ requires-dist = [
     { name = "pypdfium2", specifier = ">=4.30,<6" },
     { name = "python-docx", specifier = ">=1.1,<2" },
     { name = "python-pptx", specifier = ">=1.0,<2" },
+    { name = "pyyaml", specifier = ">=6" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.32" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
 ]
@@ -239,7 +240,6 @@ dev = [
     { name = "aiosqlite", specifier = ">=0.20" },
     { name = "pytest", specifier = ">=8.3" },
     { name = "pytest-asyncio", specifier = ">=0.24" },
-    { name = "pyyaml", specifier = ">=6" },
     { name = "respx", specifier = ">=0.21" },
     { name = "ruff", specifier = ">=0.6" },
 ]

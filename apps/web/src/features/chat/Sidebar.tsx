@@ -25,6 +25,8 @@ interface Props {
   onOpenTools: () => void;
   memoryToReview: number;
   onOpenMemory: () => void;
+  skillsToReview: number;
+  onOpenSkills: () => void;
   onOpenAccount: () => void;
 }
 
@@ -168,6 +170,22 @@ export function Sidebar(props: Props) {
               aria-label={`${props.memoryToReview} memories to review`}
             >
               {props.memoryToReview}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={props.onOpenSkills}
+          disabled={!props.online}
+          className="flex w-full items-center gap-2 rounded-lg px-1 py-1 text-left hover:bg-canvas/60 disabled:opacity-40"
+        >
+          <span aria-hidden="true">📘</span>
+          <span className="flex-1">Skills</span>
+          {props.skillsToReview > 0 && (
+            <span
+              className="rounded-full bg-accent px-1.5 text-xs font-medium text-white"
+              aria-label={`${props.skillsToReview} skills to review`}
+            >
+              {props.skillsToReview}
             </span>
           )}
         </button>

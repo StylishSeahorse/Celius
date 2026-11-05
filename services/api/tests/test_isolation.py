@@ -33,6 +33,8 @@ BODIES = {
     ("POST", "/api/v1/tool-calls/{call_id}/deny"): {"reason": "no"},
     ("POST", "/api/v1/memories/{memory_id}/approve"): {},
     ("POST", "/api/v1/memory/conflicts/{conflict_id}/resolve"): {"decision": "keep_new"},
+    ("POST", "/api/v1/skills/{skill_id}/versions"): {"files": {"SKILL.md": "x"}},
+    ("POST", "/api/v1/skills/{skill_id}/feedback"): {"outcome": "success"},
     ("PATCH", "/api/v1/projects/{project_id}"): {"name": "taken over"},
     ("PUT", "/api/v1/projects/{project_id}/members/{username}"): {"role": "write"},
     ("PATCH", "/api/v1/conversations/{conversation_id}"): {"title": "taken over"},
@@ -131,6 +133,18 @@ async def alices_world(client, sessionmaker, settings, gateway, fake, admin_head
         headers=alice,
     )
     ids["relation_id"] = relation.json()["id"]
+    skill = await client.post(
+        "/api/v1/skills",
+        json={
+            "files": {
+                "SKILL.md": "---\nname: alices-recipe\ndescription: Alice's secret soup "
+                "recipe, step by step.\n---\n\n1. Soup.\n"
+            }
+        },
+        headers=alice,
+    )
+    ids["skill_id"] = skill.json()["id"]
+    ids["version"] = "1"
     profile = await client.post("/api/v1/tool-profiles", json={"name": "Mine"}, headers=alice)
     ids["profile_id"] = profile.json()["key"].removeprefix("custom:")
     schedule = await client.post(
@@ -189,6 +203,9 @@ async def test_nobody_reaches_anyone_elses_data(
         "/api/v1/memory/conflicts",
         "/api/v1/memory/entities",
         "/api/v1/memory/relations",
+        "/api/v1/skills",
+        "/api/v1/skills?q=soup",
+        "/api/v1/skills?status=active",
         "/api/v1/tool-profiles",
         "/api/v1/schedules",
         "/api/v1/tool-calls?status=pending_approval",

@@ -10,8 +10,16 @@ import type {
   McpServer,
   Me,
   Memory,
+  MemoryConflict,
+  MemoryEntity,
+  MemoryEntityDetail,
   MemorySettings,
   ModelList,
+  Skill,
+  SkillDetail,
+  SkillEvent,
+  SkillSettings,
+  SkillVersion,
   PendingApproval,
   Schedule,
   ScheduleCreate,
@@ -25,6 +33,9 @@ import type {
   SubmitResponse,
   SyncChanges,
 } from "./types";
+
+export type MemoryCategory = "user" | "semantic" | "episodic" | "procedural";
+export type SkillTrust = "conservative" | "balanced" | "autonomous";
 
 export class ApiError extends Error {
   constructor(
@@ -222,20 +233,34 @@ export const api = {
   deleteMcpServer: (id: string) => request<void>(`/mcp-servers/${id}`, json("DELETE")),
 
   memorySettings: () => request<MemorySettings>("/memory/settings"),
-  updateMemorySettings: (body: { enabled?: boolean; auto_extract?: boolean; require_review?: boolean }) =>
-    request<MemorySettings>("/memory/settings", json("PUT", body)),
-  memories: (status: "active" | "proposed", q?: string) =>
-    request<Memory[]>(`/memories?status=${status}${q ? `&q=${encodeURIComponent(q)}` : ""}`),
+  updateMemorySettings: (body: {
+    enabled?: boolean;
+    auto_extract?: boolean;
+    require_review?: boolean;
+    extract_categories?: MemoryCategory[];
+  }) => request<MemorySettings>("/memory/settings", json("PUT", body)),
+  memories: (status: "active" | "proposed", q?: string, category?: MemoryCategory) =>
+    request<Memory[]>(
+      `/memories?status=${status}${q ? `&q=${encodeURIComponent(q)}` : ""}${category ? `&category=${category}` : ""}`,
+    ),
   createMemory: (body: {
     content: string;
     scope: "global" | "project";
     project_id?: string | null;
     always_use?: boolean;
+    category?: MemoryCategory;
   }) =>
     request<Memory>("/memories", json("POST", body)),
   updateMemory: (
     id: string,
-    body: { content?: string; scope?: "global" | "project"; project_id?: string | null; always_use?: boolean },
+    body: {
+      content?: string;
+      scope?: "global" | "project";
+      project_id?: string | null;
+      always_use?: boolean;
+      category?: MemoryCategory;
+      importance?: number;
+    },
   ) =>
     request<Memory>(`/memories/${id}`, json("PATCH", body)),
   approveMemory: (id: string, content?: string) =>
@@ -244,6 +269,38 @@ export const api = {
   deleteMemory: (id: string) => request<void>(`/memories/${id}`, json("DELETE")),
   forgetEverything: () =>
     request<{ memories: number; excerpts: number }>("/memories?confirm=forget-everything", json("DELETE")),
+  memoryConflicts: () => request<MemoryConflict[]>("/memory/conflicts"),
+  resolveConflict: (id: string, decision: "keep_new" | "keep_old" | "keep_both") =>
+    request<void>(`/memory/conflicts/${id}/resolve`, json("POST", { decision })),
+  memoryEntities: () => request<MemoryEntity[]>("/memory/entities"),
+  memoryEntity: (id: string) => request<MemoryEntityDetail>(`/memory/entities/${id}`),
+
+  skillSettings: () => request<SkillSettings>("/skills/settings"),
+  updateSkillSettings: (body: { trust?: SkillTrust; auto_generate?: boolean }) =>
+    request<SkillSettings>("/skills/settings", json("PUT", body)),
+  skills: (opts: { status?: "candidate" | "active" | "deprecated" | "pending"; q?: string } = {}) =>
+    request<Skill[]>(
+      `/skills?${opts.status ? `status=${opts.status}&` : ""}${opts.q ? `q=${encodeURIComponent(opts.q)}` : ""}`,
+    ),
+  skill: (id: string) => request<SkillDetail>(`/skills/${id}`),
+  skillVersion: (id: string, version: number) => request<SkillVersion>(`/skills/${id}/versions/${version}`),
+  skillEvents: (id: string) => request<SkillEvent[]>(`/skills/${id}/events`),
+  createSkill: (files: Record<string, string>, changelog?: string) =>
+    request<SkillDetail>("/skills", json("POST", { files, changelog })),
+  addSkillVersion: (id: string, files: Record<string, string>, changelog?: string) =>
+    request<SkillDetail>(`/skills/${id}/versions`, json("POST", { files, changelog })),
+  publishSkillVersion: (id: string, version: number) =>
+    request<SkillDetail>(`/skills/${id}/versions/${version}/publish`, json("POST")),
+  rejectSkillVersion: (id: string, version: number) =>
+    request<SkillDetail>(`/skills/${id}/versions/${version}/reject`, json("POST")),
+  testSkillVersion: (id: string, version: number) =>
+    request<{ job_id: string }>(`/skills/${id}/versions/${version}/test`, json("POST")),
+  deprecateSkill: (id: string) => request<SkillDetail>(`/skills/${id}/deprecate`, json("POST")),
+  restoreSkill: (id: string) => request<SkillDetail>(`/skills/${id}/restore`, json("POST")),
+  deleteSkill: (id: string) => request<void>(`/skills/${id}`, json("DELETE")),
+  skillFeedback: (id: string, outcome: "success" | "failure" | "corrected", note = "") =>
+    request<void>(`/skills/${id}/feedback`, json("POST", { outcome, note })),
+  skillExportUrl: (id: string) => `/api/v1/skills/${id}/export`,
 
   activity: () => request<{ items: ActivityItem[] }>("/activity"),
   cancelActivity: (kind: "run" | "job", id: string) =>

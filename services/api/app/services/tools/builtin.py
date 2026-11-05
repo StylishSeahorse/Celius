@@ -954,20 +954,14 @@ class RememberArgs(BaseModel):
     )
     kind: Literal["user", "semantic", "episodic", "procedural"] = Field(
         default="user",
-        description="user: about the user; semantic: a lasting fact about their systems, "
-        "projects or decisions; episodic: something that happened (a fix, a decision); "
-        "procedural: a short way of doing something",
+        description="user: about them; semantic: a fact about their systems or decisions; "
+        "episodic: an event; procedural: a short how-to",
     )
-    importance: float | None = Field(default=None, ge=0, le=1, description="0 to 1")
+    importance: float | None = Field(default=None, ge=0, le=1)
     about: list[str] = Field(
-        default_factory=list,
-        max_length=8,
-        description='Named things it is about, as "kind:name", e.g. "service:Proxmox"',
+        default_factory=list, max_length=8, description='e.g. "service:Proxmox"'
     )
-    replaces: str | None = Field(
-        default=None,
-        description="id of a remembered fact (from search_memory) that this corrects",
-    )
+    replaces: str | None = Field(default=None, description="id of a memory this corrects")
 
 
 async def _remember(ctx: ToolContext, args: RememberArgs) -> ToolOutput:
@@ -1037,12 +1031,9 @@ builtin(
 class SearchMemoryArgs(BaseModel):
     query: str = Field(min_length=2, max_length=500, description="What to look for")
     kinds: list[Literal["user", "semantic", "episodic", "procedural"]] = Field(
-        default_factory=list,
-        description="Only these kinds (episodic: past events, decisions and fixes)",
+        default_factory=list, description="episodic: past events and fixes"
     )
-    about: str | None = Field(
-        default=None, max_length=200, description="Only memories about this named thing"
-    )
+    about: str | None = Field(default=None, max_length=200, description="A named thing")
 
 
 async def _search_memory(ctx: ToolContext, args: SearchMemoryArgs) -> ToolOutput:

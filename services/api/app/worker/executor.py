@@ -83,13 +83,15 @@ from app.services.prompt_files import (
     project_files_block,
 )
 from app.services.runs import append_event, finish_cancelled
+from app.services.skills.jobs import queue_after_run
+from app.services.skills.prompt import skills_block
 from app.services.sync import record_sync
 from app.services.tools import workspace as ws
 from app.services.tools.calls import approval_expiry, call_event
 from app.services.tools.policy import args_hash, canonical_json, decide
 from app.services.tools.registry import ToolArgumentError, ToolContext, ToolOutput
 from app.services.tools.sandbox_client import SandboxClient
-from app.services.tools.toolset import Toolset, build_toolset
+from app.services.tools.toolset import NOT_PERMISSION_REASONS, Toolset, build_toolset
 
 log = logging.getLogger(__name__)
 
@@ -986,7 +988,13 @@ def _network_note(toolset: Toolset, settings: Settings) -> str:
 
 def _missing_tools_note(toolset: Toolset) -> str:
     """Tell the model what it can't do here, so it asks the user instead of flailing."""
-    missing = sorted(name for name in toolset.known if name not in toolset.offered)
+    missing = sorted(
+        name
+        for name in toolset.known
+        if name not in toolset.offered
+        # Not a permission matter (no skills yet, or a compact toolset): not worth the space.
+        and toolset.unavailable.get(name) not in NOT_PERMISSION_REASONS
+    )
     if not missing:
         return ""
     return (
@@ -1056,7 +1064,9 @@ async def _prepare(
 
             toolset = None
             if tool_calling:
-                toolset = await build_toolset(db, conversation, settings, sandbox=sandbox)
+                toolset = await build_toolset(
+                    db, conversation, settings, sandbox=sandbox, context_tokens=context_tokens
+                )
                 if not toolset.offered:
                     toolset = None
             if budget is not None and toolset is not None:
@@ -1150,6 +1160,15 @@ async def _prepare(
             )
             if memory := memory_prompt_block(retrieved, memory_budget):
                 system_prompt += "\n\n" + memory
+            if toolset is not None and {"skill_read", "skill_create"} & set(toolset.offered):
+                try:
+                    async with db.begin_nested():
+                        if block := await skills_block(
+                            db, conversation.owner_id, query, settings, toolset.offered
+                        ):
+                            system_prompt += "\n\n" + block
+                except Exception:
+                    log.exception("Skill index failed for run %s", run_id)
 
             if toolset is not None:
                 system_prompt += (
@@ -1398,6 +1417,17 @@ async def _finish(
                 },
             )
             await _queue_push(db, run.id, "".join(state.text))
+        if settings is not None:
+            conversation = await db.get(Conversation, run.conversation_id)
+            if conversation is not None:
+                # Settles the outcome of skills used in this run (success or failure), and
+                # may queue a skill proposal for a completed multi-step task. An extra:
+                # it must never keep the reply from finishing.
+                try:
+                    async with db.begin_nested():
+                        await queue_after_run(db, conversation, run, settings)
+                except Exception:
+                    log.exception("Skill bookkeeping failed for run %s", run.id)
         if error is None and not (state.cancel_requested or run.cancel_requested):
             if settings is not None:
                 conversation = await db.get(Conversation, run.conversation_id)

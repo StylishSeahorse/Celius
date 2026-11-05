@@ -50,6 +50,7 @@ from app.models.memory import (
     MemoryStatus,
 )
 from app.models.push import PushSubscription
+from app.models.skills import Skill, SkillEvent, SkillVersion
 from app.models.tools import (
     FINAL_TOOL_CALL_STATUSES,
     McpServer,
@@ -74,6 +75,9 @@ __all__ = [
     "MemoryRelation",
     "MemoryStatus",
     "PushSubscription",
+    "Skill",
+    "SkillEvent",
+    "SkillVersion",
     "ScheduledTask",
     "ToolCall",
     "ToolCallStatus",
