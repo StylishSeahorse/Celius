@@ -1,4 +1,8 @@
 import type {
+  Automation,
+  AutomationRun,
+  CalendarEventList,
+  IntegrationAccount,
   AssistantSettings,
   Briefing,
   UserTask,
@@ -304,6 +308,32 @@ export const api = {
   assistantSettings: () => request<AssistantSettings>("/assistant/settings"),
   updateAssistantSettings: (body: { timezone?: string; suggest_tasks?: boolean; briefing_time?: string }) =>
     request<AssistantSettings>("/assistant/settings", json("PUT", body)),
+
+  accounts: () => request<IntegrationAccount[]>("/integrations/accounts"),
+  createAccount: (body: {
+    kind: "calendar" | "email";
+    provider: "caldav" | "imap";
+    name: string;
+    config: Record<string, unknown>;
+    password?: string;
+  }) => request<IntegrationAccount>("/integrations/accounts", json("POST", body)),
+  updateAccount: (id: string, body: { enabled?: boolean; password?: string; name?: string }) =>
+    request<IntegrationAccount>(`/integrations/accounts/${id}`, json("PATCH", body)),
+  checkAccount: (id: string) =>
+    request<{ ok: boolean; error: string | null }>(`/integrations/accounts/${id}/check`, json("POST")),
+  deleteAccount: (id: string) => request<void>(`/integrations/accounts/${id}`, json("DELETE")),
+  calendarEvents: (start?: string, days = 7) =>
+    request<CalendarEventList>(`/calendar/events?days=${days}${start ? `&start=${start}` : ""}`),
+  createEvent: (body: { title: string; start: string; end?: string; calendar?: string | null; location?: string }) =>
+    request<unknown>("/calendar/events", json("POST", body)),
+  deleteEvent: (id: string) => request<void>("/calendar/events/delete", json("POST", { id })),
+  automations: () => request<Automation[]>("/automations"),
+  createAutomation: (body: { name: string; trigger: object; conditions?: object[]; actions: object[] }) =>
+    request<Automation>("/automations", json("POST", body)),
+  updateAutomation: (id: string, body: { enabled?: boolean; name?: string }) =>
+    request<Automation>(`/automations/${id}`, json("PATCH", body)),
+  deleteAutomation: (id: string) => request<void>(`/automations/${id}`, json("DELETE")),
+  automationRuns: (id: string) => request<AutomationRun[]>(`/automations/${id}/runs`),
 
   modelRegistry: () => request<ModelRegistryEntry[]>("/models/registry"),
   updateModelRegistry: (body: ModelRegistryUpdate) =>

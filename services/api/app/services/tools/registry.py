@@ -60,6 +60,8 @@ class ToolSpec:
     unavailable_on: Callable[[Settings], str | None] | None = None
     # Rarely needed: left out for models with a small context window (compact toolset).
     optional: bool = False
+    # Asks the user every time, whatever the profile or chat grants (e.g. sending email).
+    always_ask: bool = False
 
     def parameters(self) -> dict[str, Any]:
         if self.schema is not None:
@@ -137,3 +139,8 @@ BUILTIN: dict[str, ToolSpec] = {}
 def builtin(spec: ToolSpec) -> ToolSpec:
     BUILTIN[spec.name] = spec
     return spec
+
+
+def always_asks(name: str) -> bool:
+    spec = BUILTIN.get(name)
+    return bool(spec and spec.always_ask)

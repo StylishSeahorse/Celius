@@ -2,6 +2,53 @@
 
 Newest first. Each entry: what changed, how it was verified, what is left.
 
+## 2026-11-05: Phase 6, integrations and automation
+
+**Existing implementation.** Sealed credentials (MCP servers), the SSRF-guarded HTTP
+client with a per-server private-network option, Web Push, the job queue, the worker
+loop (runs, jobs, schedules, reminders), the personal task service.
+
+**Changes.** See C-11.
+- Migration 0015: `integration_accounts`, `calendar_events`, `automations`,
+  `automation_runs`, `automation_events`
+- `services/integrations/`: `accounts.py`, `ical.py`, `calendar.py` (local + CalDAV,
+  conflicts, free slots), `email.py` (pinned IMAP/SMTP, search, read, drafts, send)
+- `ToolSpec.always_ask` in the policy and approval paths
+- `services/automation/`: `engine.py` (validation, triggers, conditions, actions,
+  events, polling jobs, history, failure handling, pruning), `service.py`
+- Task service emits `task_status` / `task_created` events; the worker loop runs the
+  engine; the briefing includes the calendar
+- Tools: `calendar_events`, `calendar_add`, `calendar_change`, `email_search`,
+  `email_read`, `email_draft`, `email_send`, `automation_create`, `automation_list`
+- API: `/integrations/accounts` (+ check), `/calendar/events` (+ update, delete),
+  `/email/messages`, `/email/drafts`, `/email/send`, `/automations` (+ runs)
+- Web: Today > Calendar (week, add, delete, overlaps), Automations (recipes, JSON,
+  on/off, history, failure reason), Settings > Calendar and email accounts
+
+**Found while testing.** Updating an event in a CalDAV object that held two events
+rewrote the object with only the first: the other event was lost. Such objects (and
+repeating series) are now read-only from Celius for updates and deletes, and marked so
+in listings; the test checks nothing is lost. An isolation-sweep parameter clash
+(`{message_id}` already named chat messages) led to renaming the email route's
+parameter to `{email_id}`.
+
+**Verification.** `tests/test_integrations.py` (22) with in-process fake CalDAV and
+IMAP/SMTP servers (`tests/integration_fakes.py`): iCalendar parsing and round trip,
+sealed passwords and connection checks, admin-only local network, local calendar and
+conflicts, CalDAV create/list/update/refusals/outage, the briefing's calendar, calendar
+tools and approval, email tools appearing with an account, search/read/draft with a
+prompt-injection email, sending asking every time (Administrator + "allow all"),
+automation validation, overdue once, task events, schedules, email arrivals, page
+changes, switching off after failures, `run_prompt` with trigger data, a model-created
+rule, privacy. Isolation sweep covers the routes. e2e `integrations.spec.ts`. Totals: API
+suite **605 passed, 7 skipped** (SQLite; one Phase 5 test's assertion was too strict
+once more tools existed and was corrected); integrations, tasks, tools, isolation,
+profiles and migrations on PostgreSQL 16 + pgvector (115 passed); full e2e suite
+**95 passed**. No real CalDAV or mail server was used: **connect a real calendar and
+mailbox on the server**.
+
+**Left.** OAuth providers, recurring local events, stored email-task links.
+
 ## 2026-11-05: Phase 5, personal assistant foundation
 
 **Existing implementation.** Projects, scheduled prompts (`scheduled_tasks`), Web Push

@@ -95,6 +95,9 @@ The model can call tools in the conversation's private workspace:
 | `make_document` | Create Word, PDF, Excel, CSV, PowerPoint, Markdown or HTML files |
 | `attach_file` | Hand a workspace file to you in the chat |
 | `remember`, `search_memory` | Propose or correct a memory (kind, importance, what it is about); search memories by kind or subject, and earlier chats |
+| `calendar_events`, `calendar_add`, `calendar_change` | Read the calendar, find free time, add or change events |
+| `email_search`, `email_read`, `email_draft`, `email_send` | Search and read mail, write drafts; sending asks every time |
+| `automation_create`, `automation_list` | Set up rules that run on their own |
 | `task_add`, `task_list`, `task_update`, `daily_briefing` | Manage your task list and plan your day |
 | `plan_start`, `plan_update`, `plan_status` | Record and update the plan of a multi-step task (kept across replies) |
 | `skill_search`, `skill_read`, `skill_create`, `skill_update`, `skill_validate`, `skill_test`, `skill_publish`, `skill_deprecate`, `skill_history` | Find and follow saved procedures; save and improve them as candidates; test them in the sandbox; ask to publish (your trust setting decides) |
@@ -145,6 +148,19 @@ The model can call tools in the conversation's private workspace:
 - **Today**: overdue and due tasks, a suggested order, the next 7 days, suggestions,
   Celius's open work and what waits for you (approvals, memories, skills)
 - Optional daily briefing at a time you choose (a read-only scheduled task)
+
+### Calendar, email and automations
+- Celius's own calendar, plus CalDAV calendars (Nextcloud, iCloud, Fastmail…): see the
+  week, add events or block time for a task, find free time and overlaps; today's events
+  are in the briefing
+- Email over IMAP/SMTP (Gmail and Outlook with an app password): search and read without
+  marking mail read, summarise and find action items, save replies to Drafts.
+  **Sending asks you every time**, whatever the tool permissions
+- Automations that run on their own: "when a task becomes overdue, notify me", "every
+  morning, prepare a briefing", "when an invoice email arrives, add a task", "tell me
+  when this page changes". Create them in Today > Automations or by asking in a chat;
+  each keeps a history, and one that keeps failing switches itself off and tells you
+- Passwords are encrypted on the server and never shown again
 
 ### Local models
 - A capability registry per model: context size, tool calling, images, parallel tool
@@ -417,7 +433,7 @@ docs/                 Backlog, ADRs, deployment, operations, acceptance tests, s
   - [0009: Memory and recall](docs/adr/0009-memory-and-recall.md)
 - Assistant roadmap: [roadmap and status](docs/implementation/CELIUS_ROADMAP.md) ·
   [audit](docs/implementation/AUDIT.md) ·
-  [decisions C-01…C-10](docs/implementation/ARCHITECTURE_DECISIONS.md) ·
+  [decisions C-01…C-11](docs/implementation/ARCHITECTURE_DECISIONS.md) ·
   [implementation log](docs/implementation/IMPLEMENTATION_LOG.md)
 
 ## Not yet verified

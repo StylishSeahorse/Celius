@@ -51,6 +51,15 @@ from app.models.identity import (
     User,
     UserSettings,
 )
+from app.models.integrations import (
+    ACCOUNT_KINDS,
+    ACCOUNT_PROVIDERS,
+    Automation,
+    AutomationEvent,
+    AutomationRun,
+    CalendarEvent,
+    IntegrationAccount,
+)
 from app.models.memory import (
     MEMORY_CATEGORIES,
     Memory,
@@ -75,6 +84,13 @@ from app.models.tools import (
 )
 
 __all__ = [
+    "ACCOUNT_KINDS",
+    "ACCOUNT_PROVIDERS",
+    "Automation",
+    "AutomationEvent",
+    "AutomationRun",
+    "CalendarEvent",
+    "IntegrationAccount",
     "ACTIVE_TASK_STATUSES",
     "PRIORITIES",
     "USER_TASK_STATUSES",

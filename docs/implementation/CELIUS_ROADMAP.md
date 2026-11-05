@@ -107,14 +107,22 @@ Existing base kept: runs persist every tool call and resume after a worker crash
 | Calendar in the briefing | ⬜ | Phase 6 |
 | Overdue notifications, "when X happens" rules | ⬜ | Phase 6 automation engine |
 
-## Phase 6: integrations and automation ⬜
+## Phase 6: integrations and automation ✅
 
-Existing base: scheduled prompts (`scheduled_tasks`), MCP servers, web push.
-
-- ⬜ Calendar provider abstraction (local, CalDAV first; Google/Microsoft via OAuth later)
-- ⬜ Email provider abstraction (IMAP/SMTP first), drafts by default, sending needs approval
-- ⬜ Automation engine: triggers (schedule, event, condition), conditions, actions,
-  execution history, failure handling, on the job queue (no LLM needed to fire)
+| Item | Status | Notes |
+| --- | --- | --- |
+| Calendar provider abstraction: local calendar + CalDAV | ✅ | C-11; Google/Microsoft through CalDAV/app passwords; OAuth ⬜ |
+| Read events, availability (free time), create, update, cancel, block time for tasks, conflicts | ✅ | recurring CalDAV series read-only from Celius |
+| Calendar in the briefing (events, overlaps, deadlines during events) | ✅ | |
+| Email provider abstraction: IMAP/SMTP | ✅ | Gmail/Outlook OAuth ⬜ |
+| Search, read (unread kept), summarise/extract action items (model), drafts, replies | ✅ | |
+| Sending needs approval every time (backend-enforced) | ✅ | `always_ask` |
+| Automation engine: triggers, conditions, actions, schedules, history, failure handling | ✅ | worker loop, no model |
+| Event triggers (task status, task created), due/overdue, email arrival, web page change | ✅ | |
+| Natural-language automations | ✅ | `automation_create` tool + recipes in the UI |
+| Automation manager UI (create, enable/disable, history, failures) | ✅ | Today > Automations |
+| Linking emails to tasks/projects | 🟡 | via automations and the model (`create_task` from an email); no stored link |
+| "When a project changes status" | ⬜ | projects have no status yet |
 
 ## Phase 7: continuous improvement ⬜
 
@@ -125,12 +133,12 @@ Existing base: scheduled prompts (`scheduled_tasks`), MCP servers, web push.
 
 ## Next (continuation point)
 
-1. Phase 6: calendar provider abstraction (a local Celius calendar and CalDAV first),
-   filling `briefing.calendar`; email provider abstraction (IMAP/SMTP, drafts by default,
-   sending needs approval); an automation engine (triggers: schedule, task overdue, task
-   status change; conditions; actions: notify, create task, run a prompt) on the job
-   queue, with execution history.
-2. On the GPU machine: run `devtools/prompt_eval.py` and set model profiles.
-3. Small follow-ups: entity browser and skill import in the UI; a periodic memory
-   consolidation job; retrieval precision/recall; model ids containing "/" can't be
-   probed via `/models/{id}/verify-tools`.
+1. Phase 7: execution analytics from existing tables (run duration, tool success, context
+   use from `run.started.prompt_sections`, automation outcomes), memory quality
+   evaluation and a periodic consolidation job, skill improvement from failure
+   clusters, benchmarks with `devtools/prompt_eval.py`, configurable proactive behaviour
+   in one place.
+2. On the real hardware: run `prompt_eval.py`, connect a real CalDAV calendar and a
+   mailbox, and record the results.
+3. Follow-ups: OAuth for Google/Microsoft; recurring events in the local calendar; an
+   entity browser and skill import in the UI; `/models/{id}/verify-tools` for ids with "/".

@@ -404,6 +404,111 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/automations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Automations */
+        get: operations["list_automations_api_v1_automations_get"];
+        put?: never;
+        /** Create Automation */
+        post: operations["create_automation_api_v1_automations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/automations/{automation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Automation */
+        delete: operations["delete_automation_api_v1_automations__automation_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Automation */
+        patch: operations["update_automation_api_v1_automations__automation_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/automations/{automation_id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Automation Runs */
+        get: operations["automation_runs_api_v1_automations__automation_id__runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Calendar Events */
+        get: operations["calendar_events_api_v1_calendar_events_get"];
+        put?: never;
+        /** Create Event */
+        post: operations["create_event_api_v1_calendar_events_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/events/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Delete Event */
+        post: operations["delete_event_api_v1_calendar_events_delete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/events/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Update Event */
+        post: operations["update_event_api_v1_calendar_events_update_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/conversations": {
         parameters: {
             query?: never;
@@ -532,6 +637,77 @@ export interface paths {
         get: operations["download_workspace_file_api_v1_conversations__conversation_id__workspace_file_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/email/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save Draft */
+        post: operations["save_draft_api_v1_email_drafts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/email/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search Email */
+        get: operations["search_email_api_v1_email_messages_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/email/messages/{email_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Email */
+        get: operations["read_email_api_v1_email_messages__email_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/email/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Email
+         * @description The user sends from the UI (the model's email_send asks the user every time).
+         */
+        post: operations["send_email_api_v1_email_send_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -798,6 +974,62 @@ export interface paths {
         get: operations["ready_api_v1_health_ready_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Accounts */
+        get: operations["list_accounts_api_v1_integrations_accounts_get"];
+        put?: never;
+        /** Create Account */
+        post: operations["create_account_api_v1_integrations_accounts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/accounts/{account_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Account */
+        delete: operations["delete_account_api_v1_integrations_accounts__account_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Account */
+        patch: operations["update_account_api_v1_integrations_accounts__account_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/integrations/accounts/{account_id}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Account
+         * @description Connect and log in, without changing anything.
+         */
+        post: operations["check_account_api_v1_integrations_accounts__account_id__check_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2043,6 +2275,82 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AccountCheck */
+        AccountCheck: {
+            /** Error */
+            error?: string | null;
+            /** Ok */
+            ok: boolean;
+        };
+        /** AccountCreate */
+        AccountCreate: {
+            /**
+             * Allow Private Network
+             * @default false
+             */
+            allow_private_network: boolean;
+            /** Config */
+            config: {
+                [key: string]: unknown;
+            };
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "calendar" | "email";
+            /** Name */
+            name: string;
+            /** Password */
+            password?: string | null;
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "caldav" | "imap";
+        };
+        /** AccountOut */
+        AccountOut: {
+            /** Allow Private Network */
+            allow_private_network: boolean;
+            /** Config */
+            config: {
+                [key: string]: unknown;
+            };
+            /** Enabled */
+            enabled: boolean;
+            /** Has Password */
+            has_password: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Last Checked At */
+            last_checked_at: string | null;
+            /** Last Error */
+            last_error: string | null;
+            /** Name */
+            name: string;
+            /** Provider */
+            provider: string;
+        };
+        /** AccountUpdate */
+        AccountUpdate: {
+            /** Allow Private Network */
+            allow_private_network?: boolean | null;
+            /** Config */
+            config?: {
+                [key: string]: unknown;
+            } | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Name */
+            name?: string | null;
+            /** Password */
+            password?: string | null;
+        };
         /**
          * ActivityItem
          * @description A run or background job, for the activity panel.
@@ -2306,6 +2614,102 @@ export interface components {
             /** Timezone */
             timezone?: string | null;
         };
+        /** AutomationCreate */
+        AutomationCreate: {
+            /** Actions */
+            actions: {
+                [key: string]: unknown;
+            }[];
+            /** Conditions */
+            conditions?: {
+                [key: string]: unknown;
+            }[];
+            /** Name */
+            name: string;
+            /** Trigger */
+            trigger: {
+                [key: string]: unknown;
+            };
+        };
+        /** AutomationOut */
+        AutomationOut: {
+            /** Actions */
+            actions: unknown[];
+            /** Conditions */
+            conditions: unknown[];
+            /** Consecutive Failures */
+            consecutive_failures: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: string;
+            /** Disabled Reason */
+            disabled_reason: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Run At */
+            last_run_at: string | null;
+            /** Last Status */
+            last_status: string | null;
+            /** Name */
+            name: string;
+            /** Next Check At */
+            next_check_at: string | null;
+            /** Trigger */
+            trigger: {
+                [key: string]: unknown;
+            };
+        };
+        /** AutomationRunOut */
+        AutomationRunOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Detail */
+            detail: {
+                [key: string]: unknown;
+            };
+            /** Error */
+            error: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Reason */
+            reason: string;
+            /** Status */
+            status: string;
+        };
+        /** AutomationUpdate */
+        AutomationUpdate: {
+            /** Actions */
+            actions?: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Conditions */
+            conditions?: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Name */
+            name?: string | null;
+            /** Trigger */
+            trigger?: {
+                [key: string]: unknown;
+            } | null;
+        };
         /** Briefing */
         Briefing: {
             /** Agent Tasks */
@@ -2524,6 +2928,67 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
+        /** EmailCompose */
+        EmailCompose: {
+            /**
+             * Account Id
+             * Format: uuid
+             */
+            account_id: string;
+            /** Body */
+            body: string;
+            /** Cc */
+            cc?: string[];
+            /** Reply To */
+            reply_to?: string | null;
+            /**
+             * Subject
+             * @default
+             */
+            subject: string;
+            /** To */
+            to?: string[];
+        };
+        /** EmailOut */
+        EmailOut: {
+            /** Attachments */
+            attachments: string[];
+            /** Body */
+            body: string;
+            /** Cc */
+            cc: string;
+            /** Date */
+            date: string | null;
+            /** Id */
+            id: string;
+            /** Sender */
+            sender: string;
+            /** Snippet */
+            snippet: string;
+            /** Subject */
+            subject: string;
+            /** To */
+            to: string;
+            /** Unread */
+            unread: boolean;
+        };
+        /** EmailSummaryOut */
+        EmailSummaryOut: {
+            /** Date */
+            date: string | null;
+            /** Id */
+            id: string;
+            /** Sender */
+            sender: string;
+            /** Snippet */
+            snippet: string;
+            /** Subject */
+            subject: string;
+            /** To */
+            to: string;
+            /** Unread */
+            unread: boolean;
+        };
         /** EntityBrief */
         EntityBrief: {
             /**
@@ -2581,6 +3046,81 @@ export interface components {
             memories: number;
             /** Name */
             name: string;
+        };
+        /** EventChange */
+        EventChange: {
+            /** Description */
+            description?: string | null;
+            /** End */
+            end?: string | null;
+            /** Id */
+            id: string;
+            /** Location */
+            location?: string | null;
+            /** Start */
+            start?: string | null;
+            /** Title */
+            title?: string | null;
+        };
+        /** EventCreate */
+        EventCreate: {
+            /** Calendar */
+            calendar?: string | null;
+            /** Description */
+            description?: string | null;
+            /** End */
+            end?: string | null;
+            /** Location */
+            location?: string | null;
+            /** Start */
+            start: string;
+            /** Task Id */
+            task_id?: string | null;
+            /** Title */
+            title: string;
+        };
+        /** EventList */
+        EventList: {
+            /** Conflicts */
+            conflicts: string[][];
+            /** Events */
+            events: components["schemas"]["EventOut"][];
+            /** Problems */
+            problems: string[];
+        };
+        /** EventOut */
+        EventOut: {
+            /** All Day */
+            all_day: boolean;
+            /** Calendar */
+            calendar: string;
+            /** Description */
+            description: string | null;
+            /** Editable */
+            editable: boolean;
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
+            /** Id */
+            id: string;
+            /** Location */
+            location: string | null;
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /** Task Id */
+            task_id: string | null;
+            /** Title */
+            title: string;
+        };
+        /** EventRef */
+        EventRef: {
+            /** Id */
+            id: string;
         };
         /** ExportCreate */
         ExportCreate: {
@@ -4041,7 +4581,7 @@ export interface components {
              * Entity Type
              * @enum {string}
              */
-            entity_type: "conversation" | "message" | "project" | "file" | "memory" | "skill" | "agent_task" | "user_task";
+            entity_type: "conversation" | "message" | "project" | "file" | "memory" | "skill" | "agent_task" | "user_task" | "automation" | "calendar_event";
             /**
              * Operation
              * @enum {string}
@@ -5164,6 +5704,281 @@ export interface operations {
             };
         };
     };
+    list_automations_api_v1_automations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationOut"][];
+                };
+            };
+        };
+    };
+    create_automation_api_v1_automations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutomationCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_automation_api_v1_automations__automation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_automation_api_v1_automations__automation_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutomationUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    automation_runs_api_v1_automations__automation_id__runs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationRunOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    calendar_events_api_v1_calendar_events_get: {
+        parameters: {
+            query?: {
+                start?: string | null;
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_event_api_v1_calendar_events_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_event_api_v1_calendar_events_delete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventRef"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_event_api_v1_calendar_events_update_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_conversations_api_v1_conversations_get: {
         parameters: {
             query?: {
@@ -5526,6 +6341,143 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_draft_api_v1_email_drafts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailCompose"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_email_api_v1_email_messages_get: {
+        parameters: {
+            query: {
+                account_id: string;
+                q?: string | null;
+                unread?: boolean;
+                since_days?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailSummaryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_email_api_v1_email_messages__email_id__get: {
+        parameters: {
+            query: {
+                account_id: string;
+            };
+            header?: never;
+            path: {
+                email_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_email_api_v1_email_send_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailCompose"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -5975,6 +6927,154 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    list_accounts_api_v1_integrations_accounts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountOut"][];
+                };
+            };
+        };
+    };
+    create_account_api_v1_integrations_accounts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_account_api_v1_integrations_accounts__account_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_account_api_v1_integrations_accounts__account_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_account_api_v1_integrations_accounts__account_id__check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountCheck"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

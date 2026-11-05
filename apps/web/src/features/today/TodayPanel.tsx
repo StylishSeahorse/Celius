@@ -2,8 +2,9 @@ import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 import { ApiError, api, type TaskFields } from "../../lib/api";
 import type { AssistantSettings, Briefing, UserTask } from "../../lib/types";
+import { AccountsView, AutomationsView, CalendarView } from "./Integrations";
 
-type Tab = "today" | "tasks" | "settings";
+type Tab = "today" | "tasks" | "calendar" | "automations" | "settings";
 
 const button = "rounded-md border border-line px-2.5 py-1 text-sm hover:bg-panel disabled:opacity-40";
 const small = "rounded-md border border-line px-2 py-0.5 text-xs hover:bg-panel disabled:opacity-40";
@@ -78,11 +79,13 @@ export function TodayPanel({
             ✕
           </button>
         </header>
-        <nav className="flex gap-1 border-b border-line px-3 py-2" aria-label="Today sections">
+        <nav className="flex gap-1 overflow-x-auto border-b border-line px-3 py-2" aria-label="Today sections">
           {(
             [
               ["today", briefing ? `Briefing · ${briefing.date}` : "Briefing"],
               ["tasks", "Tasks"],
+              ["calendar", "Calendar"],
+              ["automations", "Automations"],
               ["settings", "Settings"],
             ] as [Tab, string][]
           ).map(([key, label]) => (
@@ -108,7 +111,14 @@ export function TodayPanel({
             />
           )}
           {tab === "tasks" && <TaskList key={version} onChanged={changed} />}
-          {tab === "settings" && <Settings />}
+          {tab === "calendar" && <CalendarView />}
+          {tab === "automations" && <AutomationsView />}
+          {tab === "settings" && (
+            <>
+              <Settings />
+              <AccountsView />
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -138,6 +148,21 @@ function BriefingView({
   return (
     <div className="space-y-4" data-testid="briefing">
       {nothing && <p className="py-4 text-center text-muted">Nothing due. Add tasks in the Tasks tab, or ask Celius.</p>}
+      {briefing.calendar && (briefing.calendar.events as unknown[]).length > 0 && (
+        <section className="space-y-1" aria-label="Calendar today">
+          <h3 className="font-medium">Calendar today</h3>
+          <ul className="space-y-0.5 text-sm">
+            {(briefing.calendar.events as { id: string; text: string }[]).map((e) => (
+              <li key={e.id}>{e.text.replace(/ \(id .*\)$/, "")}</li>
+            ))}
+          </ul>
+          {(briefing.calendar.conflicts as { first: string; second: string; at: string }[]).map((c, i) => (
+            <p key={i} className="text-xs text-amber-700 dark:text-amber-300">
+              Conflict: {c.first} / {c.second} ({c.at})
+            </p>
+          ))}
+        </section>
+      )}
       <Section title="Overdue" tasks={briefing.overdue} onChanged={onChanged} />
       <Section title="Due today" tasks={briefing.due_today} onChanged={onChanged} />
       <Section title="Suggested order" tasks={briefing.plan} onChanged={onChanged} numbered />

@@ -217,7 +217,8 @@ builtin(
 )
 
 ASSISTANT_NOTE = (
-    "The user keeps a task list in Celius: use task_list, task_add and task_update when "
-    "they talk about to-dos, deadlines, reminders or planning, and daily_briefing to plan "
-    "their day. Don't change dates or priorities, or cancel tasks, unless they ask."
+    "The user keeps a task list and calendar in Celius: use the task and calendar tools when "
+    "they talk about to-dos, deadlines, appointments, reminders or planning, and "
+    "daily_briefing to plan their day. Don't change dates, priorities or events, cancel "
+    "anything, or send email, unless they ask."
 )

@@ -16,6 +16,7 @@ from app.config import Settings
 from app.db import SessionFactory
 from app.services import monitoring
 from app.services.assistant.tasks import fire_due_reminders
+from app.services.automation import engine as automation_engine
 from app.services.files.service import cleanup_expired_uploads
 from app.services.jobs import claim_next_job, recover_stale_jobs, run_job
 from app.services.model_gateway import ModelGateway
@@ -109,11 +110,16 @@ async def run_worker(
                     log.info("Started %d scheduled task(s)", fired)
                 if reminded := await fire_due_reminders(factory, settings):
                     log.info("Sent %d task reminder(s)", reminded)
+                fired_automations = await automation_engine.process_events(factory, settings)
+                fired_automations += await automation_engine.run_due(factory, settings)
+                if fired_automations:
+                    log.info("Fired %d automation(s)", fired_automations)
                 last_recovery = now
             if now - last_maintenance >= MAINTENANCE_INTERVAL_SECONDS:
                 if expired := await cleanup_expired_uploads(factory, settings):
                     log.info("Expired %d abandoned upload(s)", expired)
                 await prune_stream_events(factory, settings.run_delta_retention_minutes)
+                await automation_engine.prune(factory)
                 await _record_sandbox_health(settings)
                 await _monitor(factory, settings, gateway, worker_id)
                 last_maintenance = now

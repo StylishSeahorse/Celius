@@ -10,6 +10,7 @@ from app.api.v1 import (
     exports,
     files,
     health,
+    integrations,
     memory,
     messages,
     models,
@@ -38,5 +39,6 @@ router.include_router(memory.router)
 router.include_router(skills.router)
 router.include_router(agent_tasks.router)
 router.include_router(assistant.router)
+router.include_router(integrations.router)
 router.include_router(push.router)
 router.include_router(admin.router)

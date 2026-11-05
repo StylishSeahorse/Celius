@@ -39,6 +39,8 @@ BODIES = {
     ("POST", "/api/v1/skills/{skill_id}/feedback"): {"outcome": "success"},
     ("PATCH", "/api/v1/agent-tasks/{agent_task_id}"): {"status": "abandoned"},
     ("PATCH", "/api/v1/tasks/{user_task_id}"): {"title": "taken over"},
+    ("PATCH", "/api/v1/integrations/accounts/{account_id}"): {"name": "taken over"},
+    ("PATCH", "/api/v1/automations/{automation_id}"): {"name": "taken over"},
     ("PATCH", "/api/v1/projects/{project_id}"): {"name": "taken over"},
     ("PUT", "/api/v1/projects/{project_id}/members/{username}"): {"role": "write"},
     ("PATCH", "/api/v1/conversations/{conversation_id}"): {"title": "taken over"},
@@ -52,6 +54,7 @@ BODIES = {
 QUERIES = {
     ("DELETE", "/api/v1/admin/users/{user_id}"): "?confirm=alice",
     ("GET", "/api/v1/conversations/{conversation_id}/workspace/file"): "?path=a.txt",
+    ("GET", "/api/v1/email/messages/{email_id}"): "?account_id={account_id}",
 }
 # Not about someone's data.
 SKIP = {
@@ -168,6 +171,29 @@ async def alices_world(client, sessionmaker, settings, gateway, fake, admin_head
         "/api/v1/tasks", json={"title": "Alice's errand", "notes": "Secret"}, headers=alice
     )
     ids["user_task_id"] = errand.json()["id"]
+    calendar_account = await client.post(
+        "/api/v1/integrations/accounts",
+        json={
+            "kind": "calendar",
+            "provider": "caldav",
+            "name": "Alice's calendar",
+            "config": {"url": "https://cal.example.com/alice/", "username": "alice"},
+            "password": "Secret",
+        },
+        headers=alice,
+    )
+    ids["account_id"] = calendar_account.json()["id"]
+    ids["email_id"] = "987654321"
+    rule = await client.post(
+        "/api/v1/automations",
+        json={
+            "name": "Alice's rule",
+            "trigger": {"type": "task_overdue"},
+            "actions": [{"type": "notify", "body": "Secret"}],
+        },
+        headers=alice,
+    )
+    ids["automation_id"] = rule.json()["id"]
     profile = await client.post("/api/v1/tool-profiles", json={"name": "Mine"}, headers=alice)
     ids["profile_id"] = profile.json()["key"].removeprefix("custom:")
     schedule = await client.post(
@@ -203,7 +229,7 @@ async def test_nobody_reaches_anyone_elses_data(
     reached = []
     for method, path in routes():
         url = re.sub(r"\{([^}]+)\}", lambda m: ids[m.group(1)], path)
-        url += QUERIES.get((method, path), "")
+        url += QUERIES.get((method, path), "").format(**ids)
         body = BODIES.get((method, path))
         if path.endswith("/content"):
             response = await client.request(method, url, content=b"hello", headers=bob)
@@ -231,6 +257,9 @@ async def test_nobody_reaches_anyone_elses_data(
         "/api/v1/skills?status=active",
         "/api/v1/agent-tasks?status=all",
         "/api/v1/tasks?status=all",
+        "/api/v1/integrations/accounts",
+        "/api/v1/automations",
+        "/api/v1/calendar/events",
         "/api/v1/assistant/briefing",
         "/api/v1/tool-profiles",
         "/api/v1/schedules",

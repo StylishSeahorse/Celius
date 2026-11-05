@@ -203,8 +203,10 @@ async def test_briefing_and_suggested_order(client, auth_headers):
     assert [t["title"] for t in briefing["due_today"]] == ["Today's call"]
     assert [t["title"] for t in briefing["upcoming"]] == ["Tomorrow's prep"]
     assert [t["title"] for t in briefing["plan"]][:2] == ["Overdue invoice", "Today's call"]
-    assert briefing["calendar"] is None
-    assert "Overdue:" in briefing["text"] and "Calendar: not connected." in briefing["text"]
+    assert briefing["calendar"] == {"events": [], "conflicts": [], "problems": []}
+    assert (
+        "Overdue:" in briefing["text"] and "Calendar today: nothing scheduled." in briefing["text"]
+    )
     assert briefing["waiting"] == {"approvals": 0, "memories": 0, "skills": 0}
 
 
@@ -353,7 +355,7 @@ async def test_task_tools_in_a_chat(client, auth_headers, sessionmaker, gateway,
         project_id=project["id"],
     )
     system = fake.requests[-1]["messages"][0]["content"]
-    assert "The user keeps a task list in Celius" in system
+    assert "The user keeps a task list and calendar in Celius" in system
     listed = fake.requests[-1]["messages"][-1]["content"]
     assert (
         "Fix the gate, due " + due in listed

@@ -217,7 +217,7 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
         if (changes.some((c) => c.entity_type === "memory" || c.entity_type === "skill")) refreshMemory();
         void refreshList();
         if (changes.some((c) => c.entity_type === "message")) refreshApprovals();
-        if (changes.some((c) => c.entity_type === "user_task")) {
+        if (changes.some((c) => ["user_task", "automation", "calendar_event"].includes(c.entity_type))) {
           refreshMemory();
           window.dispatchEvent(new Event("celius:user-tasks-changed"));
         }

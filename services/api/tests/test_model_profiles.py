@@ -308,7 +308,14 @@ def test_tool_budget_keeps_core_tools_and_adds_the_cheapest_rest():
     assert CORE_TOOLS <= kept
     assert sum(tool_tokens(offered[n]) for n in kept) <= core_cost + 300
     extra = kept - CORE_TOOLS
-    assert extra and all(not offered[n].optional for n in extra)  # cheap, non-optional first
+    # Non-optional tools are added first, cheapest first: the cheapest one is kept, and
+    # an optional tool is only kept once no left-out non-optional tool would still fit.
+    others = [n for n in offered if n not in CORE_TOOLS and not offered[n].optional]
+    assert min(others, key=lambda n: tool_tokens(offered[n])) in extra
+    if any(offered[n].optional for n in extra):
+        used = sum(tool_tokens(offered[n]) for n in kept if not offered[n].optional)
+        skipped = [n for n in others if n in left_out]
+        assert all(used + tool_tokens(offered[n]) > core_cost + 300 for n in skipped)
     assert fit_to_budget(offered, 10**6) == {}  # big contexts keep everything
     assert set(fit_to_budget(offered, 0)) == set(offered) - CORE_TOOLS  # core always stays
 

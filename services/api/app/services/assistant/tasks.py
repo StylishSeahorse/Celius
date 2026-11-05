@@ -265,6 +265,8 @@ async def create(
     await db.flush()
     audit(db, owner_id, "user_task.created", "user_task", task.id, source=source)
     _changed(db, task)
+    if status != "suggested" and source != "automation":  # no loops: rules don't feed rules
+        await _emit(db, task, "task_created", settings)
     return task
 
 
@@ -339,6 +341,7 @@ async def change(
                 following = await _next_occurrence(db, task, tz)
         elif status in ACTIVE_TASK_STATUSES:
             task.completed_at = None
+        await _emit(db, task, "task_status", settings)
     audit(
         db,
         task.owner_id,
@@ -350,6 +353,14 @@ async def change(
     )
     _changed(db, task)
     return following
+
+
+async def _emit(db: AsyncSession, task: UserTask, kind: str, settings: Settings) -> None:
+    """Tell the automation engine (ADR C-11)."""
+    from app.services.automation.engine import emit, task_context
+
+    tz = zone((await user_prefs(db, task.owner_id, settings)).timezone)
+    await emit(db, task.owner_id, kind, task_context(task, tz))
 
 
 async def _next_occurrence(db: AsyncSession, task: UserTask, tz: ZoneInfo) -> UserTask:
@@ -567,7 +578,52 @@ async def briefing(
         "blocked": [t for t in tasks if blocked(t, by_id)],
         "agent_tasks": [(task, title) for task, title in agent],
         "waiting": {"approvals": approvals, "memories": memories, "skills": skills},
-        "calendar": None,
+        "calendar": await _calendar_today(db, owner_id, settings, tz, today, tasks),
+    }
+
+
+async def _calendar_today(db, owner_id, settings, tz, today, tasks) -> dict:
+    """Today's events from every calendar, overlaps, and timed deadlines that fall inside
+    an event (you'll be busy then)."""
+    from app.services.integrations import calendar as cal
+
+    start = datetime.combine(today, time(0, 0), tz).astimezone(UTC)
+    events, problems = await cal.list_events(
+        db, owner_id, start, start + timedelta(days=1), settings, tz
+    )
+    clashes = [
+        {"first": a.title, "second": b.title, "at": cal.describe(b, tz)}
+        for a, b in cal.conflicts(events)
+    ]
+    for task in tasks:
+        if task.due_at is None or task.due_all_day or task.status not in ACTIVE_TASK_STATUSES:
+            continue
+        due = _aware(task.due_at)
+        for event in events:
+            if not event.all_day and cal._aware(event.start) <= due < cal._aware(event.end):
+                clashes.append(
+                    {
+                        "first": task.title,
+                        "second": event.title,
+                        "at": f"deadline during {event.title}",
+                    }
+                )
+    return {
+        "events": [
+            {
+                "id": e.id,
+                "title": e.title,
+                "calendar": e.calendar,
+                "start": e.start.isoformat(),
+                "end": e.end.isoformat(),
+                "all_day": e.all_day,
+                "location": e.location,
+                "text": cal.describe(e, tz),
+            }
+            for e in events
+        ],
+        "conflicts": clashes,
+        "problems": problems,
     }
 
 
@@ -619,7 +675,16 @@ def briefing_text(data: dict) -> str:
             f"Waiting for the user: {waiting['approvals']} approvals, "
             f"{waiting['memories']} memories and {waiting['skills']} skills to review"
         )
-    lines.append("Calendar: not connected.")
+    calendar = data.get("calendar") or {}
+    if calendar.get("events"):
+        lines.append("Calendar today:")
+        lines += [f"- {e['text']}" for e in calendar["events"]]
+    else:
+        lines.append("Calendar today: nothing scheduled.")
+    for clash in calendar.get("conflicts") or []:
+        lines.append(f"Conflict: {clash['first']} / {clash['second']} ({clash['at']})")
+    for problem in calendar.get("problems") or []:
+        lines.append(f"(A calendar couldn't be read: {problem})")
     if len(lines) <= 2:
         lines.insert(1, "No open tasks.")
     return "\n".join(lines)

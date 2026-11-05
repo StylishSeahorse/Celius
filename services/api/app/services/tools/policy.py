@@ -187,10 +187,16 @@ async def conversation_grants(db: AsyncSession, conversation_id: uuid.UUID) -> s
     return set(rows.all())
 
 
-def decide(profile: Profile, tool_name: str, risk: Risk, grants: set[str]) -> Verdict:
+def decide(
+    profile: Profile, tool_name: str, risk: Risk, grants: set[str], *, always_ask: bool = False
+) -> Verdict:
     decision = profile.decide(tool_name, risk)
     if decision == "deny":
         return Verdict("deny", "policy", f"Not allowed by the {profile.label} profile")
+    if always_ask:
+        # Acts in the user's name outside Celius (sends an email): never allowed by a
+        # profile or a grant, only by the user, each time (ADR C-11).
+        return Verdict("ask", "policy", "Asks every time: it acts in your name")
     if decision == "ask" and tool_name in grants:
         return Verdict("allow", "grant", "Allowed for this conversation")
     if decision == "ask" and ALL_TOOLS in grants:

@@ -724,7 +724,9 @@ class _Loop:
             )
         if name in toolset.unavailable:
             return refuse(toolset.unavailable[name], "system")
-        verdict = decide(toolset.profile, name, spec.risk, toolset.grants)
+        verdict = decide(
+            toolset.profile, name, spec.risk, toolset.grants, always_ask=spec.always_ask
+        )
         row.decision_source, row.decision_reason = verdict.source, verdict.reason
         if verdict.decision == "deny":
             return refuse(verdict.reason)

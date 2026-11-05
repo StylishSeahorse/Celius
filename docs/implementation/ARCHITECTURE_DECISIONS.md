@@ -343,3 +343,72 @@ tasks are the user's to-dos. They are kept apart on purpose.
 lifecycle); suggestions as notifications (intrusive); a model-written plan stored as
 truth (the plan is computed; the model only explains it); reminders through the model
 (they must fire whether or not inference is available).
+
+---
+
+## C-11: Calendar and email providers, the sending rule, and the automation engine
+
+Status: accepted · 2026-11-05
+
+**Accounts.** `integration_accounts` (migration 0015): kind (`calendar`, `email`),
+provider (`caldav`, `imap`), non-secret settings, credentials sealed with
+`services/secrets.py` (never returned; the API says only whether one is set), enabled,
+last error. Like MCP servers, reaching a server on the local network (a home Nextcloud
+or mail server) needs `allow_private_network`, which only an administrator can set.
+
+**Calendar.** One interface over Celius's own calendar (`calendar_events`, always
+there, events can block time for a task) and CalDAV accounts (Nextcloud, Radicale,
+iCloud, Fastmail…). CalDAV through the SSRF-guarded HTTP client; recurring events are
+expanded by the server (`calendar-query` with `<expand>`), so RRULE is never evaluated
+locally. iCalendar is read and written by a small in-repo module (the needed subset:
+folding, escaping, TZID/UTC/floating/all-day, DURATION); a library was not added. A
+calendar object holding several events, or a repeat rule, is **read-only** from Celius:
+rewriting it would drop the others (a data-loss bug the tests caught). A calendar that
+fails doesn't hide the others; its problem is reported. The briefing gains today's
+events, overlaps, and timed deadlines that fall inside an event. Recurring local events,
+free/busy across other people, and invitations are not implemented.
+
+**Email.** IMAP/SMTP (Gmail, Outlook/Microsoft 365, Fastmail with app passwords; OAuth
+providers are not implemented). The standard library clients are subclassed to connect
+to an address checked by netguard (TLS still verifies the host name), so a mail host
+name can't reach the server's own network. Reading uses `BODY.PEEK` (never marks read);
+search criteria are quoted and refuse line breaks; recipients are validated (≤ 20);
+messages are built with `EmailMessage` (no header injection). Drafts are appended to the
+Drafts folder with `\Draft`. Email content reaches the model inside `<email>` tags with
+a note that it is data and must never prompt sending.
+
+**Sending always asks.** `ToolSpec.always_ask` makes `policy.decide` answer "ask" for
+every call, whatever the profile, and the approval endpoint neither records "always
+allow this tool" for it nor lets "allow all for this chat" approve it. Only
+`email_send` has it. The model can't change it; a test runs it under the
+Administrator profile with "allow all" granted. Users can still send from the UI.
+
+**Tools.** `calendar_events` (events, overlaps, free time 08–18), `email_search`,
+`email_read`, `automation_list` read; `calendar_add`, `calendar_change`, `email_draft`
+external; `email_send` external + always_ask; `automation_create` write. Email tools are
+offered only once an email account exists; `calendar_change`, `email_send`,
+`automation_*` are optional (left out on lite and when the tool budget is tight).
+
+**Automation engine** (`services/automation/`), on the worker loop, no model needed:
+- Definitions: trigger + conditions (field/op/value over `task.*`, `email.*`, `page.*`)
+  + 1–5 actions; validated server-side whoever writes them (UI JSON, recipes, or the
+  model's `automation_create`, which is how natural-language rules are made).
+- Triggers: `schedule` (daily/weekly/interval, the user's time zone), `task_overdue`
+  and `task_due_soon` (checked every 5 minutes, each task once per deadline),
+  `task_status` and `task_created` (events recorded when tasks change; rules' own
+  tasks don't emit, so rules can't feed each other), `email_received` (new UIDs since
+  the last check; the first check only records the position, so old mail never fires)
+  and `web_page_changed` (text hash through the guarded web client; the change is
+  quoted). Network checks run as `automation.check` jobs so a slow server never holds
+  up the worker loop. Claims are conditional UPDATEs (several workers fire once).
+- Actions: `notify` (Web Push), `create_task`, `run_prompt` (a new conversation, the
+  read-only tool profile by default and never wider than the user may use; what
+  triggered it is appended inside `<trigger_data>` as data).
+- History: `automation_runs` (status, reason, what each action did, error), the last
+  200 kept. After 5 failures in a row an automation switches itself off with the
+  reason and the user is notified; switching it on again resets the count. At most 50
+  automations per user.
+
+**Rejected.** A workflow DSL or visual editor (recipes + validated JSON + the model
+cover it); polling email with the model; storing provider passwords in environment
+variables; letting a profile or grant skip the send confirmation.

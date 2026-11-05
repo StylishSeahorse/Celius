@@ -1,6 +1,226 @@
 {
   "components": {
     "schemas": {
+      "AccountCheck": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "title": "AccountCheck",
+        "type": "object"
+      },
+      "AccountCreate": {
+        "properties": {
+          "allow_private_network": {
+            "default": false,
+            "title": "Allow Private Network",
+            "type": "boolean"
+          },
+          "config": {
+            "additionalProperties": true,
+            "title": "Config",
+            "type": "object"
+          },
+          "kind": {
+            "enum": [
+              "calendar",
+              "email"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "password": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
+          },
+          "provider": {
+            "enum": [
+              "caldav",
+              "imap"
+            ],
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "provider",
+          "name",
+          "config"
+        ],
+        "title": "AccountCreate",
+        "type": "object"
+      },
+      "AccountOut": {
+        "properties": {
+          "allow_private_network": {
+            "title": "Allow Private Network",
+            "type": "boolean"
+          },
+          "config": {
+            "additionalProperties": true,
+            "title": "Config",
+            "type": "object"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "has_password": {
+            "title": "Has Password",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "last_checked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Checked At"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "provider",
+          "name",
+          "config",
+          "has_password",
+          "allow_private_network",
+          "enabled",
+          "last_error",
+          "last_checked_at"
+        ],
+        "title": "AccountOut",
+        "type": "object"
+      },
+      "AccountUpdate": {
+        "properties": {
+          "allow_private_network": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allow Private Network"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "password": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
+          }
+        },
+        "title": "AccountUpdate",
+        "type": "object"
+      },
       "ActivityItem": {
         "description": "A run or background job, for the activity panel.",
         "properties": {
@@ -706,6 +926,278 @@
           }
         },
         "title": "AssistantSettingsUpdate",
+        "type": "object"
+      },
+      "AutomationCreate": {
+        "properties": {
+          "actions": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "maxItems": 5,
+            "minItems": 1,
+            "title": "Actions",
+            "type": "array"
+          },
+          "conditions": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "maxItems": 10,
+            "title": "Conditions",
+            "type": "array"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "trigger": {
+            "additionalProperties": true,
+            "title": "Trigger",
+            "type": "object"
+          }
+        },
+        "required": [
+          "name",
+          "trigger",
+          "actions"
+        ],
+        "title": "AutomationCreate",
+        "type": "object"
+      },
+      "AutomationOut": {
+        "properties": {
+          "actions": {
+            "items": {},
+            "title": "Actions",
+            "type": "array"
+          },
+          "conditions": {
+            "items": {},
+            "title": "Conditions",
+            "type": "array"
+          },
+          "consecutive_failures": {
+            "title": "Consecutive Failures",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "string"
+          },
+          "disabled_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disabled Reason"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At"
+          },
+          "last_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Status"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "next_check_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Check At"
+          },
+          "trigger": {
+            "additionalProperties": true,
+            "title": "Trigger",
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "enabled",
+          "trigger",
+          "conditions",
+          "actions",
+          "next_check_at",
+          "last_run_at",
+          "last_status",
+          "consecutive_failures",
+          "disabled_reason",
+          "created_by",
+          "created_at"
+        ],
+        "title": "AutomationOut",
+        "type": "object"
+      },
+      "AutomationRunOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "detail": {
+            "additionalProperties": true,
+            "title": "Detail",
+            "type": "object"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "reason",
+          "detail",
+          "error",
+          "created_at"
+        ],
+        "title": "AutomationRunOut",
+        "type": "object"
+      },
+      "AutomationUpdate": {
+        "properties": {
+          "actions": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "maxItems": 5,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actions"
+          },
+          "conditions": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "maxItems": 10,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conditions"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "trigger": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger"
+          }
+        },
+        "title": "AutomationUpdate",
         "type": "object"
       },
       "Briefing": {
@@ -1449,6 +1941,180 @@
         "title": "DenyToolCall",
         "type": "object"
       },
+      "EmailCompose": {
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "body": {
+            "maxLength": 50000,
+            "minLength": 1,
+            "title": "Body",
+            "type": "string"
+          },
+          "cc": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Cc",
+            "type": "array"
+          },
+          "reply_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply To"
+          },
+          "subject": {
+            "default": "",
+            "maxLength": 300,
+            "title": "Subject",
+            "type": "string"
+          },
+          "to": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "To",
+            "type": "array"
+          }
+        },
+        "required": [
+          "account_id",
+          "body"
+        ],
+        "title": "EmailCompose",
+        "type": "object"
+      },
+      "EmailOut": {
+        "properties": {
+          "attachments": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Attachments",
+            "type": "array"
+          },
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "cc": {
+            "title": "Cc",
+            "type": "string"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "sender": {
+            "title": "Sender",
+            "type": "string"
+          },
+          "snippet": {
+            "title": "Snippet",
+            "type": "string"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          },
+          "to": {
+            "title": "To",
+            "type": "string"
+          },
+          "unread": {
+            "title": "Unread",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "sender",
+          "to",
+          "subject",
+          "date",
+          "snippet",
+          "unread",
+          "cc",
+          "body",
+          "attachments"
+        ],
+        "title": "EmailOut",
+        "type": "object"
+      },
+      "EmailSummaryOut": {
+        "properties": {
+          "date": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "sender": {
+            "title": "Sender",
+            "type": "string"
+          },
+          "snippet": {
+            "title": "Snippet",
+            "type": "string"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          },
+          "to": {
+            "title": "To",
+            "type": "string"
+          },
+          "unread": {
+            "title": "Unread",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "sender",
+          "to",
+          "subject",
+          "date",
+          "snippet",
+          "unread"
+        ],
+        "title": "EmailSummaryOut",
+        "type": "object"
+      },
       "EntityBrief": {
         "properties": {
           "id": {
@@ -1590,6 +2256,286 @@
           "memories"
         ],
         "title": "EntityOut",
+        "type": "object"
+      },
+      "EventChange": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End"
+          },
+          "id": {
+            "maxLength": 2000,
+            "title": "Id",
+            "type": "string"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "EventChange",
+        "type": "object"
+      },
+      "EventCreate": {
+        "properties": {
+          "calendar": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calendar"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "start": {
+            "title": "Start",
+            "type": "string"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "title": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "start"
+        ],
+        "title": "EventCreate",
+        "type": "object"
+      },
+      "EventList": {
+        "properties": {
+          "conflicts": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Conflicts",
+            "type": "array"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/EventOut"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Problems",
+            "type": "array"
+          }
+        },
+        "required": [
+          "events",
+          "conflicts",
+          "problems"
+        ],
+        "title": "EventList",
+        "type": "object"
+      },
+      "EventOut": {
+        "properties": {
+          "all_day": {
+            "title": "All Day",
+            "type": "boolean"
+          },
+          "calendar": {
+            "title": "Calendar",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "editable": {
+            "title": "Editable",
+            "type": "boolean"
+          },
+          "end": {
+            "format": "date-time",
+            "title": "End",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "start": {
+            "format": "date-time",
+            "title": "Start",
+            "type": "string"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "calendar",
+          "title",
+          "start",
+          "end",
+          "all_day",
+          "location",
+          "description",
+          "editable",
+          "task_id"
+        ],
+        "title": "EventOut",
+        "type": "object"
+      },
+      "EventRef": {
+        "properties": {
+          "id": {
+            "maxLength": 2000,
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "EventRef",
         "type": "object"
       },
       "ExportCreate": {
@@ -5835,7 +6781,9 @@
               "memory",
               "skill",
               "agent_task",
-              "user_task"
+              "user_task",
+              "automation",
+              "calendar_event"
             ],
             "title": "Entity Type",
             "type": "string"
@@ -8109,6 +9057,373 @@
         ]
       }
     },
+    "/api/v1/automations": {
+      "get": {
+        "operationId": "list_automations_api_v1_automations_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AutomationOut"
+                  },
+                  "title": "Response List Automations Api V1 Automations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Automations",
+        "tags": [
+          "integrations"
+        ]
+      },
+      "post": {
+        "operationId": "create_automation_api_v1_automations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutomationCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Automation",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/v1/automations/{automation_id}": {
+      "delete": {
+        "operationId": "delete_automation_api_v1_automations__automation_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "automation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Automation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Automation",
+        "tags": [
+          "integrations"
+        ]
+      },
+      "patch": {
+        "operationId": "update_automation_api_v1_automations__automation_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "automation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Automation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutomationUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Automation",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/v1/automations/{automation_id}/runs": {
+      "get": {
+        "operationId": "automation_runs_api_v1_automations__automation_id__runs_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "automation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Automation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AutomationRunOut"
+                  },
+                  "title": "Response Automation Runs Api V1 Automations  Automation Id  Runs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Automation Runs",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/v1/calendar/events": {
+      "get": {
+        "operationId": "calendar_events_api_v1_calendar_events_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 10,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 7,
+              "maximum": 62,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Calendar Events",
+        "tags": [
+          "integrations"
+        ]
+      },
+      "post": {
+        "operationId": "create_event_api_v1_calendar_events_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Event",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/v1/calendar/events/delete": {
+      "post": {
+        "operationId": "delete_event_api_v1_calendar_events_delete_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventRef"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Event",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/v1/calendar/events/update": {
+      "post": {
+        "operationId": "update_event_api_v1_calendar_events_update_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Event",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
     "/api/v1/conversations": {
       "get": {
         "operationId": "list_conversations_api_v1_conversations_get",
@@ -8699,6 +10014,237 @@
         "summary": "Download Workspace File",
         "tags": [
           "tools"
+        ]
+      }
+    },
+    "/api/v1/email/drafts": {
+      "post": {
+        "operationId": "save_draft_api_v1_email_drafts_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailCompose"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Save Draft Api V1 Email Drafts Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Draft",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/v1/email/messages": {
+      "get": {
+        "operationId": "search_email_api_v1_email_messages_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Account Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "unread",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Unread",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "since_days",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 365,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EmailSummaryOut"
+                  },
+                  "title": "Response Search Email Api V1 Email Messages Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Email",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/v1/email/messages/{email_id}": {
+      "get": {
+        "operationId": "read_email_api_v1_email_messages__email_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "email_id",
+            "required": true,
+            "schema": {
+              "title": "Email Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Account Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Email",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/v1/email/send": {
+      "post": {
+        "description": "The user sends from the UI (the model's email_send asks the user every time).",
+        "operationId": "send_email_api_v1_email_send_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailCompose"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Send Email Api V1 Email Send Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Send Email",
+        "tags": [
+          "integrations"
         ]
       }
     },
@@ -9304,6 +10850,201 @@
         "summary": "Ready",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/v1/integrations/accounts": {
+      "get": {
+        "operationId": "list_accounts_api_v1_integrations_accounts_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AccountOut"
+                  },
+                  "title": "Response List Accounts Api V1 Integrations Accounts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Accounts",
+        "tags": [
+          "integrations"
+        ]
+      },
+      "post": {
+        "operationId": "create_account_api_v1_integrations_accounts_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Account",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/v1/integrations/accounts/{account_id}": {
+      "delete": {
+        "operationId": "delete_account_api_v1_integrations_accounts__account_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Account Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Account",
+        "tags": [
+          "integrations"
+        ]
+      },
+      "patch": {
+        "operationId": "update_account_api_v1_integrations_accounts__account_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Account Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Account",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/v1/integrations/accounts/{account_id}/check": {
+      "post": {
+        "description": "Connect and log in, without changing anything.",
+        "operationId": "check_account_api_v1_integrations_accounts__account_id__check_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Account Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountCheck"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check Account",
+        "tags": [
+          "integrations"
         ]
       }
     },

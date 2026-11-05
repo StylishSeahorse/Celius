@@ -23,6 +23,7 @@ from app.services.audit import audit
 from app.services.runs import append_event
 from app.services.sync import record_sync
 from app.services.tools.policy import ALL_TOOLS
+from app.services.tools.registry import always_asks
 
 
 def tool_call_out(call: ToolCall) -> ToolCallOut:
@@ -196,6 +197,8 @@ async def approve(
     )
     call.decided_at = utcnow()
     grant = ALL_TOOLS if remember_all else call.tool_name if remember else None
+    if grant == call.tool_name and always_asks(call.tool_name):
+        grant = None  # this tool asks every time: nothing to remember
     if grant and await db.get(ToolGrant, (call.conversation_id, grant)) is None:
         db.add(ToolGrant(conversation_id=call.conversation_id, tool_name=grant, owner_id=user.id))
     audit(
@@ -234,6 +237,8 @@ async def _approve_waiting(
     for other in waiting:
         if other.expires_at is not None and _aware(other.expires_at) < utcnow():
             continue  # left for expiry, which tells the model
+        if always_asks(other.tool_name):
+            continue  # asks every time, even after "allow all"
         other.status = ToolCallStatus.approved
         other.decision_source = "grant"
         other.decision_reason = "All tools approved for this conversation"

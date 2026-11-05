@@ -9,13 +9,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import app.services.tools.assistant  # noqa: F401 - registers the personal-assistant tools
 import app.services.tools.builtin  # noqa: F401 - registers the built-in tools
+import app.services.tools.integrations  # noqa: F401 - calendar, email, automations
 import app.services.tools.plan  # noqa: F401 - registers the plan tools
 import app.services.tools.skills  # noqa: F401 - registers the skill tools
 import app.services.tools.websearch  # noqa: F401 - registers web_search
 from app.config import Settings
-from app.models import Conversation, McpServer, Skill, UserSettings
+from app.models import Conversation, IntegrationAccount, McpServer, Skill, UserSettings
 from app.services.context import estimate_tokens
 from app.services.memory.store import memory_active_for
+from app.services.tools.integrations import EMAIL_TOOLS
 from app.services.tools.mcp import server_headers, specs_for
 from app.services.tools.policy import (
     Profile,
@@ -123,7 +125,8 @@ def fit_to_budget(offered: dict[str, ToolSpec], max_tokens: int) -> dict[str, st
     return left_out
 
 
-NOT_PERMISSION_REASONS = ("No skills saved yet", COMPACT_REASON)
+NO_EMAIL_REASON = "No email account connected"
+NOT_PERMISSION_REASONS = ("No skills saved yet", COMPACT_REASON, NO_EMAIL_REASON)
 
 
 async def build_toolset(
@@ -148,6 +151,18 @@ async def build_toolset(
     if not has_skills:
         for name in SKILL_TOOLS_NEEDING_SKILLS:
             unavailable.setdefault(name, "No skills saved yet")
+    has_email = await db.scalar(
+        select(func.count())
+        .select_from(IntegrationAccount)
+        .where(
+            IntegrationAccount.owner_id == conversation.owner_id,
+            IntegrationAccount.kind == "email",
+            IntegrationAccount.enabled.is_(True),
+        )
+    )
+    if not has_email:
+        for name in EMAIL_TOOLS:
+            unavailable.setdefault(name, NO_EMAIL_REASON)
     if compact:  # the lite profile (model_registry): leave optional tools out
         for name, spec in known.items():
             if spec.optional:

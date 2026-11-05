@@ -2,6 +2,11 @@
 // envelope lives here; it is defined by packages/contracts, not by OpenAPI.
 
 export type {
+  Automation,
+  AutomationRun,
+  CalendarEvent,
+  CalendarEventList,
+  IntegrationAccount,
   AssistantSettings,
   Briefing,
   UserTask,
