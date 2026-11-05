@@ -171,3 +171,47 @@ Status: accepted · 2026-11-05
 SKILL.md frontmatter is YAML. PyYAML was already locked as a dev dependency; it moves to
 runtime (`safe_load` only). A hand-written subset parser was rejected: skills from other
 tools use the full syntax (nested `metadata`, lists, quoting).
+
+---
+
+## C-08: Task state outside the model; checkpoints at the end of every run
+
+Status: accepted · 2026-11-05
+
+**Context.** A run already survives a worker crash (persisted tool calls, leases), but
+the *work* lived only in the conversation: when older turns no longer fit the context, or
+a reply failed, was stopped or ran out of tool steps, the model had to rediscover what it
+was doing. Small local models are poor at this.
+
+**Decision.** An `agent_tasks` row per piece of multi-step work (one open per chat):
+objective, plan (numbered steps with status and note), blockers, verifications, notes,
+files, counters, status (`active`, `paused`, `blocked`, `completed`, `failed`,
+`abandoned`). `agent_task_events` keeps the history and a checkpoint per run.
+
+- The **model** writes intent: `plan_start` (objective and steps) and `plan_update`
+  (step status/note, new steps, findings, blockers, verification results, task status).
+  These tools change only Celius's record, so they are `read` risk.
+- The **backend** writes facts the model can't be trusted to report: files the tools
+  wrote or changed (from tool arguments and the sandbox's changed-files list), tool calls
+  and failures, and a checkpoint when each run ends. A failed or stopped reply, or one
+  that used all its tool steps with work left, **pauses** the task with the reason; the
+  next run in the chat (a user message, or `POST /agent-tasks/{id}/resume`) resumes it
+  and is told it was interrupted.
+- Every run in the chat gets the state in its system prompt (`<task_state>`, at most
+  ~3,500 characters), marked as a record rather than instructions, so the work continues
+  even when the history that created it has been trimmed.
+- Completion needs every step done or skipped; completing without a passing
+  verification is allowed but flagged (`verified: false/None`) and the model is told to
+  say so.
+- Error recovery: after two failed tool calls in a row, the result tells the model to
+  step back, check its assumptions, change approach, or record a blocker. (The existing
+  rule refusing an identical retry of a failed call stays; a successful plan update now
+  resets it, as the state changed.)
+
+Tool definitions stay cheap: optional fields are sent without JSON Schema null
+boilerplate (`ToolSpec.parameters()` compacts every built-in tool's schema; pydantic
+still validates the arguments).
+
+**Rejected.** Keeping the plan in message parts only (lost with trimmed history, not
+queryable); letting the model report files and outcomes (unreliable); a separate planner
+model call per run (doubles inference time on one GPU).

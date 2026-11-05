@@ -2,6 +2,8 @@
 // envelope lives here; it is defined by packages/contracts, not by OpenAPI.
 
 export type {
+  AgentTask,
+  AgentTaskDetail,
   ConversationDetail,
   ConversationSummary,
   ActivityItem,

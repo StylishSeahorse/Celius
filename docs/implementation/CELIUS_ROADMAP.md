@@ -56,18 +56,24 @@ Related: [audit](AUDIT.md) · [decisions](ARCHITECTURE_DECISIONS.md) ·
 | Skill manager UI: list/search, review queue, versions with approve/reject/rollback/test, files, history, feedback, export, trust settings | ✅ | `features/skills/SkillsPanel.tsx`; e2e `skills.spec.ts` |
 | Import from the UI | ⬜ | API ready (`POST /skills/import`, zip body) |
 
-## Phase 3: agent orchestration ⬜
+## Phase 3: agent orchestration ✅
 
-Existing base: runs persist every tool call and resume after a worker crash
-(`executor._restore_steps`), with iteration and time limits.
+Existing base kept: runs persist every tool call and resume after a worker crash
+(`executor._restore_steps`), with iteration, time and output limits per reply.
 
-- ⬜ Task state outside the model: objective, plan, completed/outstanding steps,
-  blockers, files touched, verification results (an `agent_tasks` table linked to runs)
-- ⬜ `plan_update` / `task_status` tools; UNDERSTAND → PLAN → EXECUTE → OBSERVE → VERIFY →
-  REPORT prompt module for Standard/Advanced profiles
-- ⬜ Checkpoints and resuming an interrupted task in a new run from stored state
-- ⬜ Error-recovery hints (same call failed twice → change approach)
-- ⬜ Agent activity panel (current task, plan, progress)
+| Item | Status | Notes |
+| --- | --- | --- |
+| Task state outside the model: objective, plan, steps, blockers, files, verification, notes | ✅ | `agent_tasks` (migration 0012), C-08 |
+| Plan tools `plan_start`, `plan_update`, `plan_status` | ✅ | `services/tools/plan.py` (`plan_status` optional: compact toolsets) |
+| UNDERSTAND → PLAN → EXECUTE → OBSERVE → VERIFY → REPORT guidance | ✅ | short prompt note when no task is open; profile-specific prompts are Phase 4 |
+| Backend record: files written/changed, tool calls and failures | ✅ | from tool results, not from the model |
+| Checkpoint at the end of every run; pause on failure, stop or tool-step limit | ✅ | `agent_task_events` |
+| Recovery: state in every run's system prompt (survives trimmed history), resume API | ✅ | `POST /agent-tasks/{id}/resume` |
+| Completion rules: steps finished; unverified completion flagged | ✅ | `verified` per task |
+| Error-recovery hint after consecutive tool failures | ✅ | executor `RECOVERY_*` |
+| Activity view: task card in the chat (plan, progress, blockers, checks, files; resume, done, stop) | ✅ | `TaskCard.tsx`, e2e `tasks.spec.ts` |
+| Task list across chats (dashboard) | ⬜ | API ready (`GET /agent-tasks?status=…`); belongs with the Phase 5 dashboard |
+| Per-task limits (replies, tool calls) | ⬜ | per-reply limits exist; counts are recorded per task for a later cap |
 
 ## Phase 4: local model intelligence ⬜
 
@@ -109,11 +115,11 @@ Existing base: scheduled prompts (`scheduled_tasks`), MCP servers, web push.
 
 ## Next (continuation point)
 
-1. Phase 3: an `agent_tasks` table (objective, plan, steps, blockers, files, verification)
-   linked to runs; `plan_update`/`task_status` tools; resuming an interrupted task from
-   stored state in a new run; an activity view of the plan. Start from
-   `services/api/app/worker/executor.py` (`_prepare`, `_Loop`, `_restore_steps`).
-2. Phase 4: split `_prepare`'s system prompt into modules and add per-model prompt
-   profiles to `model_catalog` (admin-editable), with tool filtering for Lite.
+1. Phase 4: split `_prepare`'s system prompt (`services/api/app/worker/executor.py`) into
+   modules (identity, principles, memory, skills, task, tools, security, project) and add
+   per-model prompt profiles (lite/standard/advanced) to `model_catalog`, admin-editable,
+   building on the compact toolset (`TOOL_COMPACT_BELOW_CONTEXT_TOKENS`).
+2. Phase 5: personal tasks and reminders; the assistant dashboard can list agent tasks
+   across chats from `GET /agent-tasks`.
 3. Small follow-ups: entity browser and skill import in the UI; a periodic memory
    consolidation job; measure retrieval precision/recall before tuning `MEMORY_WEIGHT_*`.

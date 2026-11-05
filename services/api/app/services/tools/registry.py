@@ -65,7 +65,7 @@ class ToolSpec:
         if self.schema is not None:
             return self.schema
         assert self.args_model is not None
-        return _strip_titles(self.args_model.model_json_schema())
+        return _compact(_strip_titles(self.args_model.model_json_schema()))
 
     def openai(self) -> dict[str, Any]:
         return {
@@ -110,6 +110,25 @@ def _strip_titles(schema: Any) -> Any:
     if isinstance(schema, list):
         return [_strip_titles(v) for v in schema]
     return schema
+
+
+def _compact(schema: Any) -> Any:
+    """Tool definitions are prompt tokens on every request: drop JSON Schema boilerplate
+    that pydantic emits for optional fields (`anyOf: [X, {"type": "null"}]` becomes X and
+    `"default": null` goes). Optional fields are simply not `required`; the arguments
+    are still validated by the pydantic model, which accepts null for them."""
+    if isinstance(schema, list):
+        return [_compact(v) for v in schema]
+    if not isinstance(schema, dict):
+        return schema
+    out = {k: _compact(v) for k, v in schema.items() if not (k == "default" and v is None)}
+    options = out.get("anyOf")
+    if isinstance(options, list):
+        rest = [o for o in options if o != {"type": "null"}]
+        if len(rest) == 1 and len(rest) < len(options):
+            out.pop("anyOf")
+            out = {**rest[0], **out}
+    return out
 
 
 BUILTIN: dict[str, ToolSpec] = {}

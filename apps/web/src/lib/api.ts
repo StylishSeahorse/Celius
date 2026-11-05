@@ -1,4 +1,6 @@
 import type {
+  AgentTask,
+  AgentTaskDetail,
   ActivityItem,
   ConversationDetail,
   ConversationMemory,
@@ -274,6 +276,16 @@ export const api = {
     request<void>(`/memory/conflicts/${id}/resolve`, json("POST", { decision })),
   memoryEntities: () => request<MemoryEntity[]>("/memory/entities"),
   memoryEntity: (id: string) => request<MemoryEntityDetail>(`/memory/entities/${id}`),
+
+  agentTasks: (opts: { status?: string; conversationId?: string } = {}) =>
+    request<AgentTask[]>(
+      `/agent-tasks?status=${opts.status ?? "open"}${opts.conversationId ? `&conversation_id=${opts.conversationId}` : ""}`,
+    ),
+  agentTask: (id: string) => request<AgentTaskDetail>(`/agent-tasks/${id}`),
+  updateAgentTask: (id: string, body: { status?: "active" | "paused" | "completed" | "abandoned"; objective?: string }) =>
+    request<AgentTaskDetail>(`/agent-tasks/${id}`, json("PATCH", body)),
+  resumeAgentTask: (id: string) =>
+    request<{ conversation_id: string; run_id: string }>(`/agent-tasks/${id}/resume`, json("POST")),
 
   skillSettings: () => request<SkillSettings>("/skills/settings"),
   updateSkillSettings: (body: { trust?: SkillTrust; auto_generate?: boolean }) =>

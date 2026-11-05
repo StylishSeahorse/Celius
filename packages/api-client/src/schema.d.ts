@@ -160,6 +160,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agent-tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Tasks */
+        get: operations["list_tasks_api_v1_agent_tasks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-tasks/{agent_task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Task */
+        get: operations["get_task_api_v1_agent_tasks__agent_task_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Task */
+        delete: operations["delete_task_api_v1_agent_tasks__agent_task_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Task */
+        patch: operations["update_task_api_v1_agent_tasks__agent_task_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/agent-tasks/{agent_task_id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resume Task
+         * @description Continue an interrupted task in a new reply. The reply is given the stored state,
+         *     so it doesn't depend on the chat's history still fitting in the context.
+         */
+        post: operations["resume_task_api_v1_agent_tasks__agent_task_id__resume_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/invitations/{token}": {
         parameters: {
             query?: never;
@@ -1917,6 +1974,162 @@ export interface components {
             /** Items */
             items: components["schemas"]["ActivityItem"][];
         };
+        /** AgentTaskDetail */
+        AgentTaskDetail: {
+            /** Blockers */
+            blockers: string[];
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Conversation Title */
+            conversation_title?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Events */
+            events: components["schemas"]["AgentTaskEventOut"][];
+            /** Failed Tool Calls */
+            failed_tool_calls: number;
+            /** Files */
+            files: {
+                [key: string]: unknown;
+            }[];
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Run Id */
+            last_run_id: string | null;
+            /** Notes */
+            notes: string[];
+            /** Objective */
+            objective: string;
+            /** Plan */
+            plan: components["schemas"]["PlanStep"][];
+            /** Runs */
+            runs: number;
+            /** Status */
+            status: string;
+            /** Status Reason */
+            status_reason: string | null;
+            /** Tool Calls */
+            tool_calls: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Verifications */
+            verifications: {
+                [key: string]: unknown;
+            }[];
+            /** Verified */
+            verified: boolean | null;
+        };
+        /** AgentTaskEventOut */
+        AgentTaskEventOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Detail */
+            detail: {
+                [key: string]: unknown;
+            };
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Run Id */
+            run_id: string | null;
+            /** Summary */
+            summary: string;
+        };
+        /** AgentTaskOut */
+        AgentTaskOut: {
+            /** Blockers */
+            blockers: string[];
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Conversation Title */
+            conversation_title?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Failed Tool Calls */
+            failed_tool_calls: number;
+            /** Files */
+            files: {
+                [key: string]: unknown;
+            }[];
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Run Id */
+            last_run_id: string | null;
+            /** Notes */
+            notes: string[];
+            /** Objective */
+            objective: string;
+            /** Plan */
+            plan: components["schemas"]["PlanStep"][];
+            /** Runs */
+            runs: number;
+            /** Status */
+            status: string;
+            /** Status Reason */
+            status_reason: string | null;
+            /** Tool Calls */
+            tool_calls: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Verifications */
+            verifications: {
+                [key: string]: unknown;
+            }[];
+            /** Verified */
+            verified: boolean | null;
+        };
+        /** AgentTaskResumed */
+        AgentTaskResumed: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Run Id */
+            run_id: string | null;
+        };
+        /** AgentTaskUpdate */
+        AgentTaskUpdate: {
+            /** Objective */
+            objective?: string | null;
+            /** Status */
+            status?: ("active" | "paused" | "completed" | "abandoned") | null;
+        };
         /** ApproveToolCall */
         ApproveToolCall: {
             /** Args Hash */
@@ -2919,6 +3132,17 @@ export interface components {
             /** Storage Quota Bytes */
             storage_quota_bytes?: number | null;
         };
+        /** PlanStep */
+        PlanStep: {
+            /** N */
+            n: number;
+            /** Note */
+            note?: string | null;
+            /** Status */
+            status: string;
+            /** Title */
+            title: string;
+        };
         /** ProjectCreate */
         ProjectCreate: {
             /** Description */
@@ -3499,7 +3723,7 @@ export interface components {
              * Entity Type
              * @enum {string}
              */
-            entity_type: "conversation" | "message" | "project" | "file" | "memory" | "skill";
+            entity_type: "conversation" | "message" | "project" | "file" | "memory" | "skill" | "agent_task";
             /**
              * Operation
              * @enum {string}
@@ -4048,6 +4272,165 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tasks_api_v1_agent_tasks_get: {
+        parameters: {
+            query?: {
+                status?: string;
+                conversation_id?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentTaskOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_task_api_v1_agent_tasks__agent_task_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentTaskDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_task_api_v1_agent_tasks__agent_task_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_task_api_v1_agent_tasks__agent_task_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentTaskUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentTaskDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resume_task_api_v1_agent_tasks__agent_task_id__resume_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentTaskResumed"];
+                };
             };
             /** @description Validation Error */
             422: {

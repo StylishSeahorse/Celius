@@ -2,6 +2,48 @@
 
 Newest first. Each entry: what changed, how it was verified, what is left.
 
+## 2026-11-05: Phase 3, agent orchestration
+
+**Existing implementation.** The executor's loop persists each model step and tool call,
+resumes a run after a worker crash or an approval pause, refuses identical retries of a
+failed call, and caps tool steps, time and output per reply. Nothing kept the *task*
+across replies.
+
+**Changes.** See C-08.
+- Migration 0012: `agent_tasks`, `agent_task_events`
+- `services/agent/tasks.py`: lifecycle, plan updates, completion rules, verification,
+  tool-call observation (files, failures), run start/checkpoint, prompt block
+- Tools `plan_start`, `plan_update`, `plan_status` (`services/tools/plan.py`)
+- Executor: task state or planning guidance in the system prompt; tool calls observed;
+  checkpoints on completion, failure (`_mark_failed`) and stop (`finish_cancelled`);
+  error-recovery hint after consecutive failures
+- API `/agent-tasks`: list (open/all/by status, by chat), detail with events, update
+  (abandon, mark done, pause), resume (a new reply with the stored state), delete; sync
+  feed carries `agent_task` changes
+- Web: task card above the composer (plan, progress, blockers, checks, files; Resume,
+  Mark done, Stop task); the dev fake model's `[tool:plan]` trigger
+
+**Found while testing.** The identical-retry guard blocked `plan_update(status=completed)`
+after the steps had been finished in between: plan updates now reset it. `write_file`
+showed as "changed" because the sandbox also lists the file: the tool's own action wins.
+The full e2e run then failed the attachment tests on the phone viewport again (prompt over
+the fake model's 8k context once skills and the plan tools were both offered). Tool
+schemas are now compacted for every tool (`anyOf [X, null]` → X, no `default: null`):
+all definitions together cost about 5,100 estimated tokens, less than before Phase 3
+added three tools (5,360).
+
+**Verification.** `tests/test_agent_tasks.py` (12): plan recorded and given back every
+run, one open task per chat and replacement, completion rules and unverified
+completion, blockers, backend file and failure record, recovery hint, pause on tool-step
+limit and resume, pause on a failed reply, pause on a stopped reply, state present when
+the first message no longer fits the context, resume/abandon/delete via the API, privacy.
+Isolation sweep covers the routes. e2e `tasks.spec.ts` (desktop and phone): card appears,
+pauses on a failed reply, resumes, stops. Totals: API suite **524 passed, 7 skipped**
+(SQLite); migrations, agent tasks, isolation, reliability, chat and skills on PostgreSQL
+16 + pgvector (78 passed); full e2e suite **83 passed**.
+
+**Left.** A cross-chat task list in a dashboard (Phase 5); per-task limits.
+
 ## 2026-11-05: web UI for memory kinds, conflicts and skills
 
 **Changes.** Memory panel: kind badges (events with their date, "unconfirmed",

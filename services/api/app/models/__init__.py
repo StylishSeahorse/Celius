@@ -1,5 +1,12 @@
 """ORM models. Importing this package registers every table on Base.metadata."""
 
+from app.models.agent import (
+    AGENT_TASK_STATUSES,
+    OPEN_TASK_STATUSES,
+    STEP_STATUSES,
+    AgentTask,
+    AgentTaskEvent,
+)
 from app.models.conversation import (
     Branch,
     Conversation,
@@ -62,6 +69,11 @@ from app.models.tools import (
 )
 
 __all__ = [
+    "AGENT_TASK_STATUSES",
+    "OPEN_TASK_STATUSES",
+    "STEP_STATUSES",
+    "AgentTask",
+    "AgentTaskEvent",
     "FINAL_TOOL_CALL_STATUSES",
     "TERMINAL_RUN_STATUSES",
     "McpServer",

@@ -52,3 +52,5 @@ export type SkillVersion = Schemas["SkillVersionOut"];
 export type SkillVersionBrief = Schemas["SkillVersionBrief"];
 export type SkillEvent = Schemas["SkillEventOut"];
 export type SkillSettings = Schemas["SkillSettings"];
+export type AgentTask = Schemas["AgentTaskOut"];
+export type AgentTaskDetail = Schemas["AgentTaskDetail"];

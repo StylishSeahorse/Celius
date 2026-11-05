@@ -10,8 +10,8 @@ reply. A message containing "[fail]" returns
 HTTP 400; "[slow]" streams very slowly (for cancellation tests).
 
 Tool calling (when the request offers tools): "[tool:write]" calls write_file,
-"[tool:python]" calls run_python, "[tool:list]" calls list_files. After a tool result the
-reply quotes it ("Tool result: …").
+"[tool:python]" calls run_python, "[tool:list]" calls list_files, "[tool:plan]" records a
+three-step plan with plan_start. After a tool result the reply quotes it ("Tool result: …").
 
 Memory extraction requests (recognised by their prompt) propose whatever follows
 "[remember:" in the user's message, e.g. "[remember:The user likes green tea]".
@@ -87,6 +87,13 @@ TOOL_TRIGGERS = {
     "[tool:write]": ("write_file", {"path": "hello.txt", "content": "Hello from Celius"}),
     "[tool:python]": ("run_python", {"code": "print(6 * 7)"}),
     "[tool:list]": ("list_files", {}),
+    "[tool:plan]": (
+        "plan_start",
+        {
+            "objective": "Tidy the workspace",
+            "steps": ["List the files", "Remove duplicates", "Check the result"],
+        },
+    ),
 }
 
 

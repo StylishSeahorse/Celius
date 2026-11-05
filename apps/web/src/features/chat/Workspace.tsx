@@ -207,6 +207,8 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
         if (changes.some((c) => c.entity_type === "memory" || c.entity_type === "skill")) refreshMemory();
         void refreshList();
         if (changes.some((c) => c.entity_type === "message")) refreshApprovals();
+        if (changes.some((c) => c.entity_type === "agent_task"))
+          window.dispatchEvent(new Event("celius:agent-task-changed"));
         if (changes.some((c) => c.entity_type === "file")) {
           refreshStorage();
           window.dispatchEvent(new Event("celius:files-changed"));

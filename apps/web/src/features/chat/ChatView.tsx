@@ -7,6 +7,7 @@ import { ToolProfilePicker } from "../tools/ToolProfilePicker";
 import { Composer } from "./Composer";
 import { runExport } from "./exporting";
 import { MessageView, PendingMessage } from "./MessageView";
+import { TaskCard } from "./TaskCard";
 import type { Conflict, useChat } from "./useChat";
 
 interface Props {
@@ -163,6 +164,15 @@ export function ChatView(props: Props) {
           <p role="alert" className="mb-2 text-sm text-red-600 dark:text-red-400">
             {chat.error}
           </p>
+        )}
+        {savedOnServer && (
+          <TaskCard
+            conversationId={detail.id}
+            running={canStop}
+            revision={messages.length + (live?.status === "completed" ? 1 : 0)}
+            online={online}
+            onResumed={() => void chat.refresh()}
+          />
         )}
         <Composer
           canStop={canStop}

@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     admin,
+    agent_tasks,
     auth,
     automation,
     conversations,
@@ -34,5 +35,6 @@ router.include_router(tools.router)
 router.include_router(automation.router)
 router.include_router(memory.router)
 router.include_router(skills.router)
+router.include_router(agent_tasks.router)
 router.include_router(push.router)
 router.include_router(admin.router)

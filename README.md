@@ -95,6 +95,7 @@ The model can call tools in the conversation's private workspace:
 | `make_document` | Create Word, PDF, Excel, CSV, PowerPoint, Markdown or HTML files |
 | `attach_file` | Hand a workspace file to you in the chat |
 | `remember`, `search_memory` | Propose or correct a memory (kind, importance, what it is about); search memories by kind or subject, and earlier chats |
+| `plan_start`, `plan_update`, `plan_status` | Record and update the plan of a multi-step task (kept across replies) |
 | `skill_search`, `skill_read`, `skill_create`, `skill_update`, `skill_validate`, `skill_test`, `skill_publish`, `skill_deprecate`, `skill_history` | Find and follow saved procedures; save and improve them as candidates; test them in the sandbox; ask to publish (your trust setting decides) |
 | MCP servers | Tools from MCP servers an administrator registers (streamable HTTP) |
 
@@ -131,6 +132,22 @@ The model can call tools in the conversation's private workspace:
 - Entities and relationships (projects, services, machines, people…) linked to memories
 - Secrets (passwords, keys, tokens) are refused and redacted before recall indexing
 - Re-embedding after you change the embedding model
+
+### Multi-step tasks
+- For work that takes several steps, the model records the objective and a plan
+  (`plan_start`) and keeps it current (`plan_update`): step status, findings, blockers and
+  verification results
+- Celius itself records the files the tools wrote or changed, tool failures, and a
+  checkpoint at the end of every reply
+- The plan is given back to every reply in the chat, so the work continues even when
+  the earlier messages no longer fit the model's context
+- A reply that fails, is stopped or uses all its tool steps pauses the task; the next
+  message, or **Resume**, picks it up where it stopped
+- A task card above the message box shows the plan and progress, with Resume, Mark done
+  and Stop task
+- Completing a task needs every step done; finishing without a passing check is allowed
+  but marked unverified
+- After two failed tool calls in a row, the model is told to step back and change approach
 
 ### Skills
 - Saved procedures in the [Agent Skills](https://agentskills.io) format (SKILL.md plus
@@ -371,7 +388,7 @@ docs/                 Backlog, ADRs, deployment, operations, acceptance tests, s
   - [0009: Memory and recall](docs/adr/0009-memory-and-recall.md)
 - Assistant roadmap: [roadmap and status](docs/implementation/CELIUS_ROADMAP.md) ·
   [audit](docs/implementation/AUDIT.md) ·
-  [decisions C-01…](docs/implementation/ARCHITECTURE_DECISIONS.md) ·
+  [decisions C-01…C-08](docs/implementation/ARCHITECTURE_DECISIONS.md) ·
   [implementation log](docs/implementation/IMPLEMENTATION_LOG.md)
 
 ## Not yet verified

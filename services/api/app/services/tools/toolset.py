@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import app.services.tools.builtin  # noqa: F401 - registers the built-in tools
+import app.services.tools.plan  # noqa: F401 - registers the plan tools
 import app.services.tools.skills  # noqa: F401 - registers the skill tools
 import app.services.tools.websearch  # noqa: F401 - registers web_search
 from app.config import Settings

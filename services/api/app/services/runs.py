@@ -18,6 +18,7 @@ from app.models import (
     ToolCallStatus,
 )
 from app.schemas.events import RunEventType
+from app.services.agent.tasks import checkpoint
 from app.services.sync import record_sync
 
 
@@ -65,6 +66,9 @@ async def finish_cancelled(db: AsyncSession, run: Run) -> None:
     run.status = RunStatus.cancelled
     run.finished_at = utcnow()
     run.lease_expires_at = None
+    # The task this chat is working on pauses, with the reason (ADR C-08).
+    async with db.begin_nested():
+        await checkpoint(db, run, reason="The reply was stopped")
     if run.output_message_id:
         message = await db.get(Message, run.output_message_id)
         if message is not None:

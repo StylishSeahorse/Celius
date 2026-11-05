@@ -9,10 +9,12 @@ Alice's data must be unchanged afterwards.
 
 import os
 import re
+import uuid
 
 import pytest
 
 from app.main import create_app
+from app.models import AgentTask, Conversation
 from tests.fakes import FakeLlama, drain_jobs, drain_runs
 from tests.test_files import upload
 from tests.test_push import Device
@@ -35,6 +37,7 @@ BODIES = {
     ("POST", "/api/v1/memory/conflicts/{conflict_id}/resolve"): {"decision": "keep_new"},
     ("POST", "/api/v1/skills/{skill_id}/versions"): {"files": {"SKILL.md": "x"}},
     ("POST", "/api/v1/skills/{skill_id}/feedback"): {"outcome": "success"},
+    ("PATCH", "/api/v1/agent-tasks/{agent_task_id}"): {"status": "abandoned"},
     ("PATCH", "/api/v1/projects/{project_id}"): {"name": "taken over"},
     ("PUT", "/api/v1/projects/{project_id}/members/{username}"): {"role": "write"},
     ("PATCH", "/api/v1/conversations/{conversation_id}"): {"title": "taken over"},
@@ -145,6 +148,21 @@ async def alices_world(client, sessionmaker, settings, gateway, fake, admin_head
     )
     ids["skill_id"] = skill.json()["id"]
     ids["version"] = "1"
+    async with sessionmaker() as db:
+        conversation = await db.get(Conversation, uuid.UUID(conv["id"]))
+        agent_task = AgentTask(
+            owner_id=conversation.owner_id,
+            conversation_id=conversation.id,
+            objective="Alice's secret plan",
+            plan=[],
+            blockers=[],
+            files=[],
+            verifications=[],
+            notes=[],
+        )
+        db.add(agent_task)
+        await db.commit()
+        ids["agent_task_id"] = str(agent_task.id)
     profile = await client.post("/api/v1/tool-profiles", json={"name": "Mine"}, headers=alice)
     ids["profile_id"] = profile.json()["key"].removeprefix("custom:")
     schedule = await client.post(
@@ -206,6 +224,7 @@ async def test_nobody_reaches_anyone_elses_data(
         "/api/v1/skills",
         "/api/v1/skills?q=soup",
         "/api/v1/skills?status=active",
+        "/api/v1/agent-tasks?status=all",
         "/api/v1/tool-profiles",
         "/api/v1/schedules",
         "/api/v1/tool-calls?status=pending_approval",
