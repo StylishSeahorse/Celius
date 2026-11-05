@@ -1151,6 +1151,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/models/registry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Model Registry List
+         * @description Every model Celius has seen, with what was detected and what an administrator set.
+         */
+        get: operations["model_registry_list_api_v1_models_registry_get"];
+        /**
+         * Model Registry Update
+         * @description Set a model's profile, capability overrides and limits (administrators).
+         */
+        put: operations["model_registry_update_api_v1_models_registry_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/models/{model_id}/verify-tools": {
         parameters: {
             query?: never;
@@ -1163,6 +1187,7 @@ export interface paths {
         /**
          * Verify Tools
          * @description Run a live tool-calling probe against the model (admin only; uses inference time).
+         *     The result is stored in the model registry, so the worker uses it too.
          */
         post: operations["verify_tools_api_v1_models__model_id__verify_tools_post"];
         delete?: never;
@@ -2145,6 +2170,24 @@ export interface components {
              */
             remember_all: boolean;
         };
+        /**
+         * CapabilityOverrides
+         * @description Set by an administrator; null fields fall back to what was detected.
+         */
+        CapabilityOverrides: {
+            /** Context Tokens */
+            context_tokens?: number | null;
+            /** Parallel Tools */
+            parallel_tools?: boolean | null;
+            /** Reasoning Toggle */
+            reasoning_toggle?: boolean | null;
+            /** Structured Output */
+            structured_output?: boolean | null;
+            /** Tool Calling */
+            tool_calling?: boolean | null;
+            /** Vision */
+            vision?: boolean | null;
+        };
         /** ConflictOut */
         ConflictOut: {
             /**
@@ -2992,6 +3035,13 @@ export interface components {
             /** Provider */
             provider: string;
         };
+        /** ModelLimits */
+        ModelLimits: {
+            /** Max Output Tokens */
+            max_output_tokens?: number | null;
+            /** Max Tool Iterations */
+            max_tool_iterations?: number | null;
+        };
         /** ModelListResponse */
         ModelListResponse: {
             /** Default Model Id */
@@ -2999,6 +3049,92 @@ export interface components {
             health: components["schemas"]["ModelHealth"];
             /** Models */
             models: components["schemas"]["ModelInfo"][];
+            /** Profiles */
+            profiles?: {
+                [key: string]: components["schemas"]["ModelProfileOut"];
+            };
+        };
+        /**
+         * ModelProfileOut
+         * @description The effective capabilities and prompt profile of a model (ADR C-09).
+         */
+        ModelProfileOut: {
+            /** Compact Tools */
+            compact_tools: boolean;
+            /** Context Tokens */
+            context_tokens: number | null;
+            /** Max Output Tokens */
+            max_output_tokens: number | null;
+            /** Max Tool Iterations */
+            max_tool_iterations: number;
+            /** Memory Items */
+            memory_items: number;
+            /** Model Id */
+            model_id: string;
+            /** Parallel Tools */
+            parallel_tools: boolean;
+            /**
+             * Profile
+             * @enum {string}
+             */
+            profile: "lite" | "standard" | "advanced";
+            /** Profile Source */
+            profile_source: string;
+            /** Provider */
+            provider: string;
+            /** Reasoning Toggle */
+            reasoning_toggle: boolean;
+            /** Recall Chunks */
+            recall_chunks: number;
+            /** Skill Index Items */
+            skill_index_items: number;
+            /** Sources */
+            sources: {
+                [key: string]: string;
+            };
+            /** Structured Output */
+            structured_output: boolean;
+            /** Tool Calling */
+            tool_calling: boolean;
+            /** Vision */
+            vision: boolean;
+        };
+        /** ModelRegistryEntry */
+        ModelRegistryEntry: {
+            /** Available */
+            available: boolean;
+            /** Detected */
+            detected: {
+                [key: string]: unknown;
+            };
+            effective: components["schemas"]["ModelProfileOut"];
+            /** Limits */
+            limits: {
+                [key: string]: unknown;
+            };
+            /** Model Id */
+            model_id: string;
+            /** Notes */
+            notes: string | null;
+            /** Overrides */
+            overrides: {
+                [key: string]: unknown;
+            };
+            /** Profile Setting */
+            profile_setting: ("lite" | "standard" | "advanced") | null;
+            /** Provider */
+            provider: string;
+        };
+        /** ModelRegistryUpdate */
+        ModelRegistryUpdate: {
+            limits?: components["schemas"]["ModelLimits"];
+            /** Model Id */
+            model_id: string;
+            /** Notes */
+            notes?: string | null;
+            overrides?: components["schemas"]["CapabilityOverrides"];
+            /** Profile */
+            profile?: ("lite" | "standard" | "advanced") | null;
         };
         /** PasswordChange */
         PasswordChange: {
@@ -6306,6 +6442,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ModelListResponse"];
+                };
+            };
+        };
+    };
+    model_registry_list_api_v1_models_registry_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelRegistryEntry"][];
+                };
+            };
+        };
+    };
+    model_registry_update_api_v1_models_registry_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelRegistryUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelRegistryEntry"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

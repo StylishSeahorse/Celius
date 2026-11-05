@@ -28,6 +28,7 @@ from app.models import (
     Message,
     MessageRole,
 )
+from app.services import model_registry
 from app.services.conversations import load_parts, message_text
 from app.services.jobs import JobFailed, enqueue_job, job_handler
 from app.services.memory.embeddings import Embedder
@@ -269,6 +270,15 @@ async def extract_memories(
             )
         ).all()
         prefs = await user_prefs(db, conversation.owner_id, settings)
+        structured = False
+        if gateway is not None:
+            try:
+                async with db.begin_nested():
+                    profile = await model_registry.resolve(db, gateway, model_id, settings)
+                structured = profile.structured_output
+            except ModelGatewayError:
+                structured = False
+        await db.commit()
     if gateway is None or settings.memory_extraction_max_per_turn == 0:
         return {"skipped": "no model"}
     if len(user_text.split()) < TRIVIAL_MESSAGE_WORDS:
@@ -305,6 +315,8 @@ async def extract_memories(
         temperature=0,
         max_tokens=700,
         reasoning=False,
+        # Small models often wrap JSON in prose; a grammar makes the answer parseable.
+        response_format={"type": "json_object"} if structured else None,
     )
     pieces: list[str] = []
     try:

@@ -402,6 +402,10 @@ GUIDANCE = (
     "task is done, verify it (run the tests, open the output, check the result) and record "
     "the check with plan_update. Simple questions need no plan."
 )
+GUIDANCE_LITE = (
+    "For a task with several steps, record them with plan_start, then do one step at a "
+    "time and mark it done with plan_update."
+)
 MARK = {"pending": " ", "in_progress": "→", "done": "x", "failed": "!", "skipped": "-"}
 
 

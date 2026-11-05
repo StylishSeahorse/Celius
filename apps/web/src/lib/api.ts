@@ -17,6 +17,8 @@ import type {
   MemoryEntityDetail,
   MemorySettings,
   ModelList,
+  ModelRegistryEntry,
+  ModelRegistryUpdate,
   Skill,
   SkillDetail,
   SkillEvent,
@@ -276,6 +278,12 @@ export const api = {
     request<void>(`/memory/conflicts/${id}/resolve`, json("POST", { decision })),
   memoryEntities: () => request<MemoryEntity[]>("/memory/entities"),
   memoryEntity: (id: string) => request<MemoryEntityDetail>(`/memory/entities/${id}`),
+
+  modelRegistry: () => request<ModelRegistryEntry[]>("/models/registry"),
+  updateModelRegistry: (body: ModelRegistryUpdate) =>
+    request<ModelRegistryEntry>("/models/registry", json("PUT", body)),
+  verifyModelTools: (modelId: string) =>
+    request<unknown>(`/models/${encodeURIComponent(modelId)}/verify-tools`, json("POST")),
 
   agentTasks: (opts: { status?: string; conversationId?: string } = {}) =>
     request<AgentTask[]>(

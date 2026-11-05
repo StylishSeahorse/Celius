@@ -150,10 +150,9 @@ history, validate, deprecate) are offered only once the user has one.
 Tool definitions are prompt tokens too (the nine skill tools first cost about 1,600
 estimated tokens, which pushed attachments out of an 8k-context model's budget in the e2e
 suite). Descriptions are kept short, and tools marked `optional` (skill_validate,
-skill_history, skill_deprecate, skill_test, skill_publish) are left out for models whose
-context window is under `TOOL_COMPACT_BELOW_CONTEXT_TOKENS` (16,384): there the model
-searches, reads, creates and updates skills, and the user tests and publishes in the UI.
-This is the first piece of Phase 4's per-model tool filtering.
+skill_history, skill_deprecate, skill_test, skill_publish) are left out for models on the
+lite profile (C-09): there the model searches, reads, creates and updates skills, and the
+user tests and publishes in the UI.
 
 **Improvement.** Loading a published skill in a run records a `use`; when the run ends it
 becomes success (run completed, no failed tool call after loading) or failure. Automatic
@@ -215,3 +214,66 @@ still validates the arguments).
 **Rejected.** Keeping the plan in message parts only (lost with trimmed history, not
 queryable); letting the model report files and outcomes (unreliable); a separate planner
 model call per run (doubles inference time on one GPU).
+
+---
+
+## C-09: Model capability registry, prompt profiles and a modular prompt
+
+Status: accepted · 2026-11-05
+
+**Context.** Celius runs local models of very different ability on one GPU. The audit
+found a `model_catalog` table nothing wrote to; capabilities came from environment flags
+and llama-server's `/props`, and a tool-calling probe was kept in the memory of the
+process that ran it (the API's probe never reached the worker, and a restart forgot it).
+The system prompt was one string built in `_prepare`.
+
+**Registry.** `model_catalog` (migration 0013) now holds, per provider and model: what
+was detected (capabilities, context size, refreshed at most every 5 minutes), the result
+of the tool-calling probe (`tool_calling_verified`), and what an administrator set:
+profile, capability overrides (tool calling, vision, parallel tool calls, structured
+output, thinking toggle, context size), limits (tool steps per reply, output tokens) and
+notes. Precedence: **admin > verified > reported > configured**. Nothing is inferred from
+a model's name. Each effective value records its source (shown in the UI).
+
+**Profiles.** `lite`, `standard`, `advanced`, set per model by an administrator, else
+`MODEL_DEFAULT_PROFILE`, where `auto` uses the measured context window (< 16,384 tokens:
+lite; ≥ 65,536: advanced; unknown: standard).
+
+| | lite | standard | advanced |
+| --- | --- | --- | --- |
+| Principles module | small steps, one tool per turn, short replies, check results, ask when unsure | none (unchanged prompt) | understand, plan, act, check, adjust; parallel independent calls; report what wasn't checked |
+| Tool calls per turn | 1 (extra calls refused without counting as failures) | many | many |
+| Toolset | compact (optional tools out) | full | full |
+| Memories / recall excerpts | ≤ 4 / ≤ 1 | settings | settings |
+| Skills listed | ≤ 3 | `SKILL_INDEX_MAX_ITEMS` | 10 |
+| Tool steps per reply | ≤ 12 | `TOOL_MAX_ITERATIONS` | `TOOL_MAX_ITERATIONS` |
+| Planning guidance | one sentence | full | full |
+
+Budgets are caps on the deployment's settings, so a profile never raises what an
+administrator limited, except the advanced skill index. Admin limits and overrides
+(e.g. allowing parallel calls on a lite model) win over the profile.
+
+**Modular prompt.** `services/prompting.py` assembles named sections in a fixed order:
+identity, principles, project instructions, project files, the data-not-instructions note,
+task state, memory, skills, tool rules (last, where small models attend most). Trusted
+instructions and data are separate sections, and data sections say they are data. Each
+run records its profile and the estimated tokens per section in `run.started`
+(`prompt_sections`), the measurements Phase 7 needs. The standard profile renders the
+same prompt as before (tested).
+
+**Tool calling.** One call per turn on lite (configurable per model). `ChatRequest`
+gains `response_format`; memory extraction asks for a JSON object when the registry says
+the model supports structured output (`MODEL_ENABLE_STRUCTURED_OUTPUT` or per model),
+since small models often wrap JSON in prose. Tool schemas stay compact (C-08).
+
+**Evaluation.** `devtools/prompt_eval.py` runs scenarios (plain answer, pick a tool,
+remember, plan a multi-step task, write then verify) through the real stack: registry,
+prompt builder, executor and tools, in a temporary database, once per profile, against
+any OpenAI-compatible server, and reports pass/fail, prompt tokens per section, tools
+offered, tool calls and time. It measures; choosing a model's profile stays an
+administrator's decision. **No results from a real model are recorded yet**: the harness
+has only run against the fake server here.
+
+**Rejected.** Profiles keyed on model-name patterns (wrong as soon as a fine-tune is
+renamed); separate prompt templates per model family (unmaintainable); per-chat profile
+choice for users (a property of the model, not of the conversation).

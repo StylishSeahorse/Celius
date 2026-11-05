@@ -595,6 +595,81 @@
         "title": "ApproveToolCall",
         "type": "object"
       },
+      "CapabilityOverrides": {
+        "description": "Set by an administrator; null fields fall back to what was detected.",
+        "properties": {
+          "context_tokens": {
+            "anyOf": [
+              {
+                "maximum": 10000000.0,
+                "minimum": 512.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Tokens"
+          },
+          "parallel_tools": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parallel Tools"
+          },
+          "reasoning_toggle": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Toggle"
+          },
+          "structured_output": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Structured Output"
+          },
+          "tool_calling": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Calling"
+          },
+          "vision": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vision"
+          }
+        },
+        "title": "CapabilityOverrides",
+        "type": "object"
+      },
       "ConflictOut": {
         "properties": {
           "created_at": {
@@ -3034,6 +3109,38 @@
         "title": "ModelInfo",
         "type": "object"
       },
+      "ModelLimits": {
+        "properties": {
+          "max_output_tokens": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 16.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Output Tokens"
+          },
+          "max_tool_iterations": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tool Iterations"
+          }
+        },
+        "title": "ModelLimits",
+        "type": "object"
+      },
       "ModelListResponse": {
         "properties": {
           "default_model_id": {
@@ -3049,6 +3156,13 @@
             },
             "title": "Models",
             "type": "array"
+          },
+          "profiles": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ModelProfileOut"
+            },
+            "title": "Profiles",
+            "type": "object"
           }
         },
         "required": [
@@ -3057,6 +3171,245 @@
           "health"
         ],
         "title": "ModelListResponse",
+        "type": "object"
+      },
+      "ModelProfileOut": {
+        "description": "The effective capabilities and prompt profile of a model (ADR C-09).",
+        "properties": {
+          "compact_tools": {
+            "title": "Compact Tools",
+            "type": "boolean"
+          },
+          "context_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Tokens"
+          },
+          "max_output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Output Tokens"
+          },
+          "max_tool_iterations": {
+            "title": "Max Tool Iterations",
+            "type": "integer"
+          },
+          "memory_items": {
+            "title": "Memory Items",
+            "type": "integer"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "parallel_tools": {
+            "title": "Parallel Tools",
+            "type": "boolean"
+          },
+          "profile": {
+            "enum": [
+              "lite",
+              "standard",
+              "advanced"
+            ],
+            "title": "Profile",
+            "type": "string"
+          },
+          "profile_source": {
+            "title": "Profile Source",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "reasoning_toggle": {
+            "title": "Reasoning Toggle",
+            "type": "boolean"
+          },
+          "recall_chunks": {
+            "title": "Recall Chunks",
+            "type": "integer"
+          },
+          "skill_index_items": {
+            "title": "Skill Index Items",
+            "type": "integer"
+          },
+          "sources": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "object"
+          },
+          "structured_output": {
+            "title": "Structured Output",
+            "type": "boolean"
+          },
+          "tool_calling": {
+            "title": "Tool Calling",
+            "type": "boolean"
+          },
+          "vision": {
+            "title": "Vision",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "model_id",
+          "provider",
+          "profile",
+          "profile_source",
+          "context_tokens",
+          "tool_calling",
+          "vision",
+          "reasoning_toggle",
+          "parallel_tools",
+          "structured_output",
+          "max_tool_iterations",
+          "max_output_tokens",
+          "compact_tools",
+          "memory_items",
+          "recall_chunks",
+          "skill_index_items",
+          "sources"
+        ],
+        "title": "ModelProfileOut",
+        "type": "object"
+      },
+      "ModelRegistryEntry": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "detected": {
+            "additionalProperties": true,
+            "title": "Detected",
+            "type": "object"
+          },
+          "effective": {
+            "$ref": "#/components/schemas/ModelProfileOut"
+          },
+          "limits": {
+            "additionalProperties": true,
+            "title": "Limits",
+            "type": "object"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "overrides": {
+            "additionalProperties": true,
+            "title": "Overrides",
+            "type": "object"
+          },
+          "profile_setting": {
+            "anyOf": [
+              {
+                "enum": [
+                  "lite",
+                  "standard",
+                  "advanced"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Setting"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model_id",
+          "provider",
+          "available",
+          "detected",
+          "profile_setting",
+          "overrides",
+          "limits",
+          "notes",
+          "effective"
+        ],
+        "title": "ModelRegistryEntry",
+        "type": "object"
+      },
+      "ModelRegistryUpdate": {
+        "properties": {
+          "limits": {
+            "$ref": "#/components/schemas/ModelLimits"
+          },
+          "model_id": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Model Id",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "overrides": {
+            "$ref": "#/components/schemas/CapabilityOverrides"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "enum": [
+                  "lite",
+                  "standard",
+                  "advanced"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          }
+        },
+        "required": [
+          "model_id"
+        ],
+        "title": "ModelRegistryUpdate",
         "type": "object"
       },
       "PasswordChange": {
@@ -9308,9 +9661,75 @@
         ]
       }
     },
+    "/api/v1/models/registry": {
+      "get": {
+        "description": "Every model Celius has seen, with what was detected and what an administrator set.",
+        "operationId": "model_registry_list_api_v1_models_registry_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ModelRegistryEntry"
+                  },
+                  "title": "Response Model Registry List Api V1 Models Registry Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Model Registry List",
+        "tags": [
+          "models"
+        ]
+      },
+      "put": {
+        "description": "Set a model's profile, capability overrides and limits (administrators).",
+        "operationId": "model_registry_update_api_v1_models_registry_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelRegistryUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelRegistryEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Model Registry Update",
+        "tags": [
+          "models"
+        ]
+      }
+    },
     "/api/v1/models/{model_id}/verify-tools": {
       "post": {
-        "description": "Run a live tool-calling probe against the model (admin only; uses inference time).",
+        "description": "Run a live tool-calling probe against the model (admin only; uses inference time).\nThe result is stored in the model registry, so the worker uses it too.",
         "operationId": "verify_tools_api_v1_models__model_id__verify_tools_post",
         "parameters": [
           {

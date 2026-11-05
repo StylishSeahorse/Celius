@@ -1,6 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 import { ApiError, api } from "../../lib/api";
+import { Models } from "./Models";
 import { People } from "./People";
 import { disablePush, enablePush, type PushState, pushState } from "../../lib/notifications";
 
@@ -59,6 +60,7 @@ export function AccountPanel({ isAdmin, meId, onClose }: { isAdmin: boolean; meI
         <div className="flex-1 space-y-6 overflow-y-auto p-4 text-sm">
           {isAdmin && <SystemStatus />}
           {isAdmin && <People meId={meId} />}
+          {isAdmin && <Models />}
           <Notifications />
           <PasswordForm />
           <Sessions />

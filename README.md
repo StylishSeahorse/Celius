@@ -133,6 +133,22 @@ The model can call tools in the conversation's private workspace:
 - Secrets (passwords, keys, tokens) are refused and redacted before recall indexing
 - Re-embedding after you change the embedding model
 
+### Local models
+- A capability registry per model: context size, tool calling, images, parallel tool
+  calls, JSON output, thinking on/off; from the model server and checks (never from the
+  model's name), and overridable by an administrator (Account > Models)
+- Prompt profiles: **Lite** for small models (one tool call per turn, fewer tools,
+  smaller memory and skill budgets, short rules), **Standard**, **Advanced** for large
+  ones; chosen per model or automatically from the context size
+- The system prompt is built from modules, and each reply records how many tokens each
+  part used
+- "Check tool calling" sends a test prompt and remembers the result for every reply
+- `devtools/prompt_eval.py` scores scenarios against your model server once per profile:
+
+  ```bash
+  cd services/api && uv run python -m devtools.prompt_eval --base-url http://gpu-pc:8080/v1 --model my-model
+  ```
+
 ### Multi-step tasks
 - For work that takes several steps, the model records the objective and a plan
   (`plan_start`) and keeps it current (`plan_update`): step status, findings, blockers and
@@ -388,7 +404,7 @@ docs/                 Backlog, ADRs, deployment, operations, acceptance tests, s
   - [0009: Memory and recall](docs/adr/0009-memory-and-recall.md)
 - Assistant roadmap: [roadmap and status](docs/implementation/CELIUS_ROADMAP.md) ·
   [audit](docs/implementation/AUDIT.md) ·
-  [decisions C-01…C-08](docs/implementation/ARCHITECTURE_DECISIONS.md) ·
+  [decisions C-01…C-09](docs/implementation/ARCHITECTURE_DECISIONS.md) ·
   [implementation log](docs/implementation/IMPLEMENTATION_LOG.md)
 
 ## Not yet verified

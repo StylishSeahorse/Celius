@@ -2,6 +2,46 @@
 
 Newest first. Each entry: what changed, how it was verified, what is left.
 
+## 2026-11-05: Phase 4, local model intelligence
+
+**Existing implementation.** `model_gateway` detects context size and vision from
+llama-server `/props` and can probe tool calling, but kept the probe in process memory;
+`model_catalog` existed unused; budgets came from global settings; the system prompt was
+concatenated in `executor._prepare`.
+
+**Changes.** See C-09.
+- Migration 0013: `model_catalog.profile`, `overrides`, `limits`, `notes`
+- `services/model_registry.py`: detection recorded (race-safe, throttled), probe stored,
+  effective profile with sources; `ModelProfile.run_settings` applies budgets per run
+- `services/prompting.py`: sections, order, trusted vs data, per-section sizes
+- Executor: profile resolved per run; prompt built from modules; compact toolset and one
+  tool call per turn on lite; per-model tool-step and output limits; `run.started`
+  records `profile` and `prompt_sections`
+- `ChatRequest.response_format`; memory extraction uses JSON mode when supported
+- API: `/models` includes each model's effective profile; `GET/PUT /models/registry`
+  (administrators); the tool probe persists
+- Web: Account > Models (profile, capability overrides with their source, tool steps,
+  "Check tool calling")
+- `devtools/prompt_eval.py`; the interim `TOOL_COMPACT_BELOW_CONTEXT_TOKENS` setting from
+  Phase 2 is replaced by the lite profile (it was never released)
+
+**Found while testing.** In the Models UI, two quick changes to one model raced: the
+second save sent the profile as loaded before the first save, undoing it (caught by the
+e2e test). The component now keeps local state and builds each save on the last.
+
+**Verification.** `tests/test_model_profiles.py` (12): automatic profile from context,
+builder order and sizes, standard prompt unchanged, lite (principles, compact tools, one
+call per turn with the refused call allowed next turn), advanced, admin profile/
+overrides/limits applied to runs, admin turning tool calling off, the probe reaching
+"another process" through the registry, admin-only registry, JSON mode for extraction,
+the evaluation harness scoring per profile. e2e `models.spec.ts`. The harness was run
+against the development fake server (0/15 by design: it only echoes); **no real-model
+results yet**. Totals: API suite **538 passed, 7 skipped** (SQLite); migrations, profiles,
+models, chat, memory, agent tasks and isolation on PostgreSQL 16 + pgvector (73 passed);
+full e2e suite **85 passed**.
+
+**Left.** Run the harness on the real GPU machine and set profiles from the results.
+
 ## 2026-11-05: Phase 3, agent orchestration
 
 **Existing implementation.** The executor's loop persists each model step and tool call,

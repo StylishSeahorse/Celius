@@ -96,3 +96,17 @@ class ModelCatalogEntry(Timestamps, Base):
     capabilities: Mapped[dict] = mapped_column(JSONType, default=dict, nullable=False)
     is_available: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Model capability registry (ADR C-09). `capabilities` holds what was detected or
+    # verified; the fields below are set by an administrator and win over detection.
+    # lite | standard | advanced; None: chosen from the measured context window.
+    profile: Mapped[str | None] = mapped_column(String(16))
+    # {"tool_calling": bool, "vision": bool, "parallel_tools": bool,
+    #  "structured_output": bool, "reasoning_toggle": bool, "context_tokens": int}
+    overrides: Mapped[dict] = mapped_column(
+        JSONType, default=dict, server_default="{}", nullable=False
+    )
+    # {"max_tool_iterations": int, "max_output_tokens": int}
+    limits: Mapped[dict] = mapped_column(
+        JSONType, default=dict, server_default="{}", nullable=False
+    )
+    notes: Mapped[str | None] = mapped_column(Text)

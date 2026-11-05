@@ -53,4 +53,7 @@ export type SkillVersionBrief = Schemas["SkillVersionBrief"];
 export type SkillEvent = Schemas["SkillEventOut"];
 export type SkillSettings = Schemas["SkillSettings"];
 export type AgentTask = Schemas["AgentTaskOut"];
+export type ModelProfile = Schemas["ModelProfileOut"];
+export type ModelRegistryEntry = Schemas["ModelRegistryEntry"];
+export type ModelRegistryUpdate = Schemas["ModelRegistryUpdate"];
 export type AgentTaskDetail = Schemas["AgentTaskDetail"];

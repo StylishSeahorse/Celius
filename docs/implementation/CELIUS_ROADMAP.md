@@ -75,18 +75,20 @@ Existing base kept: runs persist every tool call and resume after a worker crash
 | Task list across chats (dashboard) | ⬜ | API ready (`GET /agent-tasks?status=…`); belongs with the Phase 5 dashboard |
 | Per-task limits (replies, tool calls) | ⬜ | per-reply limits exist; counts are recorded per task for a later cap |
 
-## Phase 4: local model intelligence ⬜
+## Phase 4: local model intelligence ✅ (measurement on the real GPU pending)
 
-Existing base: `model_catalog` records context size, vision and tool calling, detected
-from llama-server `/props`; context budgeting in `context.py`.
-
-- ⬜ Model capability registry: profile (lite/standard/advanced), structured output,
-  parallel tools, limits; editable by admins, never guessed from names
-- ⬜ Modular system prompt (identity, principles, memory, skills, tools, coding,
-  assistant, security, project) assembled per profile
-- 🟡 Tool filtering per profile (Lite: few tools, one at a time). Started: optional tools
-  are left out for models with a context window under `TOOL_COMPACT_BELOW_CONTEXT_TOKENS`
-- ⬜ Prompt evaluation harness against the fake and a real llama-server
+| Item | Status | Notes |
+| --- | --- | --- |
+| Model capability registry (context, tool calling, vision, parallel tools, structured output, thinking toggle, limits, profile) | ✅ | `model_catalog` (migration 0013), `services/model_registry.py`, C-09 |
+| Never from names; precedence admin > verified > reported > configured, with sources | ✅ | |
+| Tool-calling probe persisted for every process | ✅ | was in-memory per process |
+| Lite / Standard / Advanced profiles, per model or automatic from context size | ✅ | `MODEL_DEFAULT_PROFILE`, `PROFILE_*` |
+| Modular system prompt with per-section token accounting | ✅ | `services/prompting.py`; `run.started.prompt_sections` |
+| Context optimisation per profile (memory, recall, skills, toolset, tool steps) | ✅ | |
+| Tool calling: one call per turn on lite; JSON mode for extraction | ✅ | |
+| Admin UI (Account > Models) | ✅ | e2e `models.spec.ts` |
+| Prompt evaluation harness | ✅ | `devtools/prompt_eval.py` |
+| Results on the real llama-server and a chosen profile per model | ⬜ | run the harness on the GPU machine (see README) |
 
 ## Phase 5: personal assistant foundation ⬜
 
@@ -115,11 +117,13 @@ Existing base: scheduled prompts (`scheduled_tasks`), MCP servers, web push.
 
 ## Next (continuation point)
 
-1. Phase 4: split `_prepare`'s system prompt (`services/api/app/worker/executor.py`) into
-   modules (identity, principles, memory, skills, task, tools, security, project) and add
-   per-model prompt profiles (lite/standard/advanced) to `model_catalog`, admin-editable,
-   building on the compact toolset (`TOOL_COMPACT_BELOW_CONTEXT_TOKENS`).
-2. Phase 5: personal tasks and reminders; the assistant dashboard can list agent tasks
-   across chats from `GET /agent-tasks`.
+1. On the GPU machine: `uv run python -m devtools.prompt_eval --base-url
+   http://<gpu>:8080/v1 --model <id>`; record the results in IMPLEMENTATION_LOG.md and set
+   each model's profile in Account > Models.
+2. Phase 5: personal tasks (subtasks, priorities, deadlines, recurrence), reminders on
+   the push infrastructure, daily plan, and a dashboard that also lists agent tasks
+   (`GET /agent-tasks`).
 3. Small follow-ups: entity browser and skill import in the UI; a periodic memory
-   consolidation job; measure retrieval precision/recall before tuning `MEMORY_WEIGHT_*`.
+   consolidation job; measure retrieval precision/recall before tuning `MEMORY_WEIGHT_*`;
+   model ids containing "/" can't be probed via `/models/{id}/verify-tools` (path
+   parameter).

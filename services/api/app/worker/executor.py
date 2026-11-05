@@ -57,7 +57,7 @@ from app.models import (
     ToolCallStatus,
 )
 from app.schemas.events import RunEventType
-from app.services import push
+from app.services import model_registry, push
 from app.services.agent import tasks as agent_tasks
 from app.services.audit import audit
 from app.services.context import (
@@ -83,6 +83,7 @@ from app.services.prompt_files import (
     load_attachments,
     project_files_block,
 )
+from app.services.prompting import PRINCIPLES, PromptBuilder
 from app.services.runs import append_event, finish_cancelled
 from app.services.skills.jobs import queue_after_run
 from app.services.skills.prompt import skills_block
@@ -245,6 +246,10 @@ class _Prepared:
     usage: dict[str, int] = field(default_factory=dict)
     # Tool calls that failed in a row in this run (error recovery hint).
     failure_streak: int = 0
+    # The deployment's settings with the model profile's budgets (tool steps etc.).
+    settings: Any = None
+    # Whether the model may make several tool calls in one step (profile / registry).
+    parallel_tools: bool = True
 
 
 def _delta_event(message_id: uuid.UUID, state: _StreamState) -> dict[str, Any]:
@@ -463,7 +468,8 @@ class _Loop:
         self.p: _Prepared = prepared
         self.factory: SessionFactory = factory
         self.gateway: ModelGateway = gateway
-        self.settings: Settings = settings
+        # The run's settings: the deployment's, with the model profile's limits applied.
+        self.settings: Settings = prepared.settings or settings
         self.worker_id: str = worker_id
         self.sandbox = sandbox
         self.overrides = overrides
@@ -688,6 +694,19 @@ class _Loop:
             p.failed.add((row.tool_name, row.args_hash))
             return row
 
+        if index > 0 and not p.parallel_tools:
+            # Small models do better one call at a time (lite profile). Not a failure:
+            # the same call may be made again next turn.
+            row.decision_source = "system"
+            row.decision_reason = "One tool call per turn for this model"
+            row.is_error = True
+            row.model_content = (
+                "Not run: this model makes one tool call per turn. Read the first call's "
+                "result, then make this call again if it is still needed."
+            )
+            row.arguments = {"_raw": raw["arguments"][:20_000]}
+            row.args_hash = args_hash(row.arguments)
+            return row
         if spec is None:
             return refuse(f"There is no tool named {name!r}")
         try:
@@ -1068,16 +1087,15 @@ async def _prepare(
         output = await db.get(Message, run.output_message_id)
         assert conversation is not None and output is not None
 
-        max_tokens = run.params.get("max_tokens") or settings.model_max_output_tokens
         try:
-            model = await gateway.find_model(run.model_id)
-            context_tokens = (model.context_tokens if model else None) or (
-                settings.model_default_context_tokens
-            )
-            vision = model.capabilities.vision if model else settings.model_enable_vision
-            tool_calling = (
-                model.capabilities.tool_calling if model else settings.model_enable_tool_calling
-            )
+            # What this model can do and how much to ask of it (ADR C-09): from the
+            # capability registry, never from its name.
+            profile = await model_registry.resolve(db, gateway, run.model_id, settings)
+            settings = profile.run_settings(settings)
+            max_tokens = run.params.get("max_tokens") or profile.max_output_tokens
+            context_tokens = profile.context_tokens
+            vision = profile.vision
+            tool_calling = profile.tool_calling
             budget = context_budget(
                 context_tokens, max_tokens, settings.context_safety_margin_tokens
             )
@@ -1085,7 +1103,7 @@ async def _prepare(
             toolset = None
             if tool_calling:
                 toolset = await build_toolset(
-                    db, conversation, settings, sandbox=sandbox, context_tokens=context_tokens
+                    db, conversation, settings, sandbox=sandbox, compact=profile.compact_tools
                 )
                 if not toolset.offered:
                     toolset = None
@@ -1137,14 +1155,19 @@ async def _prepare(
                     note = tool_notes.get(message.id)
                     history.append(HistoryItem("assistant", f"{note}\n\n{text}" if note else text))
 
+            # The system prompt, from modules (services/prompting.py).
+            prompt = PromptBuilder()
             # The model can't know the date, and needs it for anything recent (web searches).
             today = datetime.now(UTC).strftime("%A %d %B %Y")
-            system_prompt = f"{settings.default_system_prompt}\n\nToday's date is {today} (UTC)."
+            prompt.set(
+                "identity", f"{settings.default_system_prompt}\n\nToday's date is {today} (UTC)."
+            )
+            prompt.set("principles", PRINCIPLES[profile.profile])
             project_block = ""
             if conversation.project_id:
                 project = await db.get(Project, conversation.project_id)
                 if project and project.instructions:
-                    system_prompt = f"{system_prompt}\n\n{project.instructions}".strip()
+                    prompt.set("project_instructions", project.instructions)
                 char_budget = (
                     int(budget * settings.project_files_context_share * CHARS_PER_TOKEN)
                     if budget
@@ -1152,18 +1175,23 @@ async def _prepare(
                 )
                 project_block = await project_files_block(db, conversation.project_id, char_budget)
                 if project_block:
-                    system_prompt += "\n\nProject files:\n\n" + project_block
+                    prompt.set("project_files", "Project files:\n\n" + project_block)
             if attachments or project_block:
-                system_prompt += "\n\n" + DATA_NOT_INSTRUCTIONS
+                prompt.set("data_note", DATA_NOT_INSTRUCTIONS)
 
             # Task state kept outside the model: given back every run, so the work goes on
             # even when older turns no longer fit the context (ADR C-08).
-            resumed = await agent_tasks.on_run_start(db, conversation, run)
+            task_resumed = await agent_tasks.on_run_start(db, conversation, run)
             task = await agent_tasks.open_task(db, conversation.id)
             if task is not None:
-                system_prompt += "\n\n" + agent_tasks.prompt_block(task, resumed=resumed)
+                prompt.set("task", agent_tasks.prompt_block(task, resumed=task_resumed))
             elif toolset is not None and "plan_start" in toolset.offered:
-                system_prompt += "\n\n" + agent_tasks.GUIDANCE
+                prompt.set(
+                    "task",
+                    agent_tasks.GUIDANCE_LITE
+                    if profile.profile == "lite"
+                    else agent_tasks.GUIDANCE,
+                )
 
             retrieved = Retrieved()
             if latest_user is not None:
@@ -1187,28 +1215,27 @@ async def _prepare(
             memory_budget = (
                 int(budget * settings.memory_context_share * CHARS_PER_TOKEN) if budget else 12_000
             )
-            if memory := memory_prompt_block(retrieved, memory_budget):
-                system_prompt += "\n\n" + memory
+            prompt.set("memory", memory_prompt_block(retrieved, memory_budget))
             if toolset is not None and {"skill_read", "skill_create"} & set(toolset.offered):
                 try:
                     async with db.begin_nested():
-                        if block := await skills_block(
-                            db, conversation.owner_id, query, settings, toolset.offered
-                        ):
-                            system_prompt += "\n\n" + block
+                        prompt.set(
+                            "skills",
+                            await skills_block(
+                                db, conversation.owner_id, query, settings, toolset.offered
+                            ),
+                        )
                 except Exception:
                     log.exception("Skill index failed for run %s", run_id)
 
             if toolset is not None:
-                system_prompt += (
-                    "\n\n"
-                    + TOOL_GUIDANCE
-                    + _network_note(toolset, settings)
-                    + _missing_tools_note(toolset)
+                prompt.set(
+                    "tools",
+                    TOOL_GUIDANCE + _network_note(toolset, settings) + _missing_tools_note(toolset),
                 )
                 await _copy_attachments(settings, conversation.id, attachments)
 
-            built = build_context(system_prompt, history, budget)
+            built = build_context(prompt.render(), history, budget)
         except (ModelGatewayError, AppError) as exc:
             await _mark_failed(
                 db, run, output, exc.code, str(exc), retryable=getattr(exc, "retryable", False)
@@ -1234,6 +1261,8 @@ async def _prepare(
             iterations=run.tool_iterations,
             tool_ms=run.tool_ms,
             usage=dict(run.usage or {}),
+            settings=settings,
+            parallel_tools=profile.parallel_tools,
         )
         resumed = await _restore_steps(db, prepared, output)
         if not retrieved.empty and not await db.scalar(
@@ -1274,6 +1303,8 @@ async def _prepare(
                     "estimated_prompt_tokens": built.estimated_tokens,
                     "dropped_messages": built.dropped_messages,
                     "tools": sorted(toolset.offered) if toolset else [],
+                    "profile": profile.profile,
+                    "prompt_sections": prompt.sizes(),
                 },
             )
         await db.commit()

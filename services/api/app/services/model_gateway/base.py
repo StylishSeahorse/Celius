@@ -64,6 +64,9 @@ class ChatRequest(BaseModel):
     stop: list[str] | None = None
     # None: the model's default. True/False: ask the template to think or not.
     reasoning: bool | None = None
+    # Constrain the output, e.g. {"type": "json_object"} (only when the model registry
+    # says the server supports it; llama-server turns it into a grammar).
+    response_format: dict[str, Any] | None = None
 
 
 class ToolCallDelta(BaseModel):

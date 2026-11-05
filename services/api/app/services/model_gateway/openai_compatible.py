@@ -329,7 +329,7 @@ def _chat_payload(request: ChatRequest) -> dict[str, Any]:
         "stream": True,
         "stream_options": {"include_usage": True},
     }
-    for field in ("temperature", "top_p", "max_tokens", "stop"):
+    for field in ("temperature", "top_p", "max_tokens", "stop", "response_format"):
         value = getattr(request, field)
         if value is not None:
             payload[field] = value

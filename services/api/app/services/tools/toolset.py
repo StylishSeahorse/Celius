@@ -88,7 +88,7 @@ async def build_toolset(
     settings: Settings,
     *,
     sandbox: bool,
-    context_tokens: int | None = None,
+    compact: bool = False,
 ) -> Toolset:
     profile = await conversation_profile(db, conversation, settings)
     known, unavailable = await available_tools(db, conversation.owner_id, settings, sandbox=sandbox)
@@ -103,7 +103,7 @@ async def build_toolset(
     if not has_skills:
         for name in SKILL_TOOLS_NEEDING_SKILLS:
             unavailable.setdefault(name, "No skills saved yet")
-    if context_tokens and context_tokens < settings.tool_compact_below_context_tokens:
+    if compact:  # the lite profile (model_registry): leave optional tools out
         for name, spec in known.items():
             if spec.optional:
                 unavailable.setdefault(name, COMPACT_REASON)
