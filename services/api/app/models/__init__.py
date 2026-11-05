@@ -38,7 +38,17 @@ from app.models.identity import (
     User,
     UserSettings,
 )
-from app.models.memory import Memory, MemoryChunk, MemoryStatus
+from app.models.memory import (
+    MEMORY_CATEGORIES,
+    Memory,
+    MemoryCategory,
+    MemoryChunk,
+    MemoryConflict,
+    MemoryEntity,
+    MemoryEntityLink,
+    MemoryRelation,
+    MemoryStatus,
+)
 from app.models.push import PushSubscription
 from app.models.tools import (
     FINAL_TOOL_CALL_STATUSES,
@@ -55,7 +65,13 @@ __all__ = [
     "TERMINAL_RUN_STATUSES",
     "McpServer",
     "Memory",
+    "MEMORY_CATEGORIES",
+    "MemoryCategory",
     "MemoryChunk",
+    "MemoryConflict",
+    "MemoryEntity",
+    "MemoryEntityLink",
+    "MemoryRelation",
     "MemoryStatus",
     "PushSubscription",
     "ScheduledTask",

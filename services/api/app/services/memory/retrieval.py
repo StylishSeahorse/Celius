@@ -13,6 +13,14 @@ Selection: memories marked "always use" (who the user is, how they want answers)
 every chat in scope. Every other memory is given only when it is relevant to the message:
 close in meaning (embeddings, when configured, at least MEMORY_MIN_SIMILARITY) or sharing
 enough of its words. Unrelated memories are left out, however few there are.
+
+Ordering: relevant memories are ordered by the configurable hybrid score in ranking.py
+(semantic, keyword, recency, importance, scaled by confidence). Recency and importance
+only order memories that are already relevant; they never make an unrelated one relevant.
+Superseded memories and those below MEMORY_MIN_CONFIDENCE are never given.
+
+Candidates: by vector distance (pgvector, in SQL) and by words (PostgreSQL full-text
+search on the GIN indexes of migration 0010; LIKE on SQLite).
 """
 
 import math
@@ -27,8 +35,18 @@ from sqlalchemy.orm import undefer
 
 from app.config import Settings
 from app.db.base import utcnow
-from app.models import Conversation, Memory, MemoryChunk, MemoryStatus, Project
+from app.models import (
+    Conversation,
+    Memory,
+    MemoryChunk,
+    MemoryEntity,
+    MemoryEntityLink,
+    MemoryStatus,
+    Project,
+)
 from app.services.memory.embeddings import Embedder, cosine
+from app.services.memory.entities import entity_key
+from app.services.memory.ranking import Signals, Weights, combine, recency
 from app.services.memory.store import memory_active_for
 
 _WORD = re.compile(r"[\w']+")
@@ -130,6 +148,38 @@ def _like_any(column, query_terms: list[str]):
     return or_(*[func.lower(column).like(f"%{t}%") for t in query_terms])
 
 
+_TSQUERY_SAFE = re.compile(r"[^\w]+")
+
+
+def _text_match(db: AsyncSession, column, query_terms: list[str]):
+    """Rows containing any of the words: full-text search on PostgreSQL, LIKE elsewhere."""
+    if db.bind.dialect.name != "postgresql":
+        return _like_any(column, query_terms)
+    words = [w for t in query_terms if (w := _TSQUERY_SAFE.sub("", t))]
+    if not words:
+        return _like_any(column, query_terms)
+    query = " | ".join(f"{w}:*" for w in words)
+    return func.to_tsvector("simple", column).op("@@")(func.to_tsquery("simple", query))
+
+
+def _memory_score(
+    memory: Memory, semantic: float | None, keyword: float, weights: Weights
+) -> float:
+    return combine(
+        Signals(
+            semantic=semantic,
+            keyword=keyword,
+            recency=recency(
+                memory.last_used_at or memory.updated_at or memory.created_at,
+                half_life_days=weights.half_life_days,
+            ),
+            importance=memory.importance if memory.importance is not None else 0.5,
+            confidence=memory.confidence if memory.confidence is not None else 1.0,
+        ),
+        weights,
+    )
+
+
 async def _rank(
     db: AsyncSession,
     model,
@@ -139,8 +189,12 @@ async def _rank(
     vector: list[float] | None,
     embedding_model: str | None,
     limit: int,
+    weights: Weights | None = None,
 ):
-    """Candidates by vector distance (in SQL on PostgreSQL) and by words, then scored."""
+    """Candidates by vector distance (in SQL on PostgreSQL) and by words, then scored.
+
+    With `weights` (memories) the hybrid score of ranking.py; without (chat excerpts) the
+    plain 0.7 semantic + 0.3 keyword blend that MIN_RECALL_SCORE is calibrated for."""
     rows: dict[uuid.UUID, object] = {}
     is_pg = db.bind.dialect.name == "postgresql"
     if vector is not None:
@@ -161,7 +215,7 @@ async def _rank(
         query = (
             select(model)
             .options(undefer(model.embedding))
-            .where(*base_filter, _like_any(text_column, query_terms))
+            .where(*base_filter, _text_match(db, text_column, query_terms))
         )
         for row in (await db.scalars(query.limit(CANDIDATES))).all():
             rows.setdefault(row.id, row)
@@ -175,7 +229,12 @@ async def _rank(
         ):
             semantic = cosine(vector, list(row.embedding))
         keyword = keyword_score(query_terms, getattr(row, text_column.key))
-        scored.append((_hybrid(semantic, keyword), row, semantic, keyword))
+        score = (
+            _memory_score(row, semantic, keyword, weights)
+            if weights is not None
+            else _hybrid(semantic, keyword)
+        )
+        scored.append((score, row, semantic, keyword))
     scored.sort(key=lambda pair: pair[0], reverse=True)
     return scored[:limit]
 
@@ -186,7 +245,16 @@ async def retrieve(
     query: str,
     settings: Settings,
     embedder: Embedder | None = None,
+    *,
+    categories: list[str] | None = None,
+    entity: str | None = None,
+    include_always: bool = True,
+    track_use: bool = True,
 ) -> Retrieved:
+    """What this chat gets from memory for `query`.
+
+    `categories` and `entity` narrow the memories (the search_memory tool's filters);
+    `include_always=False` leaves out the always-use ones (already in the prompt)."""
     if not await memory_active_for(db, conversation, settings):
         return Retrieved()
     query_terms = terms(query)
@@ -205,15 +273,33 @@ async def retrieve(
             if conversation.project_id
             else false(),
         ),
+        Memory.confidence >= settings.memory_min_confidence,
     ]
-    always = (
-        await db.scalars(
-            select(Memory)
-            .where(*in_scope, Memory.always_use.is_(True))
-            .order_by(Memory.updated_at.desc())
-            .limit(ALWAYS_MAX)
+    if categories:
+        in_scope.append(Memory.category.in_(categories))
+    if entity:
+        in_scope.append(
+            Memory.id.in_(
+                select(MemoryEntityLink.memory_id)
+                .join(MemoryEntity, MemoryEntity.id == MemoryEntityLink.entity_id)
+                .where(
+                    MemoryEntity.owner_id == conversation.owner_id,
+                    MemoryEntity.key == entity_key(entity),
+                )
+            )
         )
-    ).all()
+    always = (
+        (
+            await db.scalars(
+                select(Memory)
+                .where(*in_scope, Memory.always_use.is_(True))
+                .order_by(Memory.updated_at.desc())
+                .limit(ALWAYS_MAX)
+            )
+        ).all()
+        if include_always
+        else []
+    )
     relevant: list[Memory] = []
     if settings.memory_prompt_max_items and (query_terms or vector is not None):
         ranked = await _rank(
@@ -225,6 +311,7 @@ async def retrieve(
             vector,
             embedding_model,
             settings.memory_prompt_max_items * 3,
+            Weights.from_settings(settings),
         )
         for _, memory, semantic, keyword in ranked:
             close = semantic is not None and semantic >= settings.memory_min_similarity
@@ -293,7 +380,7 @@ async def retrieve(
                 )
             )
 
-    if memories:
+    if memories and track_use:
         await db.execute(
             update(Memory)
             .where(Memory.id.in_([m.id for m in memories]))
@@ -317,7 +404,7 @@ def prompt_block(retrieved: Retrieved, char_budget: int) -> str:
     if retrieved.memories:
         lines = []
         for memory in retrieved.memories:
-            line = f"- {memory.content}"
+            line = f"- {memory.content}{_label(memory)}"
             if used + len(line) > char_budget:
                 break
             lines.append(line)
@@ -333,6 +420,19 @@ def prompt_block(retrieved: Retrieved, char_budget: int) -> str:
     return "\n\n".join(parts) if len(parts) > 1 else ""
 
 
+def _label(memory: Memory) -> str:
+    """A short tag for memories other than plain facts about the user, so the model can
+    tell an event or an inference from a confirmed fact."""
+    tags = []
+    if memory.category and memory.category != "user":
+        tags.append(memory.category)
+    if memory.category == "episodic" and (memory.occurred_at or memory.created_at):
+        tags.append((memory.occurred_at or memory.created_at).strftime("%Y-%m-%d"))
+    if memory.confidence is not None and memory.confidence < 0.8:
+        tags.append("unconfirmed")
+    return f" ({', '.join(tags)})" if tags else ""
+
+
 def _attr(value: str) -> str:
     return value.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;")[:200]
 
@@ -340,7 +440,10 @@ def _attr(value: str) -> str:
 def usage_part(retrieved: Retrieved) -> dict:
     """Shown under the reply: what memory it was given."""
     return {
-        "memories": [{"id": str(m.id), "content": m.content} for m in retrieved.memories],
+        "memories": [
+            {"id": str(m.id), "content": m.content, "category": m.category}
+            for m in retrieved.memories
+        ],
         "recalled": [
             {
                 "conversation_id": str(r.conversation_id),
@@ -351,3 +454,47 @@ def usage_part(retrieved: Retrieved) -> dict:
             for r in retrieved.recalled
         ],
     }
+
+
+async def search_memories(
+    db: AsyncSession,
+    owner_id: uuid.UUID,
+    query: str,
+    settings: Settings,
+    embedder: Embedder | None = None,
+    *,
+    categories: list[str] | None = None,
+    project_id: uuid.UUID | None = None,
+    limit: int = 50,
+) -> list[tuple[float, Memory, float | None, float]]:
+    """The memory manager's search: every active memory of the user, ranked by the same
+    hybrid score as chat retrieval but without its relevance cut-off or use tracking."""
+    query_terms = terms(query)
+    vector = None
+    if embedder is not None and query.strip():
+        vectors = await embedder.embed([query[:4000]])
+        vector = vectors[0] if vectors else None
+    embedding_model = embedder.model if vector is not None and embedder else None
+    if not query_terms and vector is None:
+        return []
+    base = [Memory.owner_id == owner_id, Memory.status == MemoryStatus.active]
+    if categories:
+        base.append(Memory.category.in_(categories))
+    if project_id:
+        base.append(Memory.project_id == project_id)
+    ranked = await _rank(
+        db,
+        Memory,
+        base,
+        Memory.content,
+        query_terms,
+        vector,
+        embedding_model,
+        limit,
+        Weights.from_settings(settings),
+    )
+    return [
+        (round(score, 4), memory, semantic, keyword)
+        for score, memory, semantic, keyword in ranked
+        if keyword > 0 or (semantic is not None and semantic >= settings.memory_min_similarity)
+    ]

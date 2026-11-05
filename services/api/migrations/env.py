@@ -14,6 +14,14 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
+# PostgreSQL-only full-text (GIN) expression indexes are created by migration 0010 with raw
+# SQL; the models don't declare them (SQLite can't build them), so autogenerate ignores them.
+SQL_ONLY_INDEXES = {"ix_memories_content_fts", "ix_memory_chunks_text_fts"}
+
+
+def include_object(obj, name, type_, reflected, compare_to) -> bool:
+    return not (type_ == "index" and name in SQL_ONLY_INDEXES)
+
 
 def run_migrations_offline() -> None:
     context.configure(
@@ -21,13 +29,19 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         compare_type=True,
+        include_object=include_object,
     )
     with context.begin_transaction():
         context.run_migrations()
 
 
 def _run(connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        compare_type=True,
+        include_object=include_object,
+    )
     with context.begin_transaction():
         context.run_migrations()
 

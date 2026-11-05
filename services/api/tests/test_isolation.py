@@ -32,6 +32,7 @@ BODIES = {
     ("POST", "/api/v1/tool-calls/{call_id}/approve"): {"args_hash": "0" * 64},
     ("POST", "/api/v1/tool-calls/{call_id}/deny"): {"reason": "no"},
     ("POST", "/api/v1/memories/{memory_id}/approve"): {},
+    ("POST", "/api/v1/memory/conflicts/{conflict_id}/resolve"): {"decision": "keep_new"},
     ("PATCH", "/api/v1/projects/{project_id}"): {"name": "taken over"},
     ("PUT", "/api/v1/projects/{project_id}/members/{username}"): {"role": "write"},
     ("PATCH", "/api/v1/conversations/{conversation_id}"): {"title": "taken over"},
@@ -108,6 +109,28 @@ async def alices_world(client, sessionmaker, settings, gateway, fake, admin_head
         "/api/v1/memories", json={"content": "Alice is allergic to cats"}, headers=alice
     )
     ids["memory_id"] = memory.json()["id"]
+    await client.post(
+        "/api/v1/memories",
+        json={
+            "content": "Alice is not allergic to cats",
+            "entities": [{"kind": "machine", "name": "Alice's laptop"}],
+        },
+        headers=alice,
+    )
+    ids["conflict_id"] = (await client.get("/api/v1/memory/conflicts", headers=alice)).json()[0][
+        "id"
+    ]
+    ids["entity_id"] = (await client.get("/api/v1/memory/entities", headers=alice)).json()[0]["id"]
+    relation = await client.post(
+        "/api/v1/memory/relations",
+        json={
+            "source": {"kind": "machine", "name": "Alice's laptop"},
+            "relation": "backs up to",
+            "target": {"kind": "machine", "name": "Alice's NAS"},
+        },
+        headers=alice,
+    )
+    ids["relation_id"] = relation.json()["id"]
     profile = await client.post("/api/v1/tool-profiles", json={"name": "Mine"}, headers=alice)
     ids["profile_id"] = profile.json()["key"].removeprefix("custom:")
     schedule = await client.post(
@@ -162,6 +185,10 @@ async def test_nobody_reaches_anyone_elses_data(
         "/api/v1/conversations",
         "/api/v1/files",
         "/api/v1/memories",
+        "/api/v1/memories/search?q=allergic",
+        "/api/v1/memory/conflicts",
+        "/api/v1/memory/entities",
+        "/api/v1/memory/relations",
         "/api/v1/tool-profiles",
         "/api/v1/schedules",
         "/api/v1/tool-calls?status=pending_approval",
@@ -186,7 +213,11 @@ async def test_nobody_reaches_anyone_elses_data(
     project = (await client.get(f"/api/v1/projects/{ids['project_id']}", headers=alice)).json()
     assert project["name"] == "Secret" and project["shared"] is False
     memories = (await client.get("/api/v1/memories", headers=alice)).json()
-    assert [m["content"] for m in memories] == ["Alice is allergic to cats"]
+    assert sorted(m["content"] for m in memories) == [
+        "Alice is allergic to cats",
+        "Alice is not allergic to cats",
+    ]
+    assert len((await client.get("/api/v1/memory/conflicts", headers=alice)).json()) == 1
     me = (await client.get("/api/v1/auth/me", headers=alice)).json()
     assert me["is_admin"] is False
     upload_state = await client.get(f"/api/v1/files/uploads/{ids['upload_id']}", headers=alice)

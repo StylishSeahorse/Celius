@@ -20,6 +20,7 @@ import httpx
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
+from app.db.base import utcnow
 from app.models import (
     Conversation,
     FileLink,
@@ -37,9 +38,10 @@ from app.services.files.sniff import FileRejected, detect
 from app.services.jobs import enqueue_job
 from app.services.limits import storage_limit
 from app.services.memory.embeddings import Embedder
+from app.services.memory.entities import EntityRef
 from app.services.memory.retrieval import prompt_block as memory_prompt_block
 from app.services.memory.retrieval import retrieve, usage_part
-from app.services.memory.store import add_memory, memory_active_for
+from app.services.memory.store import SensitiveMemory, add_memory, memory_active_for
 from app.services.sync import record_sync
 from app.services.tools import workspace as ws
 from app.services.tools.netguard import (
@@ -950,6 +952,22 @@ class RememberArgs(BaseModel):
         description="true only if it should shape every reply (their name, the language, "
         "tone or length they want); false if it matters only when its subject comes up",
     )
+    kind: Literal["user", "semantic", "episodic", "procedural"] = Field(
+        default="user",
+        description="user: about the user; semantic: a lasting fact about their systems, "
+        "projects or decisions; episodic: something that happened (a fix, a decision); "
+        "procedural: a short way of doing something",
+    )
+    importance: float | None = Field(default=None, ge=0, le=1, description="0 to 1")
+    about: list[str] = Field(
+        default_factory=list,
+        max_length=8,
+        description='Named things it is about, as "kind:name", e.g. "service:Proxmox"',
+    )
+    replaces: str | None = Field(
+        default=None,
+        description="id of a remembered fact (from search_memory) that this corrects",
+    )
 
 
 async def _remember(ctx: ToolContext, args: RememberArgs) -> ToolOutput:
@@ -958,6 +976,12 @@ async def _remember(ctx: ToolContext, args: RememberArgs) -> ToolOutput:
         if conversation is None or not await memory_active_for(db, conversation, ctx.settings):
             return _error("Memory is turned off for this chat")
         project_id = conversation.project_id if args.scope == "project" else None
+        replaces = None
+        if args.replaces:
+            try:
+                replaces = uuid.UUID(args.replaces.strip())
+            except ValueError:
+                return _error("replaces must be a memory id from search_memory")
         embedder = Embedder.from_settings(ctx.settings)
         try:
             memory = await add_memory(
@@ -972,7 +996,15 @@ async def _remember(ctx: ToolContext, args: RememberArgs) -> ToolOutput:
                 message_id=ctx.message_id,
                 embedder=embedder,
                 always_use=args.always,
+                category=args.kind,
+                importance=args.importance,
+                occurred_at=utcnow() if args.kind == "episodic" else None,
+                entities=[ref for item in args.about if (ref := EntityRef.parse(item))],
+                replaces=replaces,
             )
+        except SensitiveMemory as exc:
+            await db.commit()
+            return _error(f"{exc}. Never store secrets in memory.")
         finally:
             if embedder is not None:
                 await embedder.aclose()
@@ -1004,6 +1036,13 @@ builtin(
 
 class SearchMemoryArgs(BaseModel):
     query: str = Field(min_length=2, max_length=500, description="What to look for")
+    kinds: list[Literal["user", "semantic", "episodic", "procedural"]] = Field(
+        default_factory=list,
+        description="Only these kinds (episodic: past events, decisions and fixes)",
+    )
+    about: str | None = Field(
+        default=None, max_length=200, description="Only memories about this named thing"
+    )
 
 
 async def _search_memory(ctx: ToolContext, args: SearchMemoryArgs) -> ToolOutput:
@@ -1013,7 +1052,15 @@ async def _search_memory(ctx: ToolContext, args: SearchMemoryArgs) -> ToolOutput
             return _error("Conversation not found")
         embedder = Embedder.from_settings(ctx.settings)
         try:
-            found = await retrieve(db, conversation, args.query, ctx.settings, embedder)
+            found = await retrieve(
+                db,
+                conversation,
+                args.query,
+                ctx.settings,
+                embedder,
+                categories=list(args.kinds) or None,
+                entity=args.about,
+            )
         finally:
             if embedder is not None:
                 await embedder.aclose()
@@ -1021,6 +1068,10 @@ async def _search_memory(ctx: ToolContext, args: SearchMemoryArgs) -> ToolOutput
     if found.empty:
         return ToolOutput(content="Nothing found in memory.", data={"results": 0})
     block = memory_prompt_block(found, ctx.settings.tool_max_result_chars)
+    if found.memories:
+        # Ids, so a correction can name the fact it replaces (remember(replaces=...)).
+        ids = "\n".join(f"- {m.id}: {m.content[:80]}" for m in found.memories)
+        block += f"\n\nMemory ids (for corrections):\n{ids}"
     return ToolOutput(content=block, data=usage_part(found))
 
 

@@ -128,6 +128,27 @@ class Settings(BaseSettings):
     memory_recall_chunks: int = Field(default=4, ge=0, le=20)
     memory_context_share: float = Field(default=0.15, ge=0, le=0.5)
     memory_extraction_max_per_turn: int = Field(default=2, ge=0, le=10)
+    # Hybrid ranking (ADR-C03): weights of the four signals. They needn't sum to 1; the
+    # score is divided by the weights of the signals that exist for a memory (no embedding
+    # means no semantic signal). Confidence scales the result (an inference ranks lower).
+    memory_weight_semantic: float = Field(default=0.50, ge=0, le=1)
+    memory_weight_keyword: float = Field(default=0.25, ge=0, le=1)
+    memory_weight_recency: float = Field(default=0.15, ge=0, le=1)
+    memory_weight_importance: float = Field(default=0.10, ge=0, le=1)
+    # Recency halves every this many days (last used, else last updated).
+    memory_recency_half_life_days: float = Field(default=30, gt=0)
+    # Memories below this confidence are never given to a chat.
+    memory_min_confidence: float = Field(default=0.3, ge=0, le=1)
+
+    # Skills (ADR C-06). Defaults; each user can change trust and auto-generation.
+    skill_trust_default: Literal["conservative", "balanced", "autonomous"] = "balanced"
+    # Propose a skill after a run that completed a multi-step task with tools.
+    skill_autogen_enabled: bool = True
+    skill_autogen_min_tool_calls: int = Field(default=4, ge=1, le=100)
+    # At most this many relevant skills are listed in the system prompt (names and
+    # descriptions only; the model loads one with skill_read). 0 turns the index off.
+    skill_index_max_items: int = Field(default=6, ge=0, le=50)
+    skill_test_timeout_seconds: int = Field(default=120, ge=5, le=3600)
 
     # Tools (ADR 0008)
     # Profile for conversations that don't pick one (users can change their own default).
