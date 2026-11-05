@@ -14,7 +14,8 @@ Tool calling (when the request offers tools): "[tool:write]" calls write_file,
 three-step plan with plan_start. After a tool result the reply quotes it ("Tool result: …").
 
 Memory extraction requests (recognised by their prompt) propose whatever follows
-"[remember:" in the user's message, e.g. "[remember:The user likes green tea]".
+"[remember:" in the user's message, e.g. "[remember:The user likes green tea]", and
+suggest a task for "[todo:Renew passport]".
 """
 
 import argparse
@@ -134,8 +135,17 @@ async def chat(request: Request):
     offered = {t["function"]["name"] for t in body.get("tools") or []}
     system = messages[0].get("content") if messages else ""
     if isinstance(system, str) and system.startswith("You decide what an assistant"):
-        facts = re.findall(r"\[remember:([^\]]+)\]", _text_of(messages[-1].get("content"))[0])
-        return _text_stream(json.dumps({"memories": [f.strip() for f in facts]}))
+        said = _text_of(messages[-1].get("content"))[0]
+        facts = re.findall(r"\[remember:([^\]]+)\]", said)
+        todos = re.findall(r"\[todo:([^\]]+)\]", said)
+        return _text_stream(
+            json.dumps(
+                {
+                    "memories": [f.strip() for f in facts],
+                    "tasks": [{"title": t.strip(), "due": None} for t in todos],
+                }
+            )
+        )
     if messages and messages[-1].get("role") == "tool":
         result = str(messages[-1].get("content") or "")[:200]
         return _text_stream(f"Tool result: {result}")

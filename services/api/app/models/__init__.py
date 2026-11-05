@@ -7,6 +7,12 @@ from app.models.agent import (
     AgentTask,
     AgentTaskEvent,
 )
+from app.models.assistant import (
+    ACTIVE_TASK_STATUSES,
+    PRIORITIES,
+    USER_TASK_STATUSES,
+    UserTask,
+)
 from app.models.conversation import (
     Branch,
     Conversation,
@@ -69,6 +75,10 @@ from app.models.tools import (
 )
 
 __all__ = [
+    "ACTIVE_TASK_STATUSES",
+    "PRIORITIES",
+    "USER_TASK_STATUSES",
+    "UserTask",
     "AGENT_TASK_STATUSES",
     "OPEN_TASK_STATUSES",
     "STEP_STATUSES",

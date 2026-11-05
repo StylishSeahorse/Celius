@@ -179,6 +179,12 @@ class Settings(BaseSettings):
     tool_memory_mb: int = Field(default=1024, ge=64)
     tool_max_result_chars: int = Field(default=20_000, ge=500)
 
+    # Personal assistant (ADR C-10). Each user can set their own time zone.
+    default_timezone: str = "UTC"
+    # Notice deadlines and to-dos mentioned in chats and suggest them as tasks (they wait
+    # for the user to accept them). Part of the memory extraction call: no extra model use.
+    assistant_suggest_tasks: bool = True
+
     # Prompt profiles (ADR C-09): how much the prompt asks of the model and gives it.
     # "auto" picks one from the model's measured context window (never from its name);
     # an administrator can set one per model.
@@ -188,6 +194,10 @@ class Settings(BaseSettings):
     # Whether the server can constrain output to JSON (llama.cpp: response_format /
     # grammars). Off until configured or set per model: it is not detected.
     model_enable_structured_output: bool = False
+    # Tool definitions are sent with every request. With a known context window they may
+    # use at most this share of it; beyond that, non-core tools are left out (cheapest
+    # kept first). Large models never reach it.
+    tool_context_share: float = Field(default=0.35, ge=0.05, le=0.9)
     tool_approval_ttl_minutes: int = Field(default=60, ge=1)
     mcp_timeout_seconds: float = Field(default=30, gt=0)
     schedule_min_interval_minutes: int = Field(default=15, ge=1)

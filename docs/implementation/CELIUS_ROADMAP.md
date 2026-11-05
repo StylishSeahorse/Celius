@@ -86,18 +86,26 @@ Existing base kept: runs persist every tool call and resume after a worker crash
 | Modular system prompt with per-section token accounting | ✅ | `services/prompting.py`; `run.started.prompt_sections` |
 | Context optimisation per profile (memory, recall, skills, toolset, tool steps) | ✅ | |
 | Tool calling: one call per turn on lite; JSON mode for extraction | ✅ | |
+| Tool definitions within a share of the context (core first, cheapest next) | ✅ | `TOOL_CONTEXT_SHARE`; added in Phase 5 |
+| Attachments sized from what the system prompt leaves | ✅ | fixed in Phase 5 |
 | Admin UI (Account > Models) | ✅ | e2e `models.spec.ts` |
 | Prompt evaluation harness | ✅ | `devtools/prompt_eval.py` |
 | Results on the real llama-server and a chosen profile per model | ⬜ | run the harness on the GPU machine (see README) |
 
-## Phase 5: personal assistant foundation ⬜
+## Phase 5: personal assistant foundation ✅
 
-- ⬜ Tasks (subtasks, priority, deadline, dependencies, recurrence, project) with tools
-  and API
-- ⬜ Deadline/commitment detection from conversations (as proposals)
-- ⬜ Reminders on the existing push infrastructure
-- ⬜ Daily plan / briefing (scheduled task + tasks + calendar when available)
-- ⬜ Assistant dashboard
+| Item | Status | Notes |
+| --- | --- | --- |
+| Personal knowledge management (inspect, correct, delete) | ✅ | Phase 1 memory manager: kinds, conflicts, entities |
+| Tasks: subtasks, priorities, deadlines, dependencies, status, notes, attachments, recurrence, project | ✅ | `user_tasks` (migration 0014), C-10 |
+| Natural-language task management | ✅ | `task_add`, `task_list`, `task_update`; write tools ask under Standard |
+| Project context | ✅ | tasks added in a project chat belong to the project; `task_list` marks them |
+| Daily planning: overdue, deadlines, priorities, suggested order, briefing | ✅ | `GET /assistant/briefing`, `daily_briefing` tool, optional daily briefing schedule (read-only) |
+| Deadlines mentioned in chats → suggested tasks (configurable, no extra model call) | ✅ | |
+| Reminder infrastructure (push, worker, no model) | ✅ | `fire_due_reminders` |
+| Personal assistant dashboard | ✅ | Today panel: briefing, tasks, settings; `#/today` |
+| Calendar in the briefing | ⬜ | Phase 6 |
+| Overdue notifications, "when X happens" rules | ⬜ | Phase 6 automation engine |
 
 ## Phase 6: integrations and automation ⬜
 
@@ -117,13 +125,12 @@ Existing base: scheduled prompts (`scheduled_tasks`), MCP servers, web push.
 
 ## Next (continuation point)
 
-1. On the GPU machine: `uv run python -m devtools.prompt_eval --base-url
-   http://<gpu>:8080/v1 --model <id>`; record the results in IMPLEMENTATION_LOG.md and set
-   each model's profile in Account > Models.
-2. Phase 5: personal tasks (subtasks, priorities, deadlines, recurrence), reminders on
-   the push infrastructure, daily plan, and a dashboard that also lists agent tasks
-   (`GET /agent-tasks`).
+1. Phase 6: calendar provider abstraction (a local Celius calendar and CalDAV first),
+   filling `briefing.calendar`; email provider abstraction (IMAP/SMTP, drafts by default,
+   sending needs approval); an automation engine (triggers: schedule, task overdue, task
+   status change; conditions; actions: notify, create task, run a prompt) on the job
+   queue, with execution history.
+2. On the GPU machine: run `devtools/prompt_eval.py` and set model profiles.
 3. Small follow-ups: entity browser and skill import in the UI; a periodic memory
-   consolidation job; measure retrieval precision/recall before tuning `MEMORY_WEIGHT_*`;
-   model ids containing "/" can't be probed via `/models/{id}/verify-tools` (path
-   parameter).
+   consolidation job; retrieval precision/recall; model ids containing "/" can't be
+   probed via `/models/{id}/verify-tools`.

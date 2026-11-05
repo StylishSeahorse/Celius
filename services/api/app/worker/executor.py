@@ -89,6 +89,7 @@ from app.services.skills.jobs import queue_after_run
 from app.services.skills.prompt import skills_block
 from app.services.sync import record_sync
 from app.services.tools import workspace as ws
+from app.services.tools.assistant import ASSISTANT_NOTE
 from app.services.tools.calls import approval_expiry, call_event
 from app.services.tools.policy import args_hash, canonical_json, decide
 from app.services.tools.registry import ToolArgumentError, ToolContext, ToolOutput
@@ -1103,7 +1104,14 @@ async def _prepare(
             toolset = None
             if tool_calling:
                 toolset = await build_toolset(
-                    db, conversation, settings, sandbox=sandbox, compact=profile.compact_tools
+                    db,
+                    conversation,
+                    settings,
+                    sandbox=sandbox,
+                    compact=profile.compact_tools,
+                    max_tool_tokens=int(context_tokens * settings.tool_context_share)
+                    if context_tokens
+                    else None,
                 )
                 if not toolset.offered:
                     toolset = None
@@ -1116,45 +1124,6 @@ async def _prepare(
             attachments = await load_attachments(db, path, parts)
             latest_user = next((m for m in reversed(path) if m.role == MessageRole.user), None)
             query = message_text(parts[latest_user.id]) if latest_user else ""
-            # The newest message's files share a part of the context; files on earlier
-            # messages (already answered) get a short excerpt each.
-            latest_files = len(attachments.get(latest_user.id, [])) if latest_user else 0
-            attachment_chars = (
-                int(budget * settings.attachment_context_share * CHARS_PER_TOKEN)
-                if budget
-                else settings.max_attachment_prompt_chars * max(latest_files, 1)
-            )
-            readable = toolset is not None and "read_file" in toolset.offered
-            tool_notes = await _tool_history_notes(
-                db, [m.id for m in path if m.role == MessageRole.assistant], settings
-            )
-            history: list[HistoryItem] = []
-            for message in path:
-                text = message_text(parts[message.id])
-                if message.role == MessageRole.user:
-                    files = attachments.get(message.id, [])
-                    is_latest = message is latest_user
-                    per_file = (
-                        attachment_chars // max(len(files), 1)
-                        if is_latest
-                        else settings.attachment_history_chars
-                    )
-                    prefix, images = await attachment_content(
-                        files,
-                        settings,
-                        send_images=is_latest,
-                        vision=vision,
-                        char_limit=min(per_file, settings.max_attachment_prompt_chars),
-                        query=text if is_latest else "",
-                        full_text_in_workspace=readable,
-                    )
-                    history.append(HistoryItem("user", f"{prefix}\n\n{text}".strip(), images))
-                elif message.role == MessageRole.assistant and (
-                    message.status == MessageStatus.complete
-                ):
-                    note = tool_notes.get(message.id)
-                    history.append(HistoryItem("assistant", f"{note}\n\n{text}" if note else text))
-
             # The system prompt, from modules (services/prompting.py).
             prompt = PromptBuilder()
             # The model can't know the date, and needs it for anything recent (web searches).
@@ -1228,12 +1197,56 @@ async def _prepare(
                 except Exception:
                     log.exception("Skill index failed for run %s", run_id)
 
+            if toolset is not None and "task_list" in toolset.offered:
+                prompt.set("assistant", ASSISTANT_NOTE)
             if toolset is not None:
                 prompt.set(
                     "tools",
                     TOOL_GUIDANCE + _network_note(toolset, settings) + _missing_tools_note(toolset),
                 )
                 await _copy_attachments(settings, conversation.id, attachments)
+
+            # The newest message's files share a part of the context; files on earlier
+            # messages (already answered) get a short excerpt each.
+            latest_files = len(attachments.get(latest_user.id, [])) if latest_user else 0
+            # Sized from what the system prompt leaves: a fixed share of the whole window
+            # overflowed small-context models once the prompt grew (ADR C-09).
+            room = budget - estimate_tokens(prompt.render()) if budget else None
+            attachment_chars = (
+                int(max(room, 0) * settings.attachment_context_share * CHARS_PER_TOKEN)
+                if budget
+                else settings.max_attachment_prompt_chars * max(latest_files, 1)
+            )
+            readable = toolset is not None and "read_file" in toolset.offered
+            tool_notes = await _tool_history_notes(
+                db, [m.id for m in path if m.role == MessageRole.assistant], settings
+            )
+            history: list[HistoryItem] = []
+            for message in path:
+                text = message_text(parts[message.id])
+                if message.role == MessageRole.user:
+                    files = attachments.get(message.id, [])
+                    is_latest = message is latest_user
+                    per_file = (
+                        attachment_chars // max(len(files), 1)
+                        if is_latest
+                        else settings.attachment_history_chars
+                    )
+                    prefix, images = await attachment_content(
+                        files,
+                        settings,
+                        send_images=is_latest,
+                        vision=vision,
+                        char_limit=min(per_file, settings.max_attachment_prompt_chars),
+                        query=text if is_latest else "",
+                        full_text_in_workspace=readable,
+                    )
+                    history.append(HistoryItem("user", f"{prefix}\n\n{text}".strip(), images))
+                elif message.role == MessageRole.assistant and (
+                    message.status == MessageStatus.complete
+                ):
+                    note = tool_notes.get(message.id)
+                    history.append(HistoryItem("assistant", f"{note}\n\n{text}" if note else text))
 
             built = build_context(prompt.render(), history, budget)
         except (ModelGatewayError, AppError) as exc:

@@ -15,6 +15,7 @@ import app.services.skills.jobs  # noqa: F401 - registers job handlers
 from app.config import Settings
 from app.db import SessionFactory
 from app.services import monitoring
+from app.services.assistant.tasks import fire_due_reminders
 from app.services.files.service import cleanup_expired_uploads
 from app.services.jobs import claim_next_job, recover_stale_jobs, run_job
 from app.services.model_gateway import ModelGateway
@@ -106,6 +107,8 @@ async def run_worker(
                     log.info("Expired %d unanswered approval request(s)", expired)
                 if fired := await fire_due(factory, settings):
                     log.info("Started %d scheduled task(s)", fired)
+                if reminded := await fire_due_reminders(factory, settings):
+                    log.info("Sent %d task reminder(s)", reminded)
                 last_recovery = now
             if now - last_maintenance >= MAINTENANCE_INTERVAL_SECONDS:
                 if expired := await cleanup_expired_uploads(factory, settings):

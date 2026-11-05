@@ -714,7 +714,7 @@ async def test_small_context_models_get_a_compact_skill_toolset(
         client, auth_headers, "Hi", sessionmaker, gateway, settings, tool_profile="developer"
     )
     offered = tools_offered(fake)
-    assert {"skill_search", "skill_read", "skill_create", "skill_update"} <= offered
+    # Lite: management tools are left out; the rest compete for the tool budget.
     assert not {"skill_validate", "skill_history", "skill_deprecate", "skill_test"} & offered
     assert "skill_history" not in fake.requests[-1]["messages"][0]["content"]
 

@@ -417,3 +417,26 @@ async def test_earlier_attachments_shrink_to_an_excerpt(
     await run_all()
     earlier = [m for m in fake.requests[1]["messages"] if m["role"] == "user"][0]["content"]
     assert len(earlier) < settings.attachment_history_chars + 1500 < first
+
+
+async def test_a_long_document_fits_a_small_model_with_a_full_system_prompt(
+    client, auth_headers, sessionmaker, settings, fake, run_all
+):
+    """Regression: the attachment share was taken of the whole window before the system
+    prompt was built, so a grown prompt (tools, notes, memory) plus the document could
+    overflow an 8k model. It is now taken of what the prompt leaves."""
+    fake.context_tokens = 8192
+    settings.default_system_prompt = "You are a helpful assistant. " + "Be careful. " * 400
+    document = _long_document()
+    file = await ready_file(client, auth_headers, sessionmaker, settings, "survey.md", document)
+    conv = await new_conversation(client, auth_headers, tool_profile="developer")
+    await send(
+        client,
+        auth_headers,
+        conv["id"],
+        content="What was the budget for lamp oil?",
+        attachment_ids=[file["id"]],
+    )
+    await run_all()
+    assert len(fake.requests) == 1, "the run failed before reaching the model"
+    assert 'excerpt="true"' in user_message(fake.requests[0])["content"]

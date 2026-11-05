@@ -1,17 +1,20 @@
 """The set of tools offered to the model for one run."""
 
+import json
 import uuid
 from dataclasses import dataclass, field
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import app.services.tools.assistant  # noqa: F401 - registers the personal-assistant tools
 import app.services.tools.builtin  # noqa: F401 - registers the built-in tools
 import app.services.tools.plan  # noqa: F401 - registers the plan tools
 import app.services.tools.skills  # noqa: F401 - registers the skill tools
 import app.services.tools.websearch  # noqa: F401 - registers web_search
 from app.config import Settings
 from app.models import Conversation, McpServer, Skill, UserSettings
+from app.services.context import estimate_tokens
 from app.services.memory.store import memory_active_for
 from app.services.tools.mcp import server_headers, specs_for
 from app.services.tools.policy import (
@@ -79,6 +82,47 @@ async def available_tools(
 
 
 COMPACT_REASON = "Left out to save space in this model's small context window"
+# Always offered when available and allowed, whatever the budget: the tools most tasks need.
+CORE_TOOLS = frozenset(
+    {
+        "list_files",
+        "read_file",
+        "write_file",
+        "run_python",
+        "web_fetch",
+        "remember",
+        "search_memory",
+        "task_list",
+        "task_add",
+        "plan_start",
+        "plan_update",
+    }
+)
+
+
+def tool_tokens(spec: ToolSpec) -> int:
+    return estimate_tokens(json.dumps(spec.openai()))
+
+
+def fit_to_budget(offered: dict[str, ToolSpec], max_tokens: int) -> dict[str, str]:
+    """Which offered tools to leave out so their definitions fit `max_tokens`: core tools
+    stay; the others are added cheapest first (optional ones last) while they fit."""
+    core = {n: s for n, s in offered.items() if n in CORE_TOOLS}
+    used = sum(tool_tokens(s) for s in core.values())
+    rest = sorted(
+        (n for n in offered if n not in CORE_TOOLS),
+        key=lambda n: (offered[n].optional, tool_tokens(offered[n]), n),
+    )
+    left_out: dict[str, str] = {}
+    for name in rest:
+        cost = tool_tokens(offered[name])
+        if used + cost <= max_tokens:
+            used += cost
+        else:
+            left_out[name] = COMPACT_REASON
+    return left_out
+
+
 NOT_PERMISSION_REASONS = ("No skills saved yet", COMPACT_REASON)
 
 
@@ -89,6 +133,7 @@ async def build_toolset(
     *,
     sandbox: bool,
     compact: bool = False,
+    max_tool_tokens: int | None = None,
 ) -> Toolset:
     profile = await conversation_profile(db, conversation, settings)
     known, unavailable = await available_tools(db, conversation.owner_id, settings, sandbox=sandbox)
@@ -112,6 +157,12 @@ async def build_toolset(
         for name, spec in known.items()
         if name not in unavailable and profile.decide(name, spec.risk) != "deny"
     }
+    if max_tool_tokens is not None:
+        # Tool definitions are sent with every request: on a small context they must
+        # leave room for the conversation (ADR C-09).
+        left_out = fit_to_budget(offered, max_tool_tokens)
+        unavailable.update(left_out)
+        offered = {n: s for n, s in offered.items() if n not in left_out}
     return Toolset(
         profile=profile,
         known=known,

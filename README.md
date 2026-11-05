@@ -95,6 +95,7 @@ The model can call tools in the conversation's private workspace:
 | `make_document` | Create Word, PDF, Excel, CSV, PowerPoint, Markdown or HTML files |
 | `attach_file` | Hand a workspace file to you in the chat |
 | `remember`, `search_memory` | Propose or correct a memory (kind, importance, what it is about); search memories by kind or subject, and earlier chats |
+| `task_add`, `task_list`, `task_update`, `daily_briefing` | Manage your task list and plan your day |
 | `plan_start`, `plan_update`, `plan_status` | Record and update the plan of a multi-step task (kept across replies) |
 | `skill_search`, `skill_read`, `skill_create`, `skill_update`, `skill_validate`, `skill_test`, `skill_publish`, `skill_deprecate`, `skill_history` | Find and follow saved procedures; save and improve them as candidates; test them in the sandbox; ask to publish (your trust setting decides) |
 | MCP servers | Tools from MCP servers an administrator registers (streamable HTTP) |
@@ -132,6 +133,18 @@ The model can call tools in the conversation's private workspace:
 - Entities and relationships (projects, services, machines, people…) linked to memories
 - Secrets (passwords, keys, tokens) are refused and redacted before recall indexing
 - Re-embedding after you change the embedding model
+
+### Tasks and your day
+- Your own task list: subtasks, priorities, deadlines (all-day or timed, in your time
+  zone), reminders on your devices, repeats, dependencies, notes, attached files,
+  projects
+- Ask in a chat: "add a task to finish the memory work", "what are my most urgent
+  tasks?", "plan my day". Changing a task asks first under the Standard tool profile
+- When you mention something you need to do, Celius can suggest it as a task; nothing
+  is added until you accept it (switch off in Today > Settings)
+- **Today**: overdue and due tasks, a suggested order, the next 7 days, suggestions,
+  Celius's open work and what waits for you (approvals, memories, skills)
+- Optional daily briefing at a time you choose (a read-only scheduled task)
 
 ### Local models
 - A capability registry per model: context size, tool calling, images, parallel tool
@@ -404,7 +417,7 @@ docs/                 Backlog, ADRs, deployment, operations, acceptance tests, s
   - [0009: Memory and recall](docs/adr/0009-memory-and-recall.md)
 - Assistant roadmap: [roadmap and status](docs/implementation/CELIUS_ROADMAP.md) ·
   [audit](docs/implementation/AUDIT.md) ·
-  [decisions C-01…C-09](docs/implementation/ARCHITECTURE_DECISIONS.md) ·
+  [decisions C-01…C-10](docs/implementation/ARCHITECTURE_DECISIONS.md) ·
   [implementation log](docs/implementation/IMPLEMENTATION_LOG.md)
 
 ## Not yet verified

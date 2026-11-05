@@ -27,6 +27,8 @@ interface Props {
   onOpenMemory: () => void;
   skillsToReview: number;
   onOpenSkills: () => void;
+  todayCount: number;
+  onOpenToday: () => void;
   onOpenAccount: () => void;
 }
 
@@ -141,6 +143,22 @@ export function Sidebar(props: Props) {
       </ul>
 
       <div className="space-y-2 border-t border-line pt-3 text-sm">
+        <button
+          onClick={props.onOpenToday}
+          disabled={!props.online}
+          className="flex w-full items-center gap-2 rounded-lg px-1 py-1 text-left hover:bg-canvas/60 disabled:opacity-40"
+        >
+          <span aria-hidden="true">📅</span>
+          <span className="flex-1">Today</span>
+          {props.todayCount > 0 && (
+            <span
+              className="rounded-full bg-accent px-1.5 text-xs font-medium text-white"
+              aria-label={`${props.todayCount} tasks for today`}
+            >
+              {props.todayCount}
+            </span>
+          )}
+        </button>
         <button
           onClick={props.onOpenTools}
           disabled={!props.online}

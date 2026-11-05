@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 class SyncChange(BaseModel):
     cursor: int
     entity_type: Literal[
-        "conversation", "message", "project", "file", "memory", "skill", "agent_task"
+        "conversation", "message", "project", "file", "memory", "skill", "agent_task", "user_task"
     ]
     entity_id: uuid.UUID
     operation: Literal["upsert", "delete"]

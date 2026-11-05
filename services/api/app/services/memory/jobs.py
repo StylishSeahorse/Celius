@@ -29,6 +29,7 @@ from app.models import (
     MessageRole,
 )
 from app.services import model_registry
+from app.services.assistant import tasks as assistant_tasks
 from app.services.conversations import load_parts, message_text
 from app.services.jobs import JobFailed, enqueue_job, job_handler
 from app.services.memory.embeddings import Embedder
@@ -81,6 +82,16 @@ At most {limit} facts, each one short sentence in the third person ("The user pr
 metric units."). Answer with JSON only: \
 {{"memories": [{{"text": "...", "kind": "user", "always": false, "importance": 0.5, \
 "stated": true, "entities": [], "replaces": null}}]}}, or {{"memories": []}}."""
+# Appended when the user lets Celius suggest tasks (assistant settings): the same model call
+# notices deadlines and to-dos, so suggestions cost no extra inference (ADR C-10).
+TASKS_RULE = """
+
+Also note to-dos the user said they must do (by a date, or soon): "I need to renew my \
+passport before March", "remind me to call the plumber". Only their own commitments, not \
+the assistant's work or things already done; none is the usual answer. Add them as \
+"tasks": [{{"title": "Renew passport", "due": "YYYY-MM-DD" or null}}], at most 2. Today \
+is {today}."""
+MAX_SUGGESTED_TASKS = 2
 TRIVIAL_MESSAGE_WORDS = 3  # "thanks", "continue", "do it": nothing to learn
 KNOWN_FOR_EXTRACTION = 60
 
@@ -220,6 +231,29 @@ def parse_candidates(text: str) -> list[Candidate]:
     return found
 
 
+def parse_tasks(text: str) -> list[tuple[str, str | None]]:
+    """(title, due "YYYY-MM-DD" or None) from the "tasks" of the extraction answer."""
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+    if not match:
+        return []
+    try:
+        data = json.loads(match.group(0))
+    except json.JSONDecodeError:
+        return []
+    items = data.get("tasks") if isinstance(data, dict) else None
+    found = []
+    for item in items if isinstance(items, list) else []:
+        if isinstance(item, str):
+            item = {"title": item}
+        if not isinstance(item, dict) or not isinstance(item.get("title"), str):
+            continue
+        due = item.get("due")
+        due = due if isinstance(due, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", due) else None
+        if item["title"].strip():
+            found.append((item["title"].strip(), due))
+    return found[:MAX_SUGGESTED_TASKS]
+
+
 def parse_memories(text: str) -> list[tuple[str, bool]]:
     """(fact, always use): the original, simpler view of parse_candidates."""
     return [(c.text, c.always) for c in parse_candidates(text)]
@@ -270,6 +304,11 @@ async def extract_memories(
             )
         ).all()
         prefs = await user_prefs(db, conversation.owner_id, settings)
+        assistant = await assistant_tasks.user_prefs(db, conversation.owner_id, settings)
+        suggest_tasks = assistant.suggest_tasks
+        today = (
+            utcnow().astimezone(assistant_tasks.zone(assistant.timezone)).strftime("%A %Y-%m-%d")
+        )
         structured = False
         if gateway is not None:
             try:
@@ -304,7 +343,8 @@ async def extract_memories(
                 content=EXTRACTION_PROMPT.format(
                     limit=settings.memory_extraction_max_per_turn,
                     categories=", ".join(categories),
-                ),
+                )
+                + (TASKS_RULE.format(today=today) if suggest_tasks else ""),
             ),
             ChatMessage(
                 role="user",
@@ -326,9 +366,12 @@ async def extract_memories(
     except ModelGatewayError as exc:
         log.warning("Memory extraction skipped: %s", exc)
         return {"skipped": exc.code}
-    candidates = [c for c in parse_candidates("".join(pieces)) if c.category in categories][
+    answer = "".join(pieces)
+    candidates = [c for c in parse_candidates(answer) if c.category in categories][
         : settings.memory_extraction_max_per_turn
     ]
+    task_candidates = parse_tasks(answer) if suggest_tasks else []
+    suggested: list[str] = []
 
     embedder = Embedder.from_settings(settings)
     created = []
@@ -362,11 +405,14 @@ async def extract_memories(
                     continue
                 if memory is not None:
                     created.append(str(memory.id))
+            for title, due in task_candidates:
+                if task := await assistant_tasks.suggest(db, conversation, title, due, settings):
+                    suggested.append(str(task.id))
             await db.commit()
     finally:
         if embedder is not None:
             await embedder.aclose()
-    return {"proposed": created}
+    return {"proposed": created, "suggested_tasks": suggested}
 
 
 async def queue_after_reply(db, conversation: Conversation, run, settings: Settings) -> None:

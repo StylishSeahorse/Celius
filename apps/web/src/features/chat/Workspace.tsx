@@ -12,6 +12,7 @@ import { AccountPanel } from "../account/AccountPanel";
 import { DeleteConversationDialog } from "../memory/DeleteConversationDialog";
 import { MemoryPanel } from "../memory/MemoryPanel";
 import { SkillsPanel } from "../skills/SkillsPanel";
+import { TodayPanel } from "../today/TodayPanel";
 import { ToolsPanel } from "../tools/ToolsPanel";
 import { ChatView } from "./ChatView";
 import { FolderBrowser } from "./FolderBrowser";
@@ -42,6 +43,8 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const [draftMemory, setDraftMemory] = useState(true);
   const [memoryOpen, setMemoryOpen] = useState(false);
   const [skillsOpen, setSkillsOpen] = useState(false);
+  const [todayOpen, setTodayOpen] = useState(() => window.location.hash === "#/today");
+  const [todayCount, setTodayCount] = useState(0);
   const [skillsToReview, setSkillsToReview] = useState(0);
   const [accountOpen, setAccountOpen] = useState(false);
   const [memoryToReview, setMemoryToReview] = useState(0);
@@ -96,6 +99,10 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const refreshMemory = useCallback(() => {
     api.memorySettings().then((m) => setMemoryToReview(m.counts?.proposed ?? 0)).catch(() => undefined);
     api.skillSettings().then((s) => setSkillsToReview(s.pending ?? 0)).catch(() => undefined);
+    api
+      .briefing()
+      .then((b) => setTodayCount(b.overdue.length + b.due_today.length + b.suggestions.length))
+      .catch(() => undefined);
   }, []);
   useEffect(() => {
     refreshMemory();
@@ -157,7 +164,10 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
   }, []);
 
   useEffect(() => {
-    const onHash = () => setSelectedId(idFromHash());
+    const onHash = () => {
+      if (window.location.hash === "#/today") setTodayOpen(true);
+      else setSelectedId(idFromHash());
+    };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
@@ -207,6 +217,10 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
         if (changes.some((c) => c.entity_type === "memory" || c.entity_type === "skill")) refreshMemory();
         void refreshList();
         if (changes.some((c) => c.entity_type === "message")) refreshApprovals();
+        if (changes.some((c) => c.entity_type === "user_task")) {
+          refreshMemory();
+          window.dispatchEvent(new Event("celius:user-tasks-changed"));
+        }
         if (changes.some((c) => c.entity_type === "agent_task"))
           window.dispatchEvent(new Event("celius:agent-task-changed"));
         if (changes.some((c) => c.entity_type === "file")) {
@@ -291,6 +305,11 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
             setMemoryOpen(true);
             setSidebarOpen(false);
           }}
+          todayCount={todayCount}
+          onOpenToday={() => {
+            setTodayOpen(true);
+            setSidebarOpen(false);
+          }}
           skillsToReview={skillsToReview}
           onOpenSkills={() => {
             setSkillsOpen(true);
@@ -340,6 +359,22 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
           }}
           onClose={() => {
             setMemoryOpen(false);
+            refreshMemory();
+          }}
+        />
+      )}
+      {todayOpen && (
+        <TodayPanel
+          onChanged={refreshMemory}
+          onOpenConversation={(id) => {
+            setTodayOpen(false);
+            select(id);
+          }}
+          onOpenMemory={() => (setTodayOpen(false), setMemoryOpen(true))}
+          onOpenSkills={() => (setTodayOpen(false), setSkillsOpen(true))}
+          onClose={() => {
+            setTodayOpen(false);
+            if (window.location.hash === "#/today") window.location.hash = "";
             refreshMemory();
           }}
         />

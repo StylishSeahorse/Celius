@@ -38,6 +38,7 @@ BODIES = {
     ("POST", "/api/v1/skills/{skill_id}/versions"): {"files": {"SKILL.md": "x"}},
     ("POST", "/api/v1/skills/{skill_id}/feedback"): {"outcome": "success"},
     ("PATCH", "/api/v1/agent-tasks/{agent_task_id}"): {"status": "abandoned"},
+    ("PATCH", "/api/v1/tasks/{user_task_id}"): {"title": "taken over"},
     ("PATCH", "/api/v1/projects/{project_id}"): {"name": "taken over"},
     ("PUT", "/api/v1/projects/{project_id}/members/{username}"): {"role": "write"},
     ("PATCH", "/api/v1/conversations/{conversation_id}"): {"title": "taken over"},
@@ -163,6 +164,10 @@ async def alices_world(client, sessionmaker, settings, gateway, fake, admin_head
         db.add(agent_task)
         await db.commit()
         ids["agent_task_id"] = str(agent_task.id)
+    errand = await client.post(
+        "/api/v1/tasks", json={"title": "Alice's errand", "notes": "Secret"}, headers=alice
+    )
+    ids["user_task_id"] = errand.json()["id"]
     profile = await client.post("/api/v1/tool-profiles", json={"name": "Mine"}, headers=alice)
     ids["profile_id"] = profile.json()["key"].removeprefix("custom:")
     schedule = await client.post(
@@ -225,6 +230,8 @@ async def test_nobody_reaches_anyone_elses_data(
         "/api/v1/skills?q=soup",
         "/api/v1/skills?status=active",
         "/api/v1/agent-tasks?status=all",
+        "/api/v1/tasks?status=all",
+        "/api/v1/assistant/briefing",
         "/api/v1/tool-profiles",
         "/api/v1/schedules",
         "/api/v1/tool-calls?status=pending_approval",

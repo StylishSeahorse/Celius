@@ -24,9 +24,10 @@ ORDER = (
     "task",
     "memory",
     "skills",
+    "assistant",
     "tools",
 )
-TRUSTED = {"identity", "principles", "project_instructions", "data_note", "tools"}
+TRUSTED = {"identity", "principles", "project_instructions", "data_note", "assistant", "tools"}
 
 PRINCIPLES = {
     "lite": (

@@ -1,4 +1,7 @@
 import type {
+  AssistantSettings,
+  Briefing,
+  UserTask,
   AgentTask,
   AgentTaskDetail,
   ActivityItem,
@@ -37,6 +40,17 @@ import type {
   SubmitResponse,
   SyncChanges,
 } from "./types";
+
+export interface TaskFields {
+  title?: string;
+  notes?: string | null;
+  priority?: "low" | "normal" | "high" | "urgent";
+  due?: string;
+  remind?: string;
+  recurrence?: { freq: "daily" | "weekdays" | "weekly" | "monthly" | "yearly"; interval?: number } | null;
+  parent_id?: string | null;
+  project_id?: string | null;
+}
 
 export type MemoryCategory = "user" | "semantic" | "episodic" | "procedural";
 export type SkillTrust = "conservative" | "balanced" | "autonomous";
@@ -278,6 +292,18 @@ export const api = {
     request<void>(`/memory/conflicts/${id}/resolve`, json("POST", { decision })),
   memoryEntities: () => request<MemoryEntity[]>("/memory/entities"),
   memoryEntity: (id: string) => request<MemoryEntityDetail>(`/memory/entities/${id}`),
+
+  userTasks: (status: "active" | "done" | "suggested" | "all" = "active") =>
+    request<UserTask[]>(`/tasks?status=${status}`),
+  createUserTask: (body: TaskFields & { title: string }) => request<UserTask>("/tasks", json("POST", body)),
+  updateUserTask: (id: string, body: TaskFields & { status?: string; clear_recurrence?: boolean }) =>
+    request<{ task: UserTask; next_occurrence: UserTask | null }>(`/tasks/${id}`, json("PATCH", body)),
+  acceptUserTask: (id: string) => request<UserTask>(`/tasks/${id}/accept`, json("POST")),
+  deleteUserTask: (id: string) => request<void>(`/tasks/${id}`, json("DELETE")),
+  briefing: () => request<Briefing>("/assistant/briefing"),
+  assistantSettings: () => request<AssistantSettings>("/assistant/settings"),
+  updateAssistantSettings: (body: { timezone?: string; suggest_tasks?: boolean; briefing_time?: string }) =>
+    request<AssistantSettings>("/assistant/settings", json("PUT", body)),
 
   modelRegistry: () => request<ModelRegistryEntry[]>("/models/registry"),
   updateModelRegistry: (body: ModelRegistryUpdate) =>

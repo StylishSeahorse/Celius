@@ -296,3 +296,38 @@ async def test_prompt_eval_harness_scores_scenarios_per_profile(fake):
     text = report(results)
     assert "lite: 1/1 passed" in text and "standard: 0/1 passed" in text
     json.dumps([r.__dict__ for r in results])  # serialisable for --json
+
+
+def test_tool_budget_keeps_core_tools_and_adds_the_cheapest_rest():
+    from app.services.tools.toolset import BUILTIN, CORE_TOOLS, fit_to_budget, tool_tokens
+
+    offered = dict(BUILTIN)
+    core_cost = sum(tool_tokens(offered[n]) for n in CORE_TOOLS)
+    left_out = fit_to_budget(offered, core_cost + 300)
+    kept = set(offered) - set(left_out)
+    assert CORE_TOOLS <= kept
+    assert sum(tool_tokens(offered[n]) for n in kept) <= core_cost + 300
+    extra = kept - CORE_TOOLS
+    assert extra and all(not offered[n].optional for n in extra)  # cheap, non-optional first
+    assert fit_to_budget(offered, 10**6) == {}  # big contexts keep everything
+    assert set(fit_to_budget(offered, 0)) == set(offered) - CORE_TOOLS  # core always stays
+
+
+async def test_tool_definitions_leave_room_on_a_small_context(
+    client, auth_headers, sessionmaker, gateway, settings, fake
+):
+    from app.services.context import estimate_tokens
+
+    fake.context_tokens = 8192
+    await chat(
+        client, auth_headers, "Hi", sessionmaker, gateway, settings, tool_profile="developer"
+    )
+    tools = fake.requests[-1]["tools"]
+    assert estimate_tokens(json.dumps(tools)) <= 8192 * settings.tool_context_share + 50
+    names = {t["function"]["name"] for t in tools}
+    assert {"read_file", "write_file", "task_add", "plan_start"} <= names
+    # Left out for space, not for permission: not listed as missing.
+    note = system_prompt(fake).split("Not available in this chat", 1)[-1]
+    for name in ("task_update", "skill_create", "daily_briefing", "plan_status"):
+        if name not in names:
+            assert name not in note, name

@@ -2,6 +2,9 @@
 // envelope lives here; it is defined by packages/contracts, not by OpenAPI.
 
 export type {
+  AssistantSettings,
+  Briefing,
+  UserTask,
   AgentTask,
   AgentTaskDetail,
   ConversationDetail,

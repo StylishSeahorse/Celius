@@ -261,6 +261,19 @@ run records its profile and the estimated tokens per section in `run.started`
 (`prompt_sections`), the measurements Phase 7 needs. The standard profile renders the
 same prompt as before (tested).
 
+**Context budget order.** The system prompt is built first; the newest message's
+attachments then take `ATTACHMENT_CONTEXT_SHARE` of what it leaves (previously of the
+whole window, which overflowed small models once the prompt grew; found in Phase 5).
+
+**Tool budget.** Tool definitions go with every request. With a known context window
+they may use at most `TOOL_CONTEXT_SHARE` (35%) of it: core tools (files, Python,
+web_fetch, memory, task_list/task_add, plan_start/plan_update) always stay; the others
+are added cheapest first, optional ones last, while they fit. On an 8k model that keeps
+about 2,900 tokens of tools instead of 5,800; large models keep everything. Tools left
+out for space are not reported to the model as "not available" (they aren't a
+permission matter). Found in Phase 5, when the task tools tipped the e2e attachment
+tests over an 8k context for the third time: trimming descriptions had only delayed it.
+
 **Tool calling.** One call per turn on lite (configurable per model). `ChatRequest`
 gains `response_format`; memory extraction asks for a JSON object when the registry says
 the model supports structured output (`MODEL_ENABLE_STRUCTURED_OUTPUT` or per model),
@@ -277,3 +290,56 @@ has only run against the fake server here.
 **Rejected.** Profiles keyed on model-name patterns (wrong as soon as a fine-tune is
 renamed); separate prompt templates per model family (unmaintainable); per-chat profile
 choice for users (a property of the model, not of the conversation).
+
+---
+
+## C-10: Personal tasks, reminders, suggestions and the daily briefing
+
+Status: accepted · 2026-11-05
+
+**Context.** Celius had projects and scheduled prompts, but nothing that holds the
+user's own commitments. Agent tasks (C-08) are Celius's record of its own work; personal
+tasks are the user's to-dos. They are kept apart on purpose.
+
+**Decision.**
+- `user_tasks` (migration 0014): title, notes, status (`suggested`, `open`,
+  `in_progress`, `done`, `cancelled`), priority 0–3, deadline (all-day deadlines stored
+  as midnight in the user's time zone), reminder, recurrence (`daily`, `weekdays`,
+  `weekly`, `monthly`, `yearly` × interval), subtasks (`parent_id`, loops refused),
+  dependencies (`blocked_by`, same owner), tags, attached files (same owner), project
+  (one the user can read), source (`user`, `model`, `suggested`) and source chat.
+- **Time zone** per user (`assistant.timezone` preference, default `DEFAULT_TIMEZONE`):
+  "today", overdue and repeats are computed in it; a weekly 09:00 stays 09:00 across
+  daylight-saving changes; monthly repeats clamp to the month's end.
+- **Recurrence**: completing a repeating task creates the next occurrence, deadline and
+  reminder moved by the same step. A repeating task must have a deadline.
+- **Reminders** fire from the worker loop (`fire_due_reminders`), with no model involved,
+  through the existing Web Push job. Claimed by a conditional UPDATE, so each fires once
+  with several workers; missed ones fire when a worker returns; only for active tasks;
+  moving a reminder re-arms it.
+- **Tools**: `task_list` and `daily_briefing` read; `task_add` and `task_update` are
+  `write`, because they change the user's commitments: the user's tool policy is the
+  authorisation (Standard asks first). The tool description also tells the model not to
+  change dates or priorities, or cancel, unless asked. `daily_briefing` is optional
+  (lite profile: `task_list` covers it). A one-line `assistant` prompt module tells the
+  model the task list exists.
+- **Suggestions** (proactive, configurable): when the user allows it (default on), the
+  memory extraction call also asks for to-dos the user said they must do, with today's
+  date for "by Friday". No extra model call. They become `suggested` tasks, deduplicated
+  by title, never reminded or listed as to-dos until accepted; dismissing deletes them.
+  Incognito chats suggest nothing (extraction doesn't run).
+- **Briefing** (`GET /assistant/briefing`, and the `daily_briefing` tool): overdue, due
+  today, next 7 days, in progress, blocked, suggestions, Celius's open agent tasks, and
+  what waits for the user (approvals, memories, skills). The **suggested order** is a
+  deterministic score: overdue +100, due today +60, due within 3 days +30…, priority
+  ×10, in progress +15, a little for age; blocked tasks are left out. It is explainable,
+  and it changes nothing. "Plan my day" in a chat lets the model turn it into prose.
+- **Daily briefing schedule**: an assistant setting creates an ordinary scheduled task
+  (daily, the user's time zone) with the **read-only** tool profile: it can read tasks
+  and the briefing, never change them.
+- Calendar information joins the briefing in Phase 6 (`calendar: null` until then).
+
+**Rejected.** Reusing agent tasks for to-dos (different owner of the intent, different
+lifecycle); suggestions as notifications (intrusive); a model-written plan stored as
+truth (the plan is computed; the model only explains it); reminders through the model
+(they must fire whether or not inference is available).

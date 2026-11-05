@@ -130,6 +130,48 @@
         "title": "ActivityList",
         "type": "object"
       },
+      "AgentTaskBrief": {
+        "properties": {
+          "conversation_id": {
+            "format": "uuid",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "conversation_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Title"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "objective": {
+            "title": "Objective",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "conversation_id",
+          "conversation_title",
+          "objective",
+          "status"
+        ],
+        "title": "AgentTaskBrief",
+        "type": "object"
+      },
       "AgentTaskDetail": {
         "properties": {
           "blockers": {
@@ -593,6 +635,185 @@
           "args_hash"
         ],
         "title": "ApproveToolCall",
+        "type": "object"
+      },
+      "AssistantSettings": {
+        "properties": {
+          "briefing_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Briefing Time"
+          },
+          "suggest_tasks": {
+            "title": "Suggest Tasks",
+            "type": "boolean"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "timezone",
+          "suggest_tasks",
+          "briefing_time"
+        ],
+        "title": "AssistantSettings",
+        "type": "object"
+      },
+      "AssistantSettingsUpdate": {
+        "properties": {
+          "briefing_time": {
+            "anyOf": [
+              {
+                "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$|^$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Briefing Time"
+          },
+          "suggest_tasks": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggest Tasks"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
+          }
+        },
+        "title": "AssistantSettingsUpdate",
+        "type": "object"
+      },
+      "Briefing": {
+        "properties": {
+          "agent_tasks": {
+            "items": {
+              "$ref": "#/components/schemas/AgentTaskBrief"
+            },
+            "title": "Agent Tasks",
+            "type": "array"
+          },
+          "blocked": {
+            "items": {
+              "$ref": "#/components/schemas/UserTaskOut"
+            },
+            "title": "Blocked",
+            "type": "array"
+          },
+          "calendar": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calendar"
+          },
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "due_today": {
+            "items": {
+              "$ref": "#/components/schemas/UserTaskOut"
+            },
+            "title": "Due Today",
+            "type": "array"
+          },
+          "in_progress": {
+            "items": {
+              "$ref": "#/components/schemas/UserTaskOut"
+            },
+            "title": "In Progress",
+            "type": "array"
+          },
+          "overdue": {
+            "items": {
+              "$ref": "#/components/schemas/UserTaskOut"
+            },
+            "title": "Overdue",
+            "type": "array"
+          },
+          "plan": {
+            "items": {
+              "$ref": "#/components/schemas/UserTaskOut"
+            },
+            "title": "Plan",
+            "type": "array"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/UserTaskOut"
+            },
+            "title": "Suggestions",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          },
+          "upcoming": {
+            "items": {
+              "$ref": "#/components/schemas/UserTaskOut"
+            },
+            "title": "Upcoming",
+            "type": "array"
+          },
+          "waiting": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Waiting",
+            "type": "object"
+          }
+        },
+        "required": [
+          "date",
+          "timezone",
+          "overdue",
+          "due_today",
+          "upcoming",
+          "in_progress",
+          "plan",
+          "suggestions",
+          "blocked",
+          "agent_tasks",
+          "waiting",
+          "calendar",
+          "text"
+        ],
+        "title": "Briefing",
         "type": "object"
       },
       "CapabilityOverrides": {
@@ -4151,6 +4372,33 @@
         "title": "PushKeys",
         "type": "object"
       },
+      "Recurrence": {
+        "properties": {
+          "freq": {
+            "enum": [
+              "daily",
+              "weekdays",
+              "weekly",
+              "monthly",
+              "yearly"
+            ],
+            "title": "Freq",
+            "type": "string"
+          },
+          "interval": {
+            "default": 1,
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Interval",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "freq"
+        ],
+        "title": "Recurrence",
+        "type": "object"
+      },
       "Regenerate": {
         "description": "Generate an alternative reply on a new branch; the original reply stays.",
         "properties": {
@@ -5586,7 +5834,8 @@
               "file",
               "memory",
               "skill",
-              "agent_task"
+              "agent_task",
+              "user_task"
             ],
             "title": "Entity Type",
             "type": "string"
@@ -6307,6 +6556,544 @@
         "title": "UploadProgress",
         "type": "object"
       },
+      "UserTaskChanged": {
+        "properties": {
+          "next_occurrence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserTaskOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "task": {
+            "$ref": "#/components/schemas/UserTaskOut"
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "title": "UserTaskChanged",
+        "type": "object"
+      },
+      "UserTaskCreate": {
+        "properties": {
+          "attachment_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Attachment Ids",
+            "type": "array"
+          },
+          "blocked_by": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Blocked By",
+            "type": "array"
+          },
+          "due": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "priority": {
+            "default": "normal",
+            "enum": [
+              "low",
+              "normal",
+              "high",
+              "urgent"
+            ],
+            "title": "Priority",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "recurrence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Recurrence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "remind": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remind"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Tags",
+            "type": "array"
+          },
+          "title": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "UserTaskCreate",
+        "type": "object"
+      },
+      "UserTaskOut": {
+        "properties": {
+          "attachment_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Attachment Ids",
+            "type": "array"
+          },
+          "blocked": {
+            "title": "Blocked",
+            "type": "boolean"
+          },
+          "blocked_by": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Blocked By",
+            "type": "array"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "due_all_day": {
+            "title": "Due All Day",
+            "type": "boolean"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "due_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "overdue": {
+            "title": "Overdue",
+            "type": "boolean"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "priority": {
+            "enum": [
+              "low",
+              "normal",
+              "high",
+              "urgent"
+            ],
+            "title": "Priority",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "recurrence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Recurrence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "remind_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remind At"
+          },
+          "reminded_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reminded At"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "source_conversation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Conversation Id"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "notes",
+          "status",
+          "priority",
+          "due_at",
+          "due_all_day",
+          "due_date",
+          "overdue",
+          "remind_at",
+          "reminded_at",
+          "recurrence",
+          "project_id",
+          "parent_id",
+          "blocked_by",
+          "blocked",
+          "tags",
+          "attachment_ids",
+          "source",
+          "source_conversation_id",
+          "completed_at",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "UserTaskOut",
+        "type": "object"
+      },
+      "UserTaskUpdate": {
+        "properties": {
+          "attachment_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attachment Ids"
+          },
+          "blocked_by": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocked By"
+          },
+          "clear_recurrence": {
+            "default": false,
+            "title": "Clear Recurrence",
+            "type": "boolean"
+          },
+          "due": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "enum": [
+                  "low",
+                  "normal",
+                  "high",
+                  "urgent"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "recurrence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Recurrence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "remind": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remind"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "open",
+                  "in_progress",
+                  "done",
+                  "cancelled"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "UserTaskUpdate",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -7000,6 +7787,88 @@
         "summary": "Resume Task",
         "tags": [
           "agent tasks"
+        ]
+      }
+    },
+    "/api/v1/assistant/briefing": {
+      "get": {
+        "description": "Today: overdue, due, upcoming, in progress, a suggested order, suggestions to\nreview, Celius's open work and what waits for you. Computed, no model involved.",
+        "operationId": "get_briefing_api_v1_assistant_briefing_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Briefing"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Briefing",
+        "tags": [
+          "assistant"
+        ]
+      }
+    },
+    "/api/v1/assistant/settings": {
+      "get": {
+        "operationId": "get_assistant_settings_api_v1_assistant_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantSettings"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Assistant Settings",
+        "tags": [
+          "assistant"
+        ]
+      },
+      "put": {
+        "operationId": "update_assistant_settings_api_v1_assistant_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistantSettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantSettings"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Assistant Settings",
+        "tags": [
+          "assistant"
         ]
       }
     },
@@ -11597,6 +12466,300 @@
         "summary": "Get Cursor",
         "tags": [
           "sync"
+        ]
+      }
+    },
+    "/api/v1/tasks": {
+      "get": {
+        "operationId": "list_tasks_api_v1_tasks_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "active",
+              "pattern": "^(active|done|cancelled|suggested|all)$",
+              "title": "Status",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "project_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UserTaskOut"
+                  },
+                  "title": "Response List Tasks Api V1 Tasks Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Tasks",
+        "tags": [
+          "assistant"
+        ]
+      },
+      "post": {
+        "operationId": "create_task_api_v1_tasks_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserTaskCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserTaskOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Task",
+        "tags": [
+          "assistant"
+        ]
+      }
+    },
+    "/api/v1/tasks/{user_task_id}": {
+      "delete": {
+        "description": "Delete a task (and its subtasks). Dismissing a suggestion is deleting it.",
+        "operationId": "delete_task_api_v1_tasks__user_task_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Task",
+        "tags": [
+          "assistant"
+        ]
+      },
+      "get": {
+        "operationId": "get_task_api_v1_tasks__user_task_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserTaskOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Task",
+        "tags": [
+          "assistant"
+        ]
+      },
+      "patch": {
+        "operationId": "update_task_api_v1_tasks__user_task_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserTaskUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserTaskChanged"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Task",
+        "tags": [
+          "assistant"
+        ]
+      }
+    },
+    "/api/v1/tasks/{user_task_id}/accept": {
+      "post": {
+        "description": "Accept a task Celius suggested from a chat.",
+        "operationId": "accept_task_api_v1_tasks__user_task_id__accept_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserTaskOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Accept Task",
+        "tags": [
+          "assistant"
         ]
       }
     },

@@ -2,6 +2,53 @@
 
 Newest first. Each entry: what changed, how it was verified, what is left.
 
+## 2026-11-05: Phase 5, personal assistant foundation
+
+**Existing implementation.** Projects, scheduled prompts (`scheduled_tasks`), Web Push
+(`push.queue` → `push.notify` job), memory extraction after replies, agent tasks. No
+personal tasks, reminders, user time zone, briefing or dashboard.
+
+**Changes.** See C-10.
+- Migration 0014: `user_tasks`
+- `services/assistant/tasks.py`: create/change rules (ownership, project access, loops,
+  dependencies, attachments, secrets redacted), local dates and repeats, next occurrence,
+  suggestions, briefing and suggested order, reminders
+- Worker loop fires due reminders; sync feed carries `user_task` changes
+- Tools `task_add`, `task_list`, `task_update`, `daily_briefing`; `assistant` prompt
+  module
+- Memory extraction also notices to-dos when allowed (`TASKS_RULE`, `parse_tasks`)
+- API: `/tasks` (list, create, get, update, accept, delete), `/assistant/briefing`,
+  `/assistant/settings` (time zone, suggestions, daily briefing schedule)
+- Web: Today panel (briefing with check-off, suggestions to accept or dismiss, Celius's
+  open work, what waits for you; task list with quick add, priorities, subtasks, editor
+  with due date, reminder and repeat; settings) and a sidebar entry with a count;
+  reminders open `#/today`. Dev fake model: `[todo:…]`
+
+**Found while testing.** Creating a task with dependencies answered `blocked: false`
+(the create response didn't load the blockers). The sync feed schema hadn't received
+`user_task` (my edit missed a reformatted line): any task change would have broken
+`GET /sync/changes`; caught by the web typecheck against the regenerated client, fixed,
+and now covered by a test. The full e2e run failed the attachment tests on the 8k-context
+fake model a third time. Root cause, now fixed rather than worked around: the attachment
+share was taken of the *whole* context window before the system prompt was built, so a
+grown prompt plus a long document overflowed small models. Attachments are now sized
+from what the system prompt leaves (`executor._prepare`); a regression test fails
+without the fix and passes with it. The remaining failure was the tool definitions
+themselves (~5,000 of an 8k model's ~5,900 usable tokens): tools now fit a budget of the
+context (`TOOL_CONTEXT_SHARE`, C-09), core tools first, the rest cheapest first.
+
+**Verification.** `tests/test_personal_tasks.py` (15): local dates, repeats across DST and
+month ends, list order and updates, subtasks/dependencies/validation, repeating
+completion, reminders once and only for active tasks (and re-armed), briefing and order,
+time zone deciding "today", the daily briefing schedule, suggestions from a chat
+(accept, dismiss, no duplicates), suggestions off, task tools in a project chat, Standard
+asking before a change, privacy, the sync feed. Isolation sweep covers the routes. e2e
+`today.spec.ts` (add, briefing, complete; suggestion accepted). Totals: API suite
+**565 passed, 7 skipped** (SQLite); migrations, personal tasks, attachments, profiles,
+isolation and sync on PostgreSQL 16 + pgvector (57 passed); full e2e suite **89 passed**.
+
+**Left.** Calendar and automation rules (Phase 6).
+
 ## 2026-11-05: Phase 4, local model intelligence
 
 **Existing implementation.** `model_gateway` detects context size and vision from

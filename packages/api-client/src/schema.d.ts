@@ -217,6 +217,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assistant/briefing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Briefing
+         * @description Today: overdue, due, upcoming, in progress, a suggested order, suggestions to
+         *     review, Celius's open work and what waits for you. Computed, no model involved.
+         */
+        get: operations["get_briefing_api_v1_assistant_briefing_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Assistant Settings */
+        get: operations["get_assistant_settings_api_v1_assistant_settings_get"];
+        /** Update Assistant Settings */
+        put: operations["update_assistant_settings_api_v1_assistant_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/invitations/{token}": {
         parameters: {
             query?: never;
@@ -1798,6 +1837,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Tasks */
+        get: operations["list_tasks_api_v1_tasks_get"];
+        put?: never;
+        /** Create Task */
+        post: operations["create_task_api_v1_tasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{user_task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Task */
+        get: operations["get_task_api_v1_tasks__user_task_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Task
+         * @description Delete a task (and its subtasks). Dismissing a suggestion is deleting it.
+         */
+        delete: operations["delete_task_api_v1_tasks__user_task_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Task */
+        patch: operations["update_task_api_v1_tasks__user_task_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/tasks/{user_task_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Task
+         * @description Accept a task Celius suggested from a chat.
+         */
+        post: operations["accept_task_api_v1_tasks__user_task_id__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tool-calls/pending": {
         parameters: {
             query?: never;
@@ -1999,6 +2098,25 @@ export interface components {
             /** Items */
             items: components["schemas"]["ActivityItem"][];
         };
+        /** AgentTaskBrief */
+        AgentTaskBrief: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Conversation Title */
+            conversation_title: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Objective */
+            objective: string;
+            /** Status */
+            status: string;
+        };
         /** AgentTaskDetail */
         AgentTaskDetail: {
             /** Blockers */
@@ -2169,6 +2287,57 @@ export interface components {
              * @default false
              */
             remember_all: boolean;
+        };
+        /** AssistantSettings */
+        AssistantSettings: {
+            /** Briefing Time */
+            briefing_time: string | null;
+            /** Suggest Tasks */
+            suggest_tasks: boolean;
+            /** Timezone */
+            timezone: string;
+        };
+        /** AssistantSettingsUpdate */
+        AssistantSettingsUpdate: {
+            /** Briefing Time */
+            briefing_time?: string | null;
+            /** Suggest Tasks */
+            suggest_tasks?: boolean | null;
+            /** Timezone */
+            timezone?: string | null;
+        };
+        /** Briefing */
+        Briefing: {
+            /** Agent Tasks */
+            agent_tasks: components["schemas"]["AgentTaskBrief"][];
+            /** Blocked */
+            blocked: components["schemas"]["UserTaskOut"][];
+            /** Calendar */
+            calendar: {
+                [key: string]: unknown;
+            } | null;
+            /** Date */
+            date: string;
+            /** Due Today */
+            due_today: components["schemas"]["UserTaskOut"][];
+            /** In Progress */
+            in_progress: components["schemas"]["UserTaskOut"][];
+            /** Overdue */
+            overdue: components["schemas"]["UserTaskOut"][];
+            /** Plan */
+            plan: components["schemas"]["UserTaskOut"][];
+            /** Suggestions */
+            suggestions: components["schemas"]["UserTaskOut"][];
+            /** Text */
+            text: string;
+            /** Timezone */
+            timezone: string;
+            /** Upcoming */
+            upcoming: components["schemas"]["UserTaskOut"][];
+            /** Waiting */
+            waiting: {
+                [key: string]: number;
+            };
         };
         /**
          * CapabilityOverrides
@@ -3377,6 +3546,19 @@ export interface components {
             /** P256Dh */
             p256dh: string;
         };
+        /** Recurrence */
+        Recurrence: {
+            /**
+             * Freq
+             * @enum {string}
+             */
+            freq: "daily" | "weekdays" | "weekly" | "monthly" | "yearly";
+            /**
+             * Interval
+             * @default 1
+             */
+            interval: number;
+        };
         /**
          * Regenerate
          * @description Generate an alternative reply on a new branch; the original reply stays.
@@ -3859,7 +4041,7 @@ export interface components {
              * Entity Type
              * @enum {string}
              */
-            entity_type: "conversation" | "message" | "project" | "file" | "memory" | "skill" | "agent_task";
+            entity_type: "conversation" | "message" | "project" | "file" | "memory" | "skill" | "agent_task" | "user_task";
             /**
              * Operation
              * @enum {string}
@@ -4103,6 +4285,130 @@ export interface components {
             received_bytes: number;
             /** Status */
             status: string;
+        };
+        /** UserTaskChanged */
+        UserTaskChanged: {
+            next_occurrence?: components["schemas"]["UserTaskOut"] | null;
+            task: components["schemas"]["UserTaskOut"];
+        };
+        /** UserTaskCreate */
+        UserTaskCreate: {
+            /** Attachment Ids */
+            attachment_ids?: string[];
+            /** Blocked By */
+            blocked_by?: string[];
+            /** Due */
+            due?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Parent Id */
+            parent_id?: string | null;
+            /**
+             * Priority
+             * @default normal
+             * @enum {string}
+             */
+            priority: "low" | "normal" | "high" | "urgent";
+            /** Project Id */
+            project_id?: string | null;
+            recurrence?: components["schemas"]["Recurrence"] | null;
+            /** Remind */
+            remind?: string | null;
+            /** Tags */
+            tags?: string[];
+            /** Title */
+            title: string;
+        };
+        /** UserTaskOut */
+        UserTaskOut: {
+            /** Attachment Ids */
+            attachment_ids: string[];
+            /** Blocked */
+            blocked: boolean;
+            /** Blocked By */
+            blocked_by: string[];
+            /** Completed At */
+            completed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Due All Day */
+            due_all_day: boolean;
+            /** Due At */
+            due_at: string | null;
+            /** Due Date */
+            due_date: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Notes */
+            notes: string | null;
+            /** Overdue */
+            overdue: boolean;
+            /** Parent Id */
+            parent_id: string | null;
+            /**
+             * Priority
+             * @enum {string}
+             */
+            priority: "low" | "normal" | "high" | "urgent";
+            /** Project Id */
+            project_id: string | null;
+            recurrence: components["schemas"]["Recurrence"] | null;
+            /** Remind At */
+            remind_at: string | null;
+            /** Reminded At */
+            reminded_at: string | null;
+            /** Source */
+            source: string;
+            /** Source Conversation Id */
+            source_conversation_id: string | null;
+            /** Status */
+            status: string;
+            /** Tags */
+            tags: string[];
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** UserTaskUpdate */
+        UserTaskUpdate: {
+            /** Attachment Ids */
+            attachment_ids?: string[] | null;
+            /** Blocked By */
+            blocked_by?: string[] | null;
+            /**
+             * Clear Recurrence
+             * @default false
+             */
+            clear_recurrence: boolean;
+            /** Due */
+            due?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Parent Id */
+            parent_id?: string | null;
+            /** Priority */
+            priority?: ("low" | "normal" | "high" | "urgent") | null;
+            /** Project Id */
+            project_id?: string | null;
+            recurrence?: components["schemas"]["Recurrence"] | null;
+            /** Remind */
+            remind?: string | null;
+            /** Status */
+            status?: ("open" | "in_progress" | "done" | "cancelled") | null;
+            /** Tags */
+            tags?: string[] | null;
+            /** Title */
+            title?: string | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -4566,6 +4872,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentTaskResumed"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_briefing_api_v1_assistant_briefing_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Briefing"];
+                };
+            };
+        };
+    };
+    get_assistant_settings_api_v1_assistant_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssistantSettings"];
+                };
+            };
+        };
+    };
+    update_assistant_settings_api_v1_assistant_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssistantSettingsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssistantSettings"];
                 };
             };
             /** @description Validation Error */
@@ -7801,6 +8180,198 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SyncCursor"];
+                };
+            };
+        };
+    };
+    list_tasks_api_v1_tasks_get: {
+        parameters: {
+            query?: {
+                status?: string;
+                project_id?: string | null;
+                q?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserTaskOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_task_api_v1_tasks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserTaskCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserTaskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_task_api_v1_tasks__user_task_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserTaskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_task_api_v1_tasks__user_task_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_task_api_v1_tasks__user_task_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserTaskUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserTaskChanged"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_task_api_v1_tasks__user_task_id__accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserTaskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
