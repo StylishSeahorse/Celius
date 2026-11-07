@@ -1074,6 +1074,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/integrations/google": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Google Status */
+        get: operations["google_status_api_v1_integrations_google_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/google/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Google Start
+         * @description The Google consent URL. The browser goes there; Google sends it back to the callback.
+         */
+        post: operations["google_start_api_v1_integrations_google_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/mcp-servers": {
         parameters: {
             query?: never;
@@ -3292,6 +3329,23 @@ export interface components {
             temperature?: number | null;
             /** Top P */
             top_p?: number | null;
+        };
+        /** GoogleStart */
+        GoogleStart: {
+            /** Login Hint */
+            login_hint?: string | null;
+        };
+        /** GoogleStartOut */
+        GoogleStartOut: {
+            /** Url */
+            url: string;
+        };
+        /** GoogleStatus */
+        GoogleStatus: {
+            /** Configured */
+            configured: boolean;
+            /** Redirect Uri */
+            redirect_uri: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -7226,6 +7280,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccountCheck"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    google_status_api_v1_integrations_google_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoogleStatus"];
+                };
+            };
+        };
+    };
+    google_start_api_v1_integrations_google_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GoogleStart"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoogleStartOut"];
                 };
             };
             /** @description Validation Error */

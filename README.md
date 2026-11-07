@@ -159,7 +159,9 @@ The model can call tools in the conversation's private workspace:
 - Celius's own calendar, plus CalDAV calendars (Nextcloud, iCloud, Fastmail…): see the
   week, add events or block time for a task, find free time and overlaps; today's events
   are in the briefing
-- Email over IMAP/SMTP (Gmail and Outlook with an app password): search and read without
+- Email over IMAP/SMTP: Gmail with **Sign in with Google**
+  ([setup](docs/deployment/google-sign-in.md)) or an app password, Outlook and others
+  with an app password. Search and read without
   marking mail read, summarise and find action items, save replies to Drafts.
   **Sending asks you every time**, whatever the tool permissions
 - Automations that run on their own: "when a task becomes overdue, notify me", "every
@@ -302,7 +304,8 @@ Then:
    ([reverse-proxy.md](docs/deployment/reverse-proxy.md)). HTTPS is needed for the
    installable app, offline start and notifications
 3. Sign in with the bootstrap account, then remove `BOOTSTRAP_PASSWORD` from `.env`
-4. Optional: `EXA_API_KEY` for web search, an embedding server for better memory, backups
+4. Optional: `GOOGLE_OAUTH_CLIENT_ID`/`_SECRET` for Gmail sign-in
+   ([google-sign-in.md](docs/deployment/google-sign-in.md)), `EXA_API_KEY` for web search, an embedding server for better memory, backups
    with `BACKUP_PASSPHRASE` and `BACKUP_OFFSITE_TARGET`, an `ALERT_WEBHOOK_URL`
 
 Database migrations run automatically on `make up` and `make upgrade`.

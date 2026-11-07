@@ -114,7 +114,7 @@ Existing base kept: runs persist every tool call and resume after a worker crash
 | Calendar provider abstraction: local calendar + CalDAV | ✅ | C-11; Google/Microsoft through CalDAV/app passwords; OAuth ⬜ |
 | Read events, availability (free time), create, update, cancel, block time for tasks, conflicts | ✅ | recurring CalDAV series read-only from Celius |
 | Calendar in the briefing (events, overlaps, deadlines during events) | ✅ | |
-| Email provider abstraction: IMAP/SMTP | ✅ | Gmail/Outlook OAuth ⬜ |
+| Email provider abstraction: IMAP/SMTP | ✅ | Gmail OAuth ✅ (C-14); Outlook OAuth ⬜ |
 | Search, read (unread kept), summarise/extract action items (model), drafts, replies | ✅ | |
 | Sending needs approval every time (backend-enforced) | ✅ | `always_ask` |
 | Automation engine: triggers, conditions, actions, schedules, history, failure handling | ✅ | worker loop, no model |
@@ -147,6 +147,6 @@ All seven phases are built. What is left needs the real installation or is a fol
    --embeddings-url http://<embeddings>/v1 --save memory.json`; set model profiles and
    (only if the grid says so) `MEMORY_WEIGHT_*`; record results in IMPLEMENTATION_LOG.md.
 2. Connect a real CalDAV calendar and mailbox; check reminders and automations on devices.
-3. Follow-ups: OAuth for Google/Microsoft; recurring local events; an entity browser and
+3. Follow-ups: Google Calendar over the same Google sign-in; OAuth for Microsoft; recurring local events; an entity browser and
    skill import in the UI; `/models/{id}/verify-tools` for ids with "/"; a labelled
    memory set from the household's own (consented) data.

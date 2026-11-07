@@ -29,6 +29,11 @@ function byUpdated(a: ConversationSummary, b: ConversationSummary) {
   return b.updated_at.localeCompare(a.updated_at);
 }
 
+/** "#/today", also with a query (e.g. coming back from signing in with Google). */
+function isTodayHash(hash: string) {
+  return hash === "#/today" || hash.startsWith("#/today?");
+}
+
 export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const online = useOnline();
   const [selectedId, setSelectedId] = useState<string | null>(idFromHash);
@@ -43,7 +48,7 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const [draftMemory, setDraftMemory] = useState(true);
   const [memoryOpen, setMemoryOpen] = useState(false);
   const [skillsOpen, setSkillsOpen] = useState(false);
-  const [todayOpen, setTodayOpen] = useState(() => window.location.hash === "#/today");
+  const [todayOpen, setTodayOpen] = useState(() => isTodayHash(window.location.hash));
   const [todayCount, setTodayCount] = useState(0);
   const [skillsToReview, setSkillsToReview] = useState(0);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -165,7 +170,7 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
 
   useEffect(() => {
     const onHash = () => {
-      if (window.location.hash === "#/today") setTodayOpen(true);
+      if (isTodayHash(window.location.hash)) setTodayOpen(true);
       else setSelectedId(idFromHash());
     };
     window.addEventListener("hashchange", onHash);
@@ -374,7 +379,7 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
           onOpenSkills={() => (setTodayOpen(false), setSkillsOpen(true))}
           onClose={() => {
             setTodayOpen(false);
-            if (window.location.hash === "#/today") window.location.hash = "";
+            if (isTodayHash(window.location.hash)) window.location.hash = "";
             refreshMemory();
           }}
         />

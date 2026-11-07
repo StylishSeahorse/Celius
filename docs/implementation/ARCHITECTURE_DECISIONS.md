@@ -506,3 +506,58 @@ runs in sequence with the chat. The reviewer judges intent from the user's words
 only, so it errs towards asking on vague requests; that is the intended trade-off. It
 doesn't make prompt injection impossible, because a user's request can be broad enough
 to cover a harmful step. The risk classes and hard rules bound what it can approve.
+
+## C-14: Gmail through "Sign in with Google" (OAuth 2.0 + XOAUTH2)
+
+**Context.** Gmail worked only with an app password (C-11). App passwords need 2-step
+verification, are being phased out for many accounts, and give full account access with
+nothing to show the user what was granted.
+
+**Decision.**
+- **Same mailbox code.** A new email provider, `gmail`, uses the same IMAP/SMTP mailbox
+  and signs in with **XOAUTH2** and the `https://mail.google.com/` scope.
+  - Reading, drafts and the always-ask sending rule are unchanged.
+  - The Gmail REST API would add a second mail implementation, with scopes that differ
+    only on paper; IMAP needs the full scope anyway.
+- **Consent** (`services/integrations/google.py`):
+  - Authorisation-code flow with PKCE (S256), `access_type=offline` and
+    `prompt=consent`.
+  - The `state` is sealed with the server key. It holds the user, the verifier, a
+    10-minute expiry and a hash of a nonce.
+  - The nonce goes to the browser in an HttpOnly `SameSite=Lax` cookie on the callback
+    path. The session cookie is `Strict`, so it isn't sent on Google's redirect back;
+    the callback identifies the user from the state and checks the nonce.
+  - So a consent can't be finished in another browser, and can't attach a mailbox to
+    another user.
+- **Callback:**
+  - The code is exchanged server-side with the client secret.
+  - The ID token from that response is checked: audience, issuer, verified address.
+    No signature check is needed, because it came straight from the token endpoint over
+    TLS (OIDC Core 3.1.3.7).
+  - The Gmail scope must have been granted (the user can untick it).
+  - The same address again updates the existing account. If Google leaves out the
+    refresh token on a reconnect, the old one is kept.
+- **Tokens:**
+  - The refresh token, access token and expiry are sealed like other credentials, and
+    never returned.
+  - Access tokens are refreshed two minutes before they expire and cached in memory per
+    process; the API and the worker each refresh on their own.
+  - `invalid_grant` becomes "sign in with Google again", shown by Check and by the tools.
+- **Fixed servers:**
+  - A Gmail account's config is always Google's servers, whatever is sent.
+  - Its servers and password can't be changed, and it can't be created by hand.
+  - So the bearer token can't be pointed at another host.
+- **Removal** revokes the grant at Google (best effort).
+- **Setup:** `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, and optionally
+  `GOOGLE_OAUTH_REDIRECT_URL`. Without them the button doesn't show.
+
+**Consequences.**
+- **Redirect address:** Google needs an https redirect on a real domain, or localhost.
+  An installation reached only by LAN IP needs a domain, Tailscale HTTPS, or a one-off
+  sign-in through localhost.
+- **Testing status:** while the Google app is in "Testing", refresh tokens last 7 days.
+  Publishing it unverified removes the limit but shows Google's "unverified app" warning,
+  for up to 100 users.
+- **Not covered yet:**
+  - Google Calendar would use the same client and CalDAV with a bearer token.
+  - Microsoft 365 would need the same flow against Entra ID.

@@ -2973,6 +2973,55 @@
         "title": "GenerationParams",
         "type": "object"
       },
+      "GoogleStart": {
+        "properties": {
+          "login_hint": {
+            "anyOf": [
+              {
+                "maxLength": 320,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Login Hint"
+          }
+        },
+        "title": "GoogleStart",
+        "type": "object"
+      },
+      "GoogleStartOut": {
+        "properties": {
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "title": "GoogleStartOut",
+        "type": "object"
+      },
+      "GoogleStatus": {
+        "properties": {
+          "configured": {
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "redirect_uri": {
+            "title": "Redirect Uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "configured",
+          "redirect_uri"
+        ],
+        "title": "GoogleStatus",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -11322,6 +11371,69 @@
           }
         },
         "summary": "Check Account",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/v1/integrations/google": {
+      "get": {
+        "operationId": "google_status_api_v1_integrations_google_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Google Status",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/v1/integrations/google/start": {
+      "post": {
+        "description": "The Google consent URL. The browser goes there; Google sends it back to the callback.",
+        "operationId": "google_start_api_v1_integrations_google_start_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleStart"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleStartOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Google Start",
         "tags": [
           "integrations"
         ]

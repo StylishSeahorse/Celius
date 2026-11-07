@@ -80,6 +80,8 @@ class FakeMailServer:
         self.folders: dict[str, list[tuple[str, bytes]]] = {"Drafts": []}
         self.sent: list[EmailMessage] = []
         self.logins: list[tuple[str, str]] = []
+        # Gmail: XOAUTH2 strings accepted, as "user=…\x01auth=Bearer …\x01\x01".
+        self.oauth_tokens: set[str] = set()
 
     def deliver(self, raw: bytes, seen: bool = False) -> int:
         uid = max(self.inbox, default=0) + 1
@@ -104,6 +106,15 @@ class FakeIMAP:
         if (user, password) != (USER, PASSWORD):
             raise imaplib.IMAP4.error("authentication failed")
         return "OK", [b"logged in"]
+
+    def authenticate(self, mechanism, authobject):
+        import imaplib
+
+        sent = authobject(b"").decode()
+        self.server.logins.append((mechanism, sent))
+        if mechanism != "XOAUTH2" or sent not in self.server.oauth_tokens:
+            raise imaplib.IMAP4.error("AUTHENTICATE failed")
+        return "OK", [b"authenticated"]
 
     def select(self, folder, readonly=False):
         return ("OK", [b"1"]) if folder.strip('"') in ("INBOX", "Drafts") else ("NO", [b""])
@@ -175,6 +186,12 @@ class FakeSMTP:
         import smtplib
 
         if (user, password) != (USER, PASSWORD):
+            raise smtplib.SMTPAuthenticationError(535, b"no")
+
+    def auth(self, mechanism, authobject):
+        import smtplib
+
+        if mechanism != "XOAUTH2" or authobject() not in self.server.oauth_tokens:
             raise smtplib.SMTPAuthenticationError(535, b"no")
 
     def send_message(self, msg):

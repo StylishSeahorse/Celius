@@ -91,3 +91,25 @@ test("connect a calendar account", async ({ page }) => {
   await row.getByRole("button", { name: `Remove ${name}` }).click();
   await expect(row).toHaveCount(0);
 });
+
+test("sign in with Google: consent round trip comes back to the accounts", async ({ page }) => {
+  // Google can't be reached from the test: answer its consent page as Google would when
+  // the user clicks Cancel (the code exchange itself is covered by the API tests).
+  let consent: URL | null = null;
+  await page.route("https://accounts.google.com/**", async (route) => {
+    consent = new URL(route.request().url());
+    const back = new URL(consent.searchParams.get("redirect_uri")!);
+    back.searchParams.set("error", "access_denied");
+    back.searchParams.set("state", consent.searchParams.get("state")!);
+    await route.fulfill({ status: 302, headers: { location: back.toString() } });
+  });
+  const panel = await openToday(page);
+  await panel.getByRole("button", { name: "Settings" }).click();
+  await panel.getByRole("button", { name: "Sign in with Google (Gmail)" }).click();
+
+  const back = page.getByRole("dialog", { name: "Today" });
+  await expect(back.getByRole("status")).toHaveText("Signing in with Google was cancelled");
+  expect(consent!.searchParams.get("scope")).toBe("openid email https://mail.google.com/");
+  expect(consent!.searchParams.get("code_challenge_method")).toBe("S256");
+  expect(page.url()).toMatch(/#\/today$/);
+});

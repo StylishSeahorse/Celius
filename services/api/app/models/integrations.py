@@ -9,7 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base, JSONType, Timestamps, UUIDPrimaryKey, utcnow
 
 ACCOUNT_KINDS = ("calendar", "email")
-ACCOUNT_PROVIDERS = {"calendar": ("caldav",), "email": ("imap",)}
+ACCOUNT_PROVIDERS = {"calendar": ("caldav",), "email": ("imap", "gmail")}
 
 
 class IntegrationAccount(UUIDPrimaryKey, Timestamps, Base):
@@ -23,7 +23,7 @@ class IntegrationAccount(UUIDPrimaryKey, Timestamps, Base):
         Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     kind: Mapped[str] = mapped_column(String(16), nullable=False)  # calendar | email
-    provider: Mapped[str] = mapped_column(String(16), nullable=False)  # caldav | imap
+    provider: Mapped[str] = mapped_column(String(16), nullable=False)  # caldav | imap | gmail
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     # Non-secret settings: URLs, hosts, ports, user name, folders, from address.
     config: Mapped[dict] = mapped_column(JSONType, default=dict, nullable=False)

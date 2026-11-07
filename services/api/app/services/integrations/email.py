@@ -1,5 +1,6 @@
 """Email over IMAP and SMTP (ADR C-11). Gmail, Outlook/Microsoft 365, Fastmail and most
-providers work with an app password; OAuth sign-in is not implemented yet.
+providers work with an app password; Gmail can also sign in with Google (XOAUTH2,
+services/integrations/google.py).
 
 - Reading never marks messages as read (BODY.PEEK).
 - Drafts are saved to the account's Drafts folder: the user reviews and sends them in
@@ -28,7 +29,7 @@ import anyio
 
 from app.config import Settings
 from app.models import IntegrationAccount
-from app.services.integrations import accounts
+from app.services.integrations import accounts, google
 from app.services.tools.builtin import html_to_text
 from app.services.tools.netguard import BlockedDestination, resolve_checked
 
@@ -112,7 +113,19 @@ class Mailbox:
     def __init__(self, account: IntegrationAccount, settings: Settings):
         self.account = account
         self.config = account.config
-        self.password = accounts.credentials(settings, account).get("password", "")
+        self.settings = settings
+        self.stored = accounts.credentials(settings, account)
+        self.password = self.stored.get("password", "")
+        self.oauth = account.provider == "gmail"
+
+    async def _token(self) -> str | None:
+        """An OAuth access token (Gmail), or None for password accounts."""
+        if not self.oauth:
+            return None
+        try:
+            return await google.access_token(self.settings, self.account.id, self.stored)
+        except google.GoogleError as exc:
+            raise EmailError(f"{self.account.name}: {exc}") from exc
 
     async def _imap(self):
         host, port = self.config["imap_host"], int(self.config["imap_port"])
@@ -124,6 +137,7 @@ class Mailbox:
 
     async def _run(self, work):
         """Connect, log in, run `work(imap)` in a thread, log out."""
+        token = await self._token()
         try:
             imap = await self._imap()
         except (OSError, imaplib.IMAP4.error) as exc:
@@ -131,7 +145,12 @@ class Mailbox:
 
         def session():
             try:
-                imap.login(self.config["username"], self.password)
+                if token is not None:
+                    auth = google.xoauth2(self.config["username"], token).encode()
+                    # Gmail's first challenge is empty; a later one is an error to answer empty.
+                    imap.authenticate("XOAUTH2", lambda challenge: b"" if challenge else auth)
+                else:
+                    imap.login(self.config["username"], self.password)
             except imaplib.IMAP4.error as exc:
                 raise EmailError(f"{self.account.name}: the server refused the login") from exc
             try:
@@ -267,10 +286,16 @@ class Mailbox:
 
     async def send(self, message: EmailMessage) -> None:
         host, port = self.config["smtp_host"], int(self.config["smtp_port"])
+        token = await self._token()
 
         def work(smtp):
             try:
-                smtp.login(self.config["username"], self.password)
+                if token is not None:
+                    auth = google.xoauth2(self.config["username"], token)
+                    # After a failed XOAUTH2 the server sends a challenge; answer empty.
+                    smtp.auth("XOAUTH2", lambda challenge=None: auth if challenge is None else "")
+                else:
+                    smtp.login(self.config["username"], self.password)
                 smtp.send_message(message)
             finally:
                 try:

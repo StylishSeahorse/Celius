@@ -343,6 +343,9 @@ export const api = {
   checkAccount: (id: string) =>
     request<{ ok: boolean; error: string | null }>(`/integrations/accounts/${id}/check`, json("POST")),
   deleteAccount: (id: string) => request<void>(`/integrations/accounts/${id}`, json("DELETE")),
+  googleStatus: () => request<{ configured: boolean; redirect_uri: string }>("/integrations/google"),
+  googleStart: (body: { login_hint?: string } = {}) =>
+    request<{ url: string }>("/integrations/google/start", json("POST", body)),
   calendarEvents: (start?: string, days = 7) =>
     request<CalendarEventList>(`/calendar/events?days=${days}${start ? `&start=${start}` : ""}`),
   createEvent: (body: { title: string; start: string; end?: string; calendar?: string | null; location?: string }) =>

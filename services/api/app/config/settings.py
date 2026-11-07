@@ -233,6 +233,12 @@ class Settings(BaseSettings):
     alert_failed_jobs_per_day: int = 5
     alert_backup_warning_hours: float = 26
     alert_backup_critical_hours: float = 72
+    # "Sign in with Google" for Gmail (ADR C-14): an OAuth client of type "Web application"
+    # from Google Cloud Console. The redirect URI to register is
+    # APP_PUBLIC_URL + /api/v1/integrations/google/callback (or set it here).
+    google_oauth_client_id: str | None = None
+    google_oauth_client_secret: SecretStr | None = None
+    google_oauth_redirect_url: str | None = None
     # Web Push notifications (replies ready, approvals). Keys are derived from APP_SECRET_KEY.
     push_enabled: bool = True
     # VAPID contact, e.g. mailto:you@example.com (defaults to APP_PUBLIC_URL).

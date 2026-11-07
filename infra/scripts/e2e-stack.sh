@@ -25,6 +25,10 @@ export RUN_LEASE_SECONDS="${RUN_LEASE_SECONDS:-6}"
 export WORKSPACE_ROOT="${WORKSPACE_ROOT:-$STATE/workspaces}"
 export SANDBOX_URL="http://127.0.0.1:${SANDBOX_PORT:-18100}"
 export SANDBOX_TOKEN="${SANDBOX_TOKEN:-e2e-sandbox-token-0123456789}"
+# A made-up Google OAuth client: the e2e test intercepts accounts.google.com.
+export GOOGLE_OAUTH_CLIENT_ID="${GOOGLE_OAUTH_CLIENT_ID:-e2e.apps.googleusercontent.com}"
+export GOOGLE_OAUTH_CLIENT_SECRET="${GOOGLE_OAUTH_CLIENT_SECRET:-e2e-secret}"
+export APP_PUBLIC_URL="${APP_PUBLIC_URL:-http://127.0.0.1:${API_PORT:-18000}}"
 mkdir -p "$WORKSPACE_ROOT"
 
 # The sandbox (process mode: the e2e host is not a hardened container).

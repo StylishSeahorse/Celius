@@ -289,11 +289,29 @@ export function AccountsView() {
   const [fields, setFields] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<Record<string, string>>({});
+  const [google, setGoogle] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(() => {
     api.accounts().then(setItems, (err) => setError(message(err)));
   }, []);
   useEffect(load, [load]);
+  useEffect(() => {
+    api.googleStatus().then((s) => setGoogle(s.configured), () => setGoogle(false));
+    // Back from Google: "#/today?google=connected&message=…".
+    const query = new URLSearchParams(window.location.hash.split("?")[1] ?? "");
+    const outcome = query.get("google");
+    if (!outcome) return;
+    const text = query.get("message") ?? "";
+    if (outcome === "connected") setNotice(`Connected ${text}`);
+    else if (outcome === "cancelled") setNotice("Signing in with Google was cancelled");
+    else setError(text || "Signing in with Google failed");
+    window.history.replaceState(null, "", "#/today");
+  }, []);
+
+  function signInWithGoogle() {
+    api.googleStart().then(({ url }) => window.location.assign(url), (err) => setError(message(err)));
+  }
   const set = (key: string) => (e: { target: { value: string } }) => setFields((f) => ({ ...f, [key]: e.target.value }));
 
   function add(event: FormEvent) {
@@ -329,7 +347,10 @@ export function AccountsView() {
         {items?.map((a) => (
           <li key={a.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-line p-2 text-sm" data-testid="account">
             <span className="flex-1">
-              {a.name} <span className="text-xs text-muted">({a.kind === "calendar" ? "CalDAV calendar" : "IMAP/SMTP email"})</span>
+              {a.name}{" "}
+              <span className="text-xs text-muted">
+                ({a.kind === "calendar" ? "CalDAV calendar" : a.provider === "gmail" ? "Gmail, signed in with Google" : "IMAP/SMTP email"})
+              </span>
               {(status[a.id] || a.last_error) && <span className="block text-xs text-muted">{status[a.id] ?? a.last_error}</span>}
             </span>
             <button
@@ -346,6 +367,19 @@ export function AccountsView() {
           </li>
         ))}
       </ul>
+      {notice && <p role="status" className="text-xs text-green-700 dark:text-green-400">{notice}</p>}
+      {google && (
+        <div className="space-y-1 rounded-lg border border-line p-2">
+          <button className={primary} onClick={signInWithGoogle}>
+            Sign in with Google (Gmail)
+          </button>
+          <p className="text-xs text-muted">
+            Connects Gmail without an app password. Google asks you to allow Celius to read, draft and send mail; the
+            access is encrypted on the server, sending still asks you every time, and removing the account here
+            revokes it.
+          </p>
+        </div>
+      )}
       <form onSubmit={add} className="space-y-2 rounded-lg border border-dashed border-line p-2">
         <select className={input} aria-label="Account type" value={kind} onChange={(e) => setKind(e.target.value as "calendar" | "email")}>
           <option value="calendar">Calendar (CalDAV: Nextcloud, iCloud, Fastmail…)</option>

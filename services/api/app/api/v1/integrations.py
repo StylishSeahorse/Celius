@@ -3,8 +3,11 @@
 import uuid
 from datetime import UTC, datetime, time, timedelta
 from typing import Annotated
+from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
+from fastapi.responses import RedirectResponse
+from pydantic import BaseModel, Field
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,7 +15,7 @@ from app.auth.dependencies import CurrentAuth
 from app.config import Settings, get_settings
 from app.db import get_db
 from app.errors import AppError, not_found
-from app.models import Automation, AutomationRun, IntegrationAccount
+from app.models import Automation, AutomationRun, IntegrationAccount, User
 from app.schemas.integrations import (
     AccountCheck,
     AccountCreate,
@@ -34,7 +37,7 @@ from app.schemas.integrations import (
 from app.services.assistant import tasks as user_tasks
 from app.services.audit import audit
 from app.services.automation import service as automation_svc
-from app.services.integrations import accounts
+from app.services.integrations import accounts, google
 from app.services.integrations import calendar as cal
 from app.services.integrations.email import EmailError, Mailbox
 from app.services.sync import record_sync
@@ -110,6 +113,10 @@ async def update_account(
     account = await accounts.owned(db, auth.user.id, account_id)
     if body.allow_private_network and not auth.user.is_admin:
         raise AppError(403, "admin_only", "Only an administrator can allow the local network")
+    if account.provider == "gmail" and (body.config is not None or body.password is not None):
+        raise AppError(
+            422, "oauth_account", "A Gmail account's servers are fixed; it signs in with Google"
+        )
     if body.name is not None:
         account.name = body.name.strip()
     if body.config is not None:
@@ -147,11 +154,133 @@ async def check_account(
 
 
 @router.delete("/integrations/accounts/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_account(account_id: uuid.UUID, auth: CurrentAuth, db: DB) -> None:
+async def delete_account(
+    account_id: uuid.UUID, auth: CurrentAuth, db: DB, settings: AppSettings
+) -> None:
     account = await accounts.owned(db, auth.user.id, account_id)
+    if account.provider == "gmail":
+        try:
+            await google.revoke(accounts.credentials(settings, account))
+        except AppError:
+            pass  # unreadable credentials: nothing to revoke
+        google.forget(account.id)
     await db.delete(account)
     audit(db, auth.user.id, "integration.deleted", "integration", account.id)
     await db.commit()
+
+
+# ---------------------------------------------------------------------- Sign in with Google
+
+
+class GoogleStatus(BaseModel):
+    configured: bool
+    redirect_uri: str
+
+
+class GoogleStart(BaseModel):
+    login_hint: str | None = Field(default=None, max_length=320)
+
+
+class GoogleStartOut(BaseModel):
+    url: str
+
+
+@router.get("/integrations/google", response_model=GoogleStatus)
+async def google_status(auth: CurrentAuth, settings: AppSettings) -> GoogleStatus:
+    return GoogleStatus(
+        configured=google.configured(settings), redirect_uri=google.redirect_uri(settings)
+    )
+
+
+@router.post("/integrations/google/start", response_model=GoogleStartOut)
+async def google_start(
+    body: GoogleStart, auth: CurrentAuth, settings: AppSettings, response: Response
+) -> GoogleStartOut:
+    """The Google consent URL. The browser goes there; Google sends it back to the callback."""
+    try:
+        url, nonce = google.start(settings, auth.user.id, body.login_hint)
+    except google.GoogleError as exc:
+        raise AppError(409, "google_not_configured", str(exc)) from exc
+    response.set_cookie(
+        google.NONCE_COOKIE,
+        nonce,
+        max_age=google.STATE_SECONDS,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite="lax",  # sent on Google's redirect back (a top-level GET)
+        path=google.CALLBACK_PATH,
+    )
+    return GoogleStartOut(url=url)
+
+
+def _back(outcome: str, text: str = "") -> RedirectResponse:
+    query = urlencode({"google": outcome, **({"message": text} if text else {})})
+    response = RedirectResponse(f"/#/today?{query}", status_code=status.HTTP_303_SEE_OTHER)
+    response.delete_cookie(google.NONCE_COOKIE, path=google.CALLBACK_PATH)
+    return response
+
+
+@router.get("/integrations/google/callback", include_in_schema=False)
+async def google_callback(
+    request: Request,
+    db: DB,
+    settings: AppSettings,
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+) -> RedirectResponse:
+    """Where Google sends the browser back. The session cookie (SameSite=Strict) isn't
+    sent here, so the user comes from the sealed state, bound to this browser's nonce."""
+    if error:
+        return _back("cancelled" if error == "access_denied" else "error", error[:100])
+    try:
+        user_id, verifier = google.check_state(
+            settings, state or "", request.cookies.get(google.NONCE_COOKIE)
+        )
+        user = await db.get(User, user_id)
+        if user is None or not user.is_active:
+            raise google.GoogleError("This Celius account can't connect mail")
+        if not code:
+            raise google.GoogleError("Google didn't send a sign-in code")
+        grant = await google.exchange(settings, code, verifier)
+        existing = next(
+            (
+                a
+                for a in await accounts.accounts_of(db, user.id, "email", enabled_only=False)
+                if a.provider == "gmail" and a.config.get("username") == grant.email
+            ),
+            None,
+        )
+        previous = None
+        if existing is not None:
+            try:
+                previous = accounts.credentials(settings, existing)
+            except AppError:
+                previous = None
+        stored = google.sealed_credentials(grant, previous)
+    except google.GoogleError as exc:
+        return _back("error", str(exc))
+    if existing is None:
+        account = await accounts.create(
+            db,
+            user.id,
+            kind="email",
+            provider="gmail",
+            name=f"Gmail ({grant.email})",
+            config={"username": grant.email},
+            password=None,
+            allow_private_network=False,
+            settings=settings,
+        )
+    else:
+        account = existing
+        account.enabled = True
+        account.last_error = None
+    accounts.seal_credentials(settings, account, stored)
+    google.forget(account.id)
+    audit(db, user.id, "integration.google_connected", "integration", account.id)
+    await db.commit()
+    return _back("connected", grant.email)
 
 
 # ---------------------------------------------------------------------- calendar

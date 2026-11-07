@@ -38,7 +38,8 @@ export function TodayPanel({
   onOpenMemory: () => void;
   onOpenSkills: () => void;
 }) {
-  const [tab, setTab] = useState<Tab>("today");
+  // Coming back from "Sign in with Google" opens the accounts.
+  const [tab, setTab] = useState<Tab>(() => (window.location.hash.includes("google=") ? "settings" : "today"));
   const [briefing, setBriefing] = useState<Briefing | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);

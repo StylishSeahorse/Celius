@@ -2,6 +2,50 @@
 
 Newest first. Each entry: what changed, how it was verified, what is left.
 
+## 2026-11-07: Gmail through "Sign in with Google"
+
+**Existing implementation.** IMAP/SMTP mailboxes with sealed passwords (C-11); Gmail
+worked only with an app password.
+
+**Changes.** See C-14.
+- **Sign-in:** `services/integrations/google.py` (consent with PKCE and a sealed state
+  bound to a nonce cookie, code exchange, ID-token checks, token refresh and cache,
+  revocation).
+- **Account:** a `gmail` email provider with Google's servers fixed; the mailbox signs in
+  with XOAUTH2 over IMAP and SMTP.
+- **Routes:** `GET /integrations/google`, `POST /integrations/google/start`, and the
+  callback.
+- **Settings:** `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` and
+  `GOOGLE_OAUTH_REDIRECT_URL`.
+- **Web:** the "Sign in with Google (Gmail)" button in Today > Settings; coming back
+  from Google opens Settings with the result.
+- **Setup guide:** `docs/deployment/google-sign-in.md` (Google Cloud steps, redirect
+  rules, the 7-day Testing limit).
+- No migration: `provider` is a free string column.
+
+**Verification.**
+- `tests/test_google_oauth.py` (9) runs against a fake Google token and revocation
+  endpoint that checks PKCE. It covers:
+  - not configured;
+  - the consent URL (scopes, offline, S256, cookie flags, the secret never sent);
+  - connecting, then search, send and check through XOAUTH2, with tokens sealed and
+    never returned;
+  - refresh when expired, the cache, and revoked access asking to sign in again;
+  - reconnecting the same address updates the account and keeps the refresh token;
+  - the callback refuses another browser, an altered state, an expired state, cancel,
+    an unticked Gmail scope, a token for another app and an unverified address;
+  - a consent tied to the user who started it;
+  - fixed servers (no config or password edits, no manual creation) and revocation on
+    removal.
+- e2e `integrations.spec.ts`: the consent round trip, with Google's page intercepted.
+- Totals:
+  - API suite **641 passed, 7 skipped** (SQLite);
+  - Google and integrations tests on PostgreSQL 16: **31 passed**;
+  - full e2e **101 passed**.
+
+**Left.** A real Google project and mailbox: run the guide on the server. Google
+Calendar over the same sign-in is the next step.
+
 ## 2026-11-07: auto-review of tool approvals
 
 **Existing implementation.** Policy profiles (allow, ask or deny by risk), approvals

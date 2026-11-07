@@ -17,6 +17,7 @@ from app.config import Settings
 from app.errors import AppError, not_found
 from app.models import ACCOUNT_PROVIDERS, IntegrationAccount
 from app.services.audit import audit
+from app.services.integrations import google
 from app.services.secrets import seal, unseal
 
 PURPOSE = "integration-credentials"
@@ -39,6 +40,12 @@ CONFIG = {
 
 
 def clean_config(provider: str, config: dict[str, Any]) -> dict[str, Any]:
+    if provider == "gmail":
+        # Google's servers whatever is asked: the OAuth token must not go anywhere else.
+        address = str(config.get("username") or "").strip().lower()
+        if "@" not in address:
+            raise AppError(422, "invalid_config", "username must be the Gmail address")
+        return {**google.GMAIL_CONFIG, "username": address, "from_address": address}
     if provider not in CONFIG:
         raise AppError(422, "invalid_provider", f"Unknown provider {provider!r}")
     out = {}
@@ -59,6 +66,10 @@ def clean_config(provider: str, config: dict[str, Any]) -> dict[str, Any]:
         if "@" not in str(out["from_address"]):
             raise AppError(422, "invalid_config", "from_address must be an email address")
     return out
+
+
+def seal_credentials(settings: Settings, account: IntegrationAccount, value: dict) -> None:
+    account.credentials = seal(settings, value, PURPOSE)
 
 
 def credentials(settings: Settings, account: IntegrationAccount) -> dict[str, Any]:
@@ -135,4 +146,6 @@ async def accounts_of(
 
 
 def set_password(settings: Settings, account: IntegrationAccount, password: str | None) -> None:
+    if account.provider == "gmail":
+        raise AppError(422, "oauth_account", "Gmail accounts sign in with Google, not a password")
     account.credentials = seal(settings, {"password": password}, PURPOSE) if password else None
