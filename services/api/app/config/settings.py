@@ -186,6 +186,11 @@ class Settings(BaseSettings):
     tool_call_timeout_seconds: int = Field(default=120, ge=1, le=3600)
     tool_memory_mb: int = Field(default=1024, ge=64)
     tool_max_result_chars: int = Field(default=20_000, ge=500)
+    # Auto-review (ADR C-13): a reviewer model decides calls that would ask the user.
+    # Off unless a user turns it on (or this default changes). Empty model: the chat's.
+    tool_auto_review_default: bool = False
+    tool_auto_review_model: str | None = None
+    tool_auto_review_max_per_run: int = Field(default=20, ge=1, le=200)
 
     # Personal assistant (ADR C-10). Each user can set their own time zone.
     default_timezone: str = "UTC"

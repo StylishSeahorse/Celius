@@ -97,7 +97,7 @@ export function Insights({ isAdmin }: { isAdmin: boolean }) {
 const PRESETS: [Autonomy["preset"], string, string][] = [
   ["careful", "Careful", "Nothing is learned or suggested on its own; tools only read."],
   ["balanced", "Balanced", "Suggests memories, tasks and skills; you approve them. Tools ask before changing things."],
-  ["hands_off", "Hands-off", "Keeps what it learns without asking; publishes tested skills; runs code in the sandbox freely."],
+  ["hands_off", "Hands-off", "Keeps what it learns without asking; publishes tested skills; runs code in the sandbox freely; a reviewer approves the rest of the tool calls it can."],
 ];
 
 /** How much Celius does on its own, in one place. */
@@ -133,6 +133,7 @@ export function AutonomySettings() {
         <li>Tasks from chats: {value.suggest_tasks ? "suggested" : "off"}</li>
         <li>Skills: {value.skill_trust}{value.skill_auto_generate ? ", learned from finished tasks" : ""}</li>
         <li>Tool permissions for new chats: {value.tool_profile.replace("_", " ")}</li>
+        <li>Auto-review of tool calls: {value.tool_auto_review ? "on, a reviewer approves what plainly fits your request" : "off, you decide"}</li>
         <li>Always asks first: sending email</li>
       </ul>
       {value.notes?.map((n) => (

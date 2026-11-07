@@ -109,6 +109,12 @@ The model can call tools in the conversation's private workspace:
 - **Approvals** are bound to the exact arguments shown. "Allow once", "Always allow this
   tool in this chat" or "Allow all for this chat"; a profile's "deny" always wins. An
   approvals inbox lists everything waiting
+- **Auto-review** (Tools > Permissions, off by default): instead of asking you, a
+  separate reviewer model approves a call that plainly serves what you asked. It sees
+  only your own recent messages and the proposed call (never web pages, files or emails
+  the assistant read), can't override a "deny", and leaves anything unclear for you.
+  Sending email, outside services (unless you allow them), secret-looking arguments and
+  risky commands always ask; each approval shows the reviewer's reason
 - **Limits:** tool steps per reply (`TOOL_MAX_ITERATIONS`, 25), time per call and per
   reply, output size; a call that already failed isn't retried unchanged
 - Tool calls the model writes as text instead of a proper call are recovered, or removed
@@ -167,8 +173,8 @@ The model can call tools in the conversation's private workspace:
   by tool, prompt size per part, multi-step tasks completed, verified and recovered,
   skill reuse and success, memory use and kept suggestions, tasks and automations
 - **How much Celius does on its own**: Careful, Balanced or Hands-off sets memory review,
-  task suggestions, skill learning and default tool permissions together (sending email
-  always asks)
+  task suggestions, skill learning, default tool permissions and auto-review together
+  (sending email always asks)
 - Weekly memory upkeep: likely duplicates to resolve, old unconfirmed guesses back to
   review
 - A skill that keeps failing gets an improved version proposed for your approval

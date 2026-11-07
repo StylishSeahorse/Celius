@@ -465,3 +465,44 @@ administrator's limit on tool profiles, and never change that sending email asks
 
 **Benchmarks over time**: `prompt_eval.py` and `memory_eval.py` save summaries and
 compare against a previous file. Neither has run against the real models yet.
+
+## C-13: Auto-review: a reviewer approves tool calls instead of asking
+
+**Context.** Under Standard, every write, code run or web call waits for the user, so a
+multi-step task stops at each step. "Allow all for this chat" removes the questions but
+also the judgement. Other assistants offer a middle mode where a model checks each call.
+
+**Decision.** An opt-in reviewer (`services/tools/review.py`) decides calls the policy
+says to ask about, in the executor just before it would pause (`_auto_review`):
+
+1. **Hard rules, no model.** These go to the user:
+   - tools that always ask (sending email);
+   - risk classes the user hasn't allowed (default write, execute, network; "external",
+     meaning calendar, mail drafts and MCP, is off);
+   - arguments that look like a secret;
+   - risky shell patterns (`rm -rf /`, `curl | sh`, `git push --force`, …);
+   - anything past `TOOL_AUTO_REVIEW_MAX_PER_RUN` approvals in one reply.
+2. **The reviewer model** (`TOOL_AUTO_REVIEW_MODEL`, default the chat's model, no tools,
+   temperature 0) sees the user's own last three messages, with attachment and project-file
+   text replaced, and the proposed call. It never sees tool results, web pages, files or
+   emails, because a prompt injection would come from those. It answers JSON:
+   approve or ask, with a reason.
+3. **Fail closed.** An error, a timeout (60 s) or an unclear answer leaves the call for
+   the user.
+
+The reviewer can only turn "ask" into "approve". It never refuses a call, never runs one
+the profile denies, and never touches grants. A call the user decided while the review ran
+keeps the user's decision. Each decision has `decision_source = "reviewer"` and a reason,
+shown on the tool card ("Approved by the reviewer: …" / "Left for you: …"). It is
+audited as `tool_call.auto_reviewed`, and a call left for the user isn't reviewed again
+when the run resumes.
+
+Settings: `tools.auto_review {enabled, risks}` in the user's preferences (Tools >
+Permissions), the default `TOOL_AUTO_REVIEW_DEFAULT` (false), and the Hands-off autonomy
+preset (C-12), which turns it on; Careful and Balanced turn it off.
+
+**Consequences.** One extra short model call per reviewed call, which a local server
+runs in sequence with the chat. The reviewer judges intent from the user's words
+only, so it errs towards asking on vague requests; that is the intended trade-off. It
+doesn't make prompt injection impossible, because a user's request can be broad enough
+to cover a harmful step. The risk classes and hard rules bound what it can approve.

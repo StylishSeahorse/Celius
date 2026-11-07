@@ -2,6 +2,46 @@
 
 Newest first. Each entry: what changed, how it was verified, what is left.
 
+## 2026-11-07: auto-review of tool approvals
+
+**Existing implementation.** Policy profiles (allow, ask or deny by risk), approvals
+bound to exact arguments, grants per chat and "Allow all for this chat"; `always_ask`
+for sending email; the executor pauses when a call waits for the user.
+
+**Changes.** See C-13.
+- `services/tools/review.py`: the hard rules, the reviewer prompt and its answer parser,
+  and the user's own words with attachments removed.
+- Executor `_auto_review` runs before a pause. It sets `decision_source "reviewer"`,
+  writes a reason, audits `tool_call.auto_reviewed` and keeps a per-reply cap.
+- Settings: `TOOL_AUTO_REVIEW_DEFAULT`, `TOOL_AUTO_REVIEW_MODEL` and
+  `TOOL_AUTO_REVIEW_MAX_PER_RUN`; `auto_review {enabled, risks}` in
+  `/tools/settings`.
+- The `tool_auto_review` field in the autonomy presets: Hands-off turns it on.
+- Web: Tools > Permissions > Auto-review (toggle and risk classes); the tool card shows the
+  reviewer's reason; the autonomy summary line.
+- The dev fake model server answers review requests (`[review:approve]`).
+
+**Verification.**
+- `tests/test_auto_review.py` (8):
+  - the hard rules (email, external, cap, secrets, risky commands; a plain `rm -rf build`
+    goes to the reviewer);
+  - strict parsing;
+  - the reviewer sees neither tool results, attachments nor the system prompt;
+  - an approval runs the call without pausing, and is audited;
+  - "ask", an unclear answer and an HTTP error each leave the call waiting with a reason,
+    and it is not reviewed again on resume;
+  - off by default;
+  - the settings API, validation and presets.
+- One fix found by the tests: risky patterns are matched against argument values, not
+  their JSON (the closing quote hid `rm -rf /`).
+- e2e `tools.spec.ts` "auto-review approves what the request asks for and leaves the
+  rest" (desktop and mobile).
+- Totals: API suite **630 passed, 7 skipped** (SQLite). On PostgreSQL 16: auto-review,
+  tools, isolation and continuous improvement, 46 passed. Full e2e suite **99 passed**.
+
+**Left.** How often the real local model approves or asks on everyday requests isn't
+measured yet; `GET /insights` can count `tool_call.auto_reviewed` once there is use.
+
 ## 2026-11-07: Phase 7, continuous improvement
 
 **Existing implementation.** Everything needed for measurement was already stored (runs,

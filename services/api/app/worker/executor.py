@@ -55,6 +55,7 @@ from app.models import (
     StoredFile,
     ToolCall,
     ToolCallStatus,
+    UserSettings,
 )
 from app.schemas.events import RunEventType
 from app.services import model_registry, push
@@ -93,6 +94,9 @@ from app.services.tools.assistant import ASSISTANT_NOTE
 from app.services.tools.calls import approval_expiry, call_event
 from app.services.tools.policy import args_hash, canonical_json, decide
 from app.services.tools.registry import ToolArgumentError, ToolContext, ToolOutput
+from app.services.tools.review import review as review_call
+from app.services.tools.review import review_prefs
+from app.services.tools.review import rules as review_rules
 from app.services.tools.sandbox_client import SandboxClient
 from app.services.tools.toolset import NOT_PERMISSION_REASONS, Toolset, build_toolset
 
@@ -251,6 +255,10 @@ class _Prepared:
     settings: Any = None
     # Whether the model may make several tool calls in one step (profile / registry).
     parallel_tools: bool = True
+    # Auto-review (ADR C-13): the user's choice, and how many calls it approved so far.
+    review: Any = None
+    reviewed: int = 0
+    structured_output: bool = False
 
 
 def _delta_event(message_id: uuid.UUID, state: _StreamState) -> dict[str, Any]:
@@ -743,6 +751,7 @@ class _Loop:
     async def _resolve(self, rows: list[ToolCall]) -> str:
         """Run approved calls (in order), then pause if any still waits for a decision.
         Returns "done", "paused" or "stopped"."""
+        await self._auto_review(rows)
         for row in rows:
             if row.status == ToolCallStatus.approved:
                 outcome = await self._execute(row)
@@ -765,6 +774,71 @@ class _Loop:
                 ChatMessage(role="tool", tool_call_id=row.model_call_id, content=content)
             )
         return "done"
+
+    async def _auto_review(self, rows: list[ToolCall]) -> None:
+        """Let the reviewer decide calls that wait for the user (services/tools/review.py).
+        It approves or leaves the call for the user; it never refuses or runs anything."""
+        p = self.p
+        if p.review is None or not p.review.enabled or p.toolset is None:
+            return
+        for row in rows:
+            if row.status != ToolCallStatus.pending_approval or row.decision_source == "reviewer":
+                continue  # not waiting, or already reviewed (left for the user)
+            spec = p.toolset.known.get(row.tool_name)
+            if spec is None:
+                continue
+            verdict = review_rules(
+                spec,
+                row.arguments,
+                p.review,
+                p.reviewed,
+                self.settings.tool_auto_review_max_per_run,
+            ) or await review_call(
+                self.gateway,
+                self.settings.tool_auto_review_model or p.request.model,
+                spec,
+                row.arguments,
+                p.request.messages,
+                structured=p.structured_output,
+            )
+            async with self.factory() as db:
+                current = await db.get(ToolCall, row.id)
+                if current is None or current.status != ToolCallStatus.pending_approval:
+                    continue  # the user decided meanwhile: their decision stands
+                current.decision_source = "reviewer"
+                if verdict.decision == "approve":
+                    current.status = ToolCallStatus.approved
+                    current.decision_reason = f"Approved by the reviewer: {verdict.reason}"[:500]
+                    current.decided_at = utcnow()
+                    current.expires_at = None
+                    p.reviewed += 1
+                else:
+                    current.decision_reason = f"Left for you: {verdict.reason}"[:500]
+                audit(
+                    db,
+                    current.owner_id,
+                    "tool_call.auto_reviewed",
+                    "tool_call",
+                    current.id,
+                    tool=current.tool_name,
+                    decision=verdict.decision,
+                    by=verdict.by,
+                    reason=verdict.reason,
+                    args_hash=current.args_hash,
+                )
+                await append_event(
+                    db, p.run_id, RunEventType.tool_call_decided, call_event(current)
+                )
+                record_sync(
+                    db,
+                    current.owner_id,
+                    "message",
+                    current.message_id,
+                    payload={"conversation_id": str(current.conversation_id)},
+                )
+                await db.commit()
+                row.status, row.decision_source = current.status, current.decision_source
+                row.decision_reason = current.decision_reason
 
     async def _execute(self, row: ToolCall) -> str:
         p, settings = self.p, self.settings
@@ -1278,6 +1352,8 @@ async def _prepare(
             usage=dict(run.usage or {}),
             settings=settings,
             parallel_tools=profile.parallel_tools,
+            review=review_prefs(settings, await db.get(UserSettings, run.owner_id)),
+            structured_output=profile.structured_output,
         )
         resumed = await _restore_steps(db, prepared, output)
         if not retrieved.empty and not await db.scalar(

@@ -928,6 +928,35 @@
         "title": "AssistantSettingsUpdate",
         "type": "object"
       },
+      "AutoReview": {
+        "description": "A reviewer model decides calls that would ask you (ADR C-13).",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "risks": {
+            "items": {
+              "enum": [
+                "read",
+                "write",
+                "execute",
+                "network",
+                "external"
+              ],
+              "type": "string"
+            },
+            "title": "Risks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "enabled",
+          "risks"
+        ],
+        "title": "AutoReview",
+        "type": "object"
+      },
       "AutomationCreate": {
         "properties": {
           "actions": {
@@ -1277,6 +1306,17 @@
               }
             ],
             "title": "Suggest Tasks"
+          },
+          "tool_auto_review": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Auto Review"
           },
           "tool_profile": {
             "anyOf": [
@@ -7396,6 +7436,9 @@
       },
       "ToolSettingsOut": {
         "properties": {
+          "auto_review": {
+            "$ref": "#/components/schemas/AutoReview"
+          },
           "default_profile": {
             "title": "Default Profile",
             "type": "string"
@@ -7441,6 +7484,7 @@
         "required": [
           "default_profile",
           "disabled_tools",
+          "auto_review",
           "sandbox",
           "network_enabled",
           "web_allowlist",
@@ -7451,6 +7495,16 @@
       },
       "ToolSettingsUpdate": {
         "properties": {
+          "auto_review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AutoReview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "default_profile": {
             "anyOf": [
               {

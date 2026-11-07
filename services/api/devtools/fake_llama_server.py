@@ -16,6 +16,9 @@ three-step plan with plan_start. After a tool result the reply quotes it ("Tool 
 Memory extraction requests (recognised by their prompt) propose whatever follows
 "[remember:" in the user's message, e.g. "[remember:The user likes green tea]", and
 suggest a task for "[todo:Renew passport]".
+
+Auto-review requests approve when the user's words include "[review:approve]" and
+leave the call for the user otherwise.
 """
 
 import argparse
@@ -146,6 +149,11 @@ async def chat(request: Request):
                 }
             )
         )
+    if isinstance(system, str) and system.startswith("You review actions"):
+        said = _text_of(messages[-1].get("content"))[0]
+        if "[review:approve]" in said:
+            return _text_stream('{"decision": "approve", "reason": "It is what the user asked"}')
+        return _text_stream('{"decision": "ask", "reason": "Not clearly asked for"}')
     if messages and messages[-1].get("role") == "tool":
         result = str(messages[-1].get("content") or "")[:200]
         return _text_stream(f"Tool result: {result}")

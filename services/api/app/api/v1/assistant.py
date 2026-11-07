@@ -336,6 +336,7 @@ class AutonomyUpdate(BaseModel):
     skill_trust: Literal["conservative", "balanced", "autonomous"] | None = None
     skill_auto_generate: bool | None = None
     tool_profile: Literal["read_only", "standard", "developer", "administrator"] | None = None
+    tool_auto_review: bool | None = None
 
 
 @router.get("/assistant/autonomy")

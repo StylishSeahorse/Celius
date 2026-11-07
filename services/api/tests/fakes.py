@@ -36,6 +36,10 @@ class FakeLlama:
         self.embedding_requests: list[list[str]] = []
         # Answer to skill generation requests (skill.propose).
         self.skill_reply = "NONE"
+        # Answer to auto-review requests (services/tools/review.py).
+        self.review_reply = '{"decision": "ask", "reason": "Not sure"}'
+        self.review_requests: list[dict[str, Any]] = []
+        self.review_fail = False
         self.skill_requests: list[dict[str, Any]] = []
         self.embeddings_fail = False
 
@@ -75,6 +79,15 @@ class FakeLlama:
                 return httpx.Response(
                     200,
                     content=_text_stream(self.memory_reply),
+                    headers={"content-type": "text/event-stream"},
+                )
+            if isinstance(system, str) and system.startswith("You review actions"):
+                self.review_requests.append(body)
+                if self.review_fail:
+                    return httpx.Response(500, json={"error": {"message": "boom"}})
+                return httpx.Response(
+                    200,
+                    content=_text_stream(self.review_reply),
                     headers={"content-type": "text/event-stream"},
                 )
             if isinstance(system, str) and system.startswith("You turn finished work"):

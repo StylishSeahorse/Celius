@@ -18,6 +18,7 @@ from app.services.audit import audit
 from app.services.memory.store import user_prefs as memory_prefs
 from app.services.skills.registry import user_skill_prefs
 from app.services.tools.policy import tool_preferences
+from app.services.tools.review import review_prefs
 
 PRESETS: dict[str, dict[str, Any]] = {
     # Nothing new without asking; nothing learned automatically.
@@ -28,6 +29,7 @@ PRESETS: dict[str, dict[str, Any]] = {
         "skill_trust": "conservative",
         "skill_auto_generate": False,
         "tool_profile": "read_only",
+        "tool_auto_review": False,
     },
     # The defaults: suggestions and learning, everything reviewed before it is used.
     "balanced": {
@@ -37,6 +39,7 @@ PRESETS: dict[str, dict[str, Any]] = {
         "skill_trust": "balanced",
         "skill_auto_generate": True,
         "tool_profile": "standard",
+        "tool_auto_review": False,
     },
     # Learns and acts without asking where it is safe to; tests gate skills; tools that
     # change files run freely in the sandbox, the web and outside services still ask.
@@ -47,6 +50,8 @@ PRESETS: dict[str, dict[str, Any]] = {
         "skill_trust": "autonomous",
         "skill_auto_generate": True,
         "tool_profile": "developer",
+        # A reviewer decides what would ask (never sending email, never outside services).
+        "tool_auto_review": True,
     },
 }
 FIELDS = tuple(PRESETS["balanced"])
@@ -64,6 +69,7 @@ async def current(db: AsyncSession, user: User, settings: Settings) -> dict[str,
         "skill_trust": skills.trust,
         "skill_auto_generate": skills.auto_generate,
         "tool_profile": tools.get("default_profile") or settings.tool_default_profile,
+        "tool_auto_review": review_prefs(settings, await db.get(UserSettings, user.id)).enabled,
     }
     preset = next((name for name, p in PRESETS.items() if p == values), "custom")
     return {
@@ -117,6 +123,11 @@ async def apply(
         skills["auto_generate"] = bool(values["skill_auto_generate"])
     if "tool_profile" in values:
         tools["default_profile"] = values["tool_profile"]
+    if "tool_auto_review" in values:
+        tools["auto_review"] = {
+            **(tools.get("auto_review") or {}),
+            "enabled": bool(values["tool_auto_review"]),
+        }
     row.preferences = {
         **prefs,
         "memory": memory,

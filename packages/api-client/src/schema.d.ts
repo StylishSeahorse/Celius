@@ -2652,6 +2652,16 @@ export interface components {
             /** Timezone */
             timezone?: string | null;
         };
+        /**
+         * AutoReview
+         * @description A reviewer model decides calls that would ask you (ADR C-13).
+         */
+        AutoReview: {
+            /** Enabled */
+            enabled: boolean;
+            /** Risks */
+            risks: ("read" | "write" | "execute" | "network" | "external")[];
+        };
         /** AutomationCreate */
         AutomationCreate: {
             /** Actions */
@@ -2762,6 +2772,8 @@ export interface components {
             skill_trust?: ("conservative" | "balanced" | "autonomous") | null;
             /** Suggest Tasks */
             suggest_tasks?: boolean | null;
+            /** Tool Auto Review */
+            tool_auto_review?: boolean | null;
             /** Tool Profile */
             tool_profile?: ("read_only" | "standard" | "developer" | "administrator") | null;
         };
@@ -4804,6 +4816,7 @@ export interface components {
         };
         /** ToolSettingsOut */
         ToolSettingsOut: {
+            auto_review: components["schemas"]["AutoReview"];
             /** Default Profile */
             default_profile: string;
             /** Disabled Tools */
@@ -4823,6 +4836,7 @@ export interface components {
         };
         /** ToolSettingsUpdate */
         ToolSettingsUpdate: {
+            auto_review?: components["schemas"]["AutoReview"] | null;
             /** Default Profile */
             default_profile?: string | null;
             /** Disabled Tools */

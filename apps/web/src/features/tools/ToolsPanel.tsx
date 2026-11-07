@@ -369,6 +369,60 @@ function ScheduleForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
 
 const DECISIONS = ["allow", "ask", "deny"] as const;
 
+type AutoReview = ToolSettings["auto_review"];
+const REVIEW_RISKS: [AutoReview["risks"][number], string][] = [
+  ["write", "Changing files in the chat's workspace"],
+  ["execute", "Running code and commands in the sandbox"],
+  ["network", "Reading the web"],
+  ["external", "Outside services: calendar, mail drafts, MCP servers"],
+];
+
+/** Auto-review: a reviewer model approves calls that would ask, when they plainly serve the request. */
+function AutoReviewSettings({ value: saved, onChange: save }: { value: AutoReview; onChange: (v: AutoReview) => void }) {
+  // Shown at once; the saved settings replace it when they come back.
+  const [value, setValue] = useState(saved);
+  useEffect(() => setValue(saved), [saved]);
+  const onChange = (next: AutoReview) => {
+    setValue(next);
+    save(next);
+  };
+  const toggle = (risk: AutoReview["risks"][number]) =>
+    onChange({
+      ...value,
+      risks: value.risks.includes(risk) ? value.risks.filter((r) => r !== risk) : [...value.risks, risk],
+    });
+  return (
+    <section className="space-y-2" aria-label="Auto-review">
+      <h3 className="font-medium">Auto-review</h3>
+      <label className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={value.enabled}
+          onChange={(e) => onChange({ ...value, enabled: e.target.checked })}
+        />
+        Let a reviewer approve tool calls instead of asking me
+      </label>
+      <p className="text-xs text-muted">
+        Before a call would wait for you, a separate model checks it against your own recent messages and approves
+        it only if it plainly serves what you asked. It never sees web pages, files or emails the assistant read,
+        it can't approve anything the profile denies, and when it is unsure the call waits for you as usual.
+        Sending email, arguments that look like secrets and risky commands always ask.
+      </p>
+      {value.enabled && (
+        <fieldset className="space-y-1 text-xs">
+          <legend className="text-muted">It may approve:</legend>
+          {REVIEW_RISKS.map(([risk, label]) => (
+            <label key={risk} className="flex items-center gap-2">
+              <input type="checkbox" checked={value.risks.includes(risk)} onChange={() => toggle(risk)} />
+              {label}
+            </label>
+          ))}
+        </fieldset>
+      )}
+    </section>
+  );
+}
+
 function Permissions() {
   const load = useCallback(
     () => Promise.all([api.toolSettings(), api.tools(), loadProfiles(true)]),
@@ -383,7 +437,7 @@ function Permissions() {
     window.dispatchEvent(new Event("celius:profiles-changed"));
     reload();
   };
-  const save = (body: { default_profile?: string; disabled_tools?: string[] }) =>
+  const save = (body: Parameters<typeof api.updateToolSettings>[0]) =>
     void api.updateToolSettings(body).then(changed, (err) => setError(message(err)));
 
   return (
@@ -428,6 +482,8 @@ function Permissions() {
         </select>
         <p className="text-xs text-muted">{profiles.find((p) => p.key === settings.default_profile)?.description}</p>
       </section>
+
+      <AutoReviewSettings value={settings.auto_review} onChange={(auto_review) => save({ auto_review })} />
 
       <section className="space-y-2">
         <div className="flex items-center gap-2">

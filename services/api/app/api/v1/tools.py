@@ -19,6 +19,7 @@ from app.errors import AppError, not_found
 from app.models import ToolCall, ToolGrant, ToolProfile, UserSettings
 from app.schemas.tools import (
     ApproveToolCall,
+    AutoReview,
     DenyToolCall,
     PendingApproval,
     ToolCallOut,
@@ -41,6 +42,7 @@ from app.services.tools.policy import (
     validate_profile_key,
 )
 from app.services.tools.registry import BUILTIN
+from app.services.tools.review import review_prefs
 from app.services.tools.sandbox_client import SandboxClient
 from app.services.tools.sandbox_status import read_status
 from app.services.tools.toolset import available_tools
@@ -99,9 +101,11 @@ async def get_tool_settings(auth: CurrentAuth, db: DB, settings: AppSettings) ->
             health = (await client.health() if client else None) or {"status": "unreachable"}
             if client:
                 await client.aclose()
+    review = review_prefs(settings, await db.get(UserSettings, auth.user.id))
     return ToolSettingsOut(
         default_profile=prefs.get("default_profile") or settings.tool_default_profile,
         disabled_tools=prefs.get("disabled_tools") or [],
+        auto_review=AutoReview(enabled=review.enabled, risks=list(review.risks)),
         sandbox=health,
         network_enabled=settings.tool_network_enabled,
         web_allowlist=settings.web_allowlist,
@@ -126,6 +130,11 @@ async def update_tool_settings(
         tools["default_profile"] = body.default_profile
     if body.disabled_tools is not None:
         tools["disabled_tools"] = sorted(set(body.disabled_tools))
+    if body.auto_review is not None:
+        tools["auto_review"] = {
+            "enabled": body.auto_review.enabled,
+            "risks": sorted(set(body.auto_review.risks)),
+        }
     row.preferences = {**(row.preferences or {}), "tools": tools}
     audit(
         db,

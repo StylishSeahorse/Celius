@@ -135,6 +135,7 @@ Existing base kept: runs persist every tool call and resume after a worker crash
 | Skill improvement from failure clusters | ✅ | `skill.improve` |
 | Agent benchmarks saved and compared | ✅ | `prompt_eval.py --save/--compare` |
 | Configurable autonomous behaviour in one place | ✅ | presets |
+| Auto-review of tool approvals (a reviewer approves calls that fit the request) | ✅ | C-13; Tools > Permissions; on in Hands-off |
 | Benchmarks on the real GPU and embedding model; tune from them | ⬜ | run on the server |
 
 ## Next (continuation point)

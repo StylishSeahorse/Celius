@@ -56,6 +56,7 @@ export interface Autonomy {
   skill_trust: "conservative" | "balanced" | "autonomous";
   skill_auto_generate: boolean;
   tool_profile: string;
+  tool_auto_review: boolean;
   allowed_tool_profiles: string[];
   always_asks: string[];
   notes?: string[];
@@ -231,7 +232,11 @@ export const api = {
 
   tools: () => request<ToolInfo[]>("/tools"),
   toolSettings: () => request<ToolSettings>("/tools/settings"),
-  updateToolSettings: (body: { default_profile?: string; disabled_tools?: string[] }) =>
+  updateToolSettings: (body: {
+    default_profile?: string;
+    disabled_tools?: string[];
+    auto_review?: ToolSettings["auto_review"];
+  }) =>
     request<ToolSettings>("/tools/settings", json("PUT", body)),
   toolProfiles: () => request<ToolProfile[]>("/tool-profiles"),
   createToolProfile: (body: { name: string; base: string; description?: string | null; rules: Record<string, string> }) =>

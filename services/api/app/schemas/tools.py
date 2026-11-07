@@ -88,9 +88,17 @@ class ToolProfileUpdate(BaseModel):
     rules: dict[str, DecisionValue] | None = None
 
 
+class AutoReview(BaseModel):
+    """A reviewer model decides calls that would ask you (ADR C-13)."""
+
+    enabled: bool
+    risks: list[Literal["read", "write", "execute", "network", "external"]]
+
+
 class ToolSettingsOut(BaseModel):
     default_profile: str
     disabled_tools: list[str]
+    auto_review: AutoReview
     sandbox: dict[str, Any] | None  # the sandbox's health (mode, limits) or None
     network_enabled: bool
     web_allowlist: list[str]
@@ -100,6 +108,7 @@ class ToolSettingsOut(BaseModel):
 class ToolSettingsUpdate(BaseModel):
     default_profile: str | None = Field(default=None, max_length=80)
     disabled_tools: list[str] | None = Field(default=None, max_length=500)
+    auto_review: AutoReview | None = None
 
 
 class McpServerCreate(BaseModel):

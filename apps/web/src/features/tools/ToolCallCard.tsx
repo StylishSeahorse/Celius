@@ -171,9 +171,11 @@ export function ToolCallCard({
               {error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{error}</p>}
             </div>
           )}
-          {!pending && call.decision_reason && ["refused", "denied", "expired"].includes(call.status) && (
-            <p className="text-xs text-muted">{call.decision_reason}</p>
-          )}
+          {!pending &&
+            call.decision_reason &&
+            (["refused", "denied", "expired"].includes(call.status) || call.decision_source === "reviewer") && (
+              <p className="text-xs text-muted">{call.decision_reason}</p>
+            )}
           <ResultView call={call} result={result} />
           {changed.length > 0 && (
             <ul className="space-y-0.5 text-xs" aria-label="Changed files">

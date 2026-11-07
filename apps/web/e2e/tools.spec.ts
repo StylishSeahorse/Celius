@@ -31,6 +31,40 @@ test("a write asks for approval, then runs exactly once", async ({ page }) => {
   await expect(card.getByRole("button", { name: "Allow once" })).toHaveCount(0);
 });
 
+test("auto-review approves what the request asks for and leaves the rest", async ({ page }) => {
+  const sidebar = await openSidebar(page);
+  await sidebar.getByRole("button", { name: /Tools & activity/ }).click();
+  const panel = page.getByRole("dialog", { name: "Tools" });
+  await panel.getByRole("button", { name: "Permissions" }).click();
+  const review = panel.getByRole("region", { name: "Auto-review" });
+  const toggle = review.getByLabel("Let a reviewer approve tool calls instead of asking me");
+  await toggle.check();
+  await expect(review.getByLabel("Changing files in the chat's workspace")).toBeChecked();
+  await expect(review.getByLabel(/Outside services/)).not.toBeChecked();
+  await panel.getByRole("button", { name: "Close" }).click();
+
+  try {
+    await page.getByLabel("Tool permissions").selectOption("standard");
+    await send(page, "[tool:write] [review:approve] save a greeting");
+    const card = chat(page).getByTestId("tool-call");
+    await expect(card).toHaveAttribute("data-status", "completed");
+    await expect(lastReply(page)).toContainText("Wrote 17 bytes to hello.txt");
+
+    // A new chat: the reviewer reads the user's last few messages.
+    await newChat(page);
+    await page.getByLabel("Tool permissions").selectOption("standard");
+    await send(page, "[tool:write] save it");
+    const second = chat(page).getByTestId("tool-call");
+    await expect(second).toHaveAttribute("data-status", "pending_approval");
+    await expect(second).toContainText("Left for you: Not clearly asked for");
+    await second.getByRole("button", { name: "Deny" }).click();
+  } finally {
+    await page.request.put("/api/v1/tools/settings", {
+      data: { auto_review: { enabled: false, risks: ["execute", "network", "write"] } },
+    });
+  }
+});
+
 test("python runs in the sandbox under the developer profile", async ({ page }) => {
   await page.getByLabel("Tool permissions").selectOption("developer");
   await send(page, "[tool:python] compute");
