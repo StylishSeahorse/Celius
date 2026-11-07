@@ -279,6 +279,11 @@ function MemoryItem({
             {e.name}
           </span>
         ))}
+        {typeof memory.attributes?.review_reason === "string" && (
+          <span className="rounded bg-amber-100 px-1.5 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
+            {memory.attributes.review_reason as string}
+          </span>
+        )}
         {!!memory.open_conflicts && (
           <span className="rounded bg-amber-100 px-1.5 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
             conflicts with another memory

@@ -38,7 +38,7 @@ from app.services.skills.format import (
     SkillFormatError,
     parse,
 )
-from app.services.skills.jobs import count_pending
+from app.services.skills.jobs import count_pending, maybe_improve
 from app.services.sync import record_sync
 
 router = APIRouter(tags=["skills"])
@@ -385,10 +385,13 @@ async def restore_skill(skill_id: uuid.UUID, auth: CurrentAuth, db: DB) -> Skill
 
 @router.post("/skills/{skill_id}/feedback", status_code=status.HTTP_204_NO_CONTENT)
 async def skill_feedback(
-    skill_id: uuid.UUID, body: SkillFeedback, auth: CurrentAuth, db: DB
+    skill_id: uuid.UUID, body: SkillFeedback, auth: CurrentAuth, db: DB, settings: AppSettings
 ) -> None:
     skill = await _owned(db, auth.user.id, skill_id)
     await registry.feedback(db, skill, body.outcome, body.note)
+    if body.outcome != "success":
+        await db.flush()
+        await maybe_improve(db, skill.id, settings)
     await db.commit()
 
 

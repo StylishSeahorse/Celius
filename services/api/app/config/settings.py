@@ -125,6 +125,9 @@ class Settings(BaseSettings):
     memory_prompt_max_items: int = Field(default=8, ge=0, le=200)
     # How close in meaning a memory must be to the message to be given (with embeddings).
     memory_min_similarity: float = Field(default=0.55, ge=0, le=1)
+    # ...or share enough of its words (keyword score, 0..1). Measure with
+    # devtools/memory_eval.py before changing either.
+    memory_min_keyword_score: float = Field(default=0.2, ge=0, le=1)
     memory_recall_chunks: int = Field(default=4, ge=0, le=20)
     memory_context_share: float = Field(default=0.15, ge=0, le=0.5)
     memory_extraction_max_per_turn: int = Field(default=2, ge=0, le=10)
@@ -139,6 +142,11 @@ class Settings(BaseSettings):
     memory_recency_half_life_days: float = Field(default=30, gt=0)
     # Memories below this confidence are never given to a chat.
     memory_min_confidence: float = Field(default=0.3, ge=0, le=1)
+    # Upkeep (ADR C-12): look for likely duplicates and stale inferences this often (days;
+    # 0 turns it off); an inference never confirmed nor used for this long goes back to
+    # review.
+    memory_consolidation_days: int = Field(default=7, ge=0, le=365)
+    memory_stale_days: int = Field(default=90, ge=0, le=3650)
 
     # Skills (ADR C-06). Defaults; each user can change trust and auto-generation.
     skill_trust_default: Literal["conservative", "balanced", "autonomous"] = "balanced"

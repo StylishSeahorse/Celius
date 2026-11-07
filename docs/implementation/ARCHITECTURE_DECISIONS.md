@@ -412,3 +412,56 @@ offered only once an email account exists; `calendar_change`, `email_send`,
 **Rejected.** A workflow DSL or visual editor (recipes + validated JSON + the model
 cover it); polling email with the model; storing provider passwords in environment
 variables; letting a profile or grant skip the send confirmation.
+
+---
+
+## C-12: Measure from what is recorded; improve only what a measurement shows
+
+Status: accepted · 2026-11-07
+
+**Analytics** (`services/analytics.py`, `GET /insights`, Account > Insights) are computed
+on demand from tables Celius already keeps: runs, tool calls, `run.started` (profile,
+prompt tokens per section, dropped history), agent tasks and their events, skill events,
+memory statuses and usage parts, personal tasks, automation runs. No new logging, no
+model. Per person; administrators can see everyone. Rates are null when nothing was
+measured, so "no data" never reads as 0%. Figures cover the spec's list: task completion,
+tool success, skill reuse and evaluation success, recovery after interruption, context
+consumption, execution duration (memory precision/recall come from the benchmark below,
+since real conversations have no labels).
+
+**Memory benchmark** (`devtools/memory_eval.py`, labelled set in `devtools/data/`): the
+real retrieval path in a temporary database; precision, recall, MRR and "silence" (an
+unrelated question gets nothing); `--grid` compares weight sets; `--save`/`--compare`;
+`--embeddings-url` for the real embedding model, `--hash-embeddings` offline.
+
+First result, keyword-only: precision 0.50, recall 0.47, MRR 0.50, silence 0.75, and the
+four weight sets scored the same. So the weights weren't the problem (they only order
+memories the relevance gate already admits); the misses were word forms ("deploy" /
+"deploys") and a length-dampened threshold edge (0.197 vs 0.2). A light suffix stemmer in
+`retrieval.terms`/`keyword_score` (shared with attachment excerpts and skill search)
+raised it to **precision 0.68, recall 0.72, MRR 0.75, silence 0.75**. A first stemmer
+version that cut "runs" to "run" dropped precision to 0.63 and was reverted by the same
+benchmark, which now runs in the test suite as a regression guard. The gate thresholds
+became settings (`MEMORY_MIN_SIMILARITY`, `MEMORY_MIN_KEYWORD_SCORE`, defaults unchanged).
+The weights stay as they were: no measurement here justifies changing them; paraphrase
+misses ("graphics card" / "GPU") need the real embedding model, measured on the GPU box.
+
+**Memory upkeep** (`memory/consolidate.py`, weekly per user, `MEMORY_CONSOLIDATION_DAYS`):
+likely duplicates that slipped past the add-time checks become "Possibly the same fact"
+conflicts (a resolved pair never comes back); inferences never confirmed nor used for
+`MEMORY_STALE_DAYS` (90) go back to review with the reason. Nothing is deleted, no model.
+
+**Skill improvement from failure clusters**: when 3 of a skill's last 10 outcomes (uses
+and the user's "didn't work"/"had to correct" feedback) failed, a `skill.improve` job
+gives the model the skill, the failing tool calls and the feedback, and asks for UPDATE
+or NONE; at most once a week per skill; never under conservative trust or with learning
+off. The result is an ordinary candidate version (validated, tested, trust policy).
+
+**Autonomy in one place** (`services/autonomy.py`, `/assistant/autonomy`, Account):
+Careful / Balanced / Hands-off presets set memory suggestion and review, task
+suggestions, skill trust and learning, and the default tool profile together (the
+settings still live where they did; "custom" when mixed). Presets never widen an
+administrator's limit on tool profiles, and never change that sending email asks.
+
+**Benchmarks over time**: `prompt_eval.py` and `memory_eval.py` save summaries and
+compare against a previous file. Neither has run against the real models yet.

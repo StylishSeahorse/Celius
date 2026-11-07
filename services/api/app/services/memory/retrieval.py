@@ -123,17 +123,44 @@ class Retrieved:
         return not self.memories and not self.recalled
 
 
+def stem(word: str) -> str:
+    """A light English suffix strip, so "deploys", "deployed" and "deploying" all match
+    "deploy", and "backups" matches "backup" (found by devtools/memory_eval.py, ADR C-12).
+    Deliberately crude: it only has to make two forms of a word meet, not be a word."""
+    word = word.lower().strip("'")
+    if word.endswith("'s"):
+        word = word[:-2]
+    for suffix, keep, shortest in (
+        ("ies", "y", 3),
+        ("ing", "", 4),
+        ("ed", "", 4),
+        ("ly", "", 4),
+        ("es", "", 3),  # boxes, wishes (only after s, x, z, ch, sh)
+        ("s", "", 4),  # 3 over-stemmed: "runs" met "run" (precision fell 0.68 -> 0.63)
+    ):
+        if word.endswith(suffix) and len(word) - len(suffix) >= shortest:
+            if suffix == "s" and word.endswith("ss"):
+                continue
+            if suffix == "es" and not word[:-2].endswith(("s", "x", "z", "ch", "sh")):
+                continue
+            return word[: -len(suffix)] + keep
+    return word
+
+
 def terms(text: str) -> list[str]:
     return list(
-        dict.fromkeys(w for w in _WORD.findall(text.lower()) if len(w) > 2 and w not in STOPWORDS)
+        dict.fromkeys(
+            stem(w) for w in _WORD.findall(text.lower()) if len(w) > 2 and w not in STOPWORDS
+        )
     )[:20]
 
 
 def keyword_score(query_terms: list[str], text: str) -> float:
-    """Share of the query's words found in `text`, damped for long texts (0..1)."""
+    """Share of the query's words found in `text`, damped for long texts (0..1). Both
+    sides are stemmed (stem)."""
     if not query_terms:
         return 0.0
-    words = set(_WORD.findall(text.lower()))
+    words = {stem(w) for w in _WORD.findall(text.lower())}
     hits = sum(1 for t in query_terms if t in words)
     if not hits:
         return 0.0
@@ -315,7 +342,7 @@ async def retrieve(
         )
         for _, memory, semantic, keyword in ranked:
             close = semantic is not None and semantic >= settings.memory_min_similarity
-            if close or keyword >= MIN_KEYWORD_SCORE:
+            if close or keyword >= settings.memory_min_keyword_score:
                 relevant.append(memory)
             if len(relevant) >= settings.memory_prompt_max_items:
                 break

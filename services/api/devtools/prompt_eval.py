@@ -219,6 +219,43 @@ async def evaluate(
     return results
 
 
+def summary(results: list[Result]) -> dict[str, dict]:
+    """Per profile: pass rate, prompt tokens, tool calls and time (for --save/--compare)."""
+    out: dict[str, dict] = {}
+    for profile in dict.fromkeys(r.profile for r in results):
+        mine = [r for r in results if r.profile == profile]
+        tokens = [r.prompt_tokens for r in mine if r.prompt_tokens]
+        out[profile] = {
+            "pass_rate": round(sum(r.passed for r in mine) / len(mine), 3),
+            "prompt_tokens_mean": round(sum(tokens) / len(tokens)) if tokens else None,
+            "tool_calls_mean": round(sum(len(r.tool_calls) for r in mine) / len(mine), 2),
+            "seconds_mean": round(sum(r.seconds for r in mine) / len(mine), 2),
+        }
+    return out
+
+
+def _delta(now: dict, before: dict, key: str) -> str:
+    value, old = now.get(key), before.get(key)
+    if value is None:
+        return "-"
+    return f"{value}" if old is None else f"{value} ({value - old:+.3g})"
+
+
+def compare(current: dict[str, dict], previous: dict[str, dict]) -> str:
+    lines = [
+        "| profile | pass rate | prompt tokens | tool calls | seconds |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for profile, now in current.items():
+        before = previous.get(profile, {})
+        cells = " | ".join(
+            _delta(now, before, key)
+            for key in ("pass_rate", "prompt_tokens_mean", "tool_calls_mean", "seconds_mean")
+        )
+        lines.append(f"| {profile} | {cells} |")
+    return "\n".join(lines)
+
+
 def report(results: list[Result]) -> str:
     lines = [
         "| profile | scenario | result | prompt tokens | tools offered | tool calls | s |",
@@ -244,12 +281,21 @@ def main() -> None:
     parser.add_argument("--model", default="default")
     parser.add_argument("--profiles", default="lite,standard,advanced")
     parser.add_argument("--json", action="store_true", help="Print results as JSON")
+    parser.add_argument("--save", help="Write a summary per profile to this JSON file")
+    parser.add_argument("--compare", help="Show changes against a saved summary")
     args = parser.parse_args()
     results = asyncio.run(evaluate(args.base_url, args.model, args.profiles.split(",")))
     if args.json:
         print(json.dumps([r.__dict__ for r in results], indent=2))
     else:
         print(report(results))
+    totals = summary(results)
+    if args.compare:
+        with open(args.compare) as handle:
+            print("\n" + compare(totals, json.load(handle)))
+    if args.save:
+        with open(args.save, "w") as handle:
+            json.dump(totals, handle, indent=2)
     sys.exit(0 if all(r.passed for r in results) else 1)
 
 

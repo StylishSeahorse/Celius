@@ -19,6 +19,7 @@ from app.services.assistant.tasks import fire_due_reminders
 from app.services.automation import engine as automation_engine
 from app.services.files.service import cleanup_expired_uploads
 from app.services.jobs import claim_next_job, recover_stale_jobs, run_job
+from app.services.memory import consolidate as memory_consolidation
 from app.services.model_gateway import ModelGateway
 from app.services.runs import prune_stream_events
 from app.services.schedules import fire_due
@@ -120,6 +121,7 @@ async def run_worker(
                     log.info("Expired %d abandoned upload(s)", expired)
                 await prune_stream_events(factory, settings.run_delta_retention_minutes)
                 await automation_engine.prune(factory)
+                await memory_consolidation.queue_due(factory, settings)
                 await _record_sandbox_health(settings)
                 await _monitor(factory, settings, gateway, worker_id)
                 last_maintenance = now

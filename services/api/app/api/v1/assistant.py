@@ -2,10 +2,11 @@
 (ADR C-10). The model reaches the same data through the task tools."""
 
 import uuid
-from typing import Annotated
+from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, Query, status
+from pydantic import BaseModel
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +26,7 @@ from app.schemas.assistant import (
     UserTaskOut,
     UserTaskUpdate,
 )
+from app.services import autonomy
 from app.services import schedules as schedule_svc
 from app.services.assistant import tasks
 from app.services.audit import audit
@@ -321,3 +323,31 @@ async def _briefing_schedule(db, user, current: dict, time_of_day: str, settings
     current["briefing_schedule_id"] = str(existing.id)
     current["briefing_time"] = time_of_day
     return current
+
+
+# ---------------------------------------------------------------------- autonomy
+
+
+class AutonomyUpdate(BaseModel):
+    preset: Literal["careful", "balanced", "hands_off"] | None = None
+    memory_auto_extract: bool | None = None
+    memory_require_review: bool | None = None
+    suggest_tasks: bool | None = None
+    skill_trust: Literal["conservative", "balanced", "autonomous"] | None = None
+    skill_auto_generate: bool | None = None
+    tool_profile: Literal["read_only", "standard", "developer", "administrator"] | None = None
+
+
+@router.get("/assistant/autonomy")
+async def get_autonomy(auth: CurrentAuth, db: DB, settings: AppSettings) -> dict:
+    """How much Celius does on its own, from the memory, task, skill and tool settings."""
+    return await autonomy.current(db, auth.user, settings)
+
+
+@router.put("/assistant/autonomy")
+async def update_autonomy(
+    body: AutonomyUpdate, auth: CurrentAuth, db: DB, settings: AppSettings
+) -> dict:
+    notes = await autonomy.apply(db, auth.user, body.model_dump(exclude_none=True), settings)
+    await db.commit()
+    return {**(await autonomy.current(db, auth.user, settings)), "notes": notes}

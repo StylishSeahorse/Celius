@@ -124,21 +124,28 @@ Existing base kept: runs persist every tool call and resume after a worker crash
 | Linking emails to tasks/projects | 🟡 | via automations and the model (`create_task` from an email); no stored link |
 | "When a project changes status" | ⬜ | projects have no status yet |
 
-## Phase 7: continuous improvement ⬜
+## Phase 7: continuous improvement ✅ (real-model measurements pending)
 
-- ⬜ Execution analytics (tool success, run duration, context use) from existing tables
-- ⬜ Memory quality evaluation (precision/recall on a labelled set) and periodic
-  consolidation
-- ⬜ Skill improvement from failure clusters; benchmarks; tune ranking weights with data
+| Item | Status | Notes |
+| --- | --- | --- |
+| Execution analytics (runs, tools, context, agent tasks, skills, memory, assistant) | ✅ | `GET /insights`, Account > Insights; C-12 |
+| Memory quality: retrieval benchmark (precision/recall/MRR/silence), weight grid | ✅ | `devtools/memory_eval.py`; guards the test suite |
+| Retrieval improved from the benchmark (stemming): P 0.50→0.68, R 0.47→0.72 | ✅ | keyword-only, bundled set |
+| Periodic consolidation (duplicates → conflicts, stale inferences → review) | ✅ | weekly, no model |
+| Skill improvement from failure clusters | ✅ | `skill.improve` |
+| Agent benchmarks saved and compared | ✅ | `prompt_eval.py --save/--compare` |
+| Configurable autonomous behaviour in one place | ✅ | presets |
+| Benchmarks on the real GPU and embedding model; tune from them | ⬜ | run on the server |
 
 ## Next (continuation point)
 
-1. Phase 7: execution analytics from existing tables (run duration, tool success, context
-   use from `run.started.prompt_sections`, automation outcomes), memory quality
-   evaluation and a periodic consolidation job, skill improvement from failure
-   clusters, benchmarks with `devtools/prompt_eval.py`, configurable proactive behaviour
-   in one place.
-2. On the real hardware: run `prompt_eval.py`, connect a real CalDAV calendar and a
-   mailbox, and record the results.
-3. Follow-ups: OAuth for Google/Microsoft; recurring events in the local calendar; an
-   entity browser and skill import in the UI; `/models/{id}/verify-tools` for ids with "/".
+All seven phases are built. What is left needs the real installation or is a follow-up:
+
+1. On the GPU machine: `uv run python -m devtools.prompt_eval --base-url http://<gpu>:8080/v1
+   --model <id> --save eval.json`, and `uv run python -m devtools.memory_eval --grid
+   --embeddings-url http://<embeddings>/v1 --save memory.json`; set model profiles and
+   (only if the grid says so) `MEMORY_WEIGHT_*`; record results in IMPLEMENTATION_LOG.md.
+2. Connect a real CalDAV calendar and mailbox; check reminders and automations on devices.
+3. Follow-ups: OAuth for Google/Microsoft; recurring local events; an entity browser and
+   skill import in the UI; `/models/{id}/verify-tools` for ids with "/"; a labelled
+   memory set from the household's own (consented) data.

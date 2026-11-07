@@ -1200,6 +1200,105 @@
         "title": "AutomationUpdate",
         "type": "object"
       },
+      "AutonomyUpdate": {
+        "properties": {
+          "memory_auto_extract": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Auto Extract"
+          },
+          "memory_require_review": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Require Review"
+          },
+          "preset": {
+            "anyOf": [
+              {
+                "enum": [
+                  "careful",
+                  "balanced",
+                  "hands_off"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset"
+          },
+          "skill_auto_generate": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skill Auto Generate"
+          },
+          "skill_trust": {
+            "anyOf": [
+              {
+                "enum": [
+                  "conservative",
+                  "balanced",
+                  "autonomous"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skill Trust"
+          },
+          "suggest_tasks": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggest Tasks"
+          },
+          "tool_profile": {
+            "anyOf": [
+              {
+                "enum": [
+                  "read_only",
+                  "standard",
+                  "developer",
+                  "administrator"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Profile"
+          }
+        },
+        "title": "AutonomyUpdate",
+        "type": "object"
+      },
       "Briefing": {
         "properties": {
           "agent_tasks": {
@@ -8738,6 +8837,71 @@
         ]
       }
     },
+    "/api/v1/assistant/autonomy": {
+      "get": {
+        "description": "How much Celius does on its own, from the memory, task, skill and tool settings.",
+        "operationId": "get_autonomy_api_v1_assistant_autonomy_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Autonomy Api V1 Assistant Autonomy Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Autonomy",
+        "tags": [
+          "assistant"
+        ]
+      },
+      "put": {
+        "operationId": "update_autonomy_api_v1_assistant_autonomy_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutonomyUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Autonomy Api V1 Assistant Autonomy Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Autonomy",
+        "tags": [
+          "assistant"
+        ]
+      }
+    },
     "/api/v1/assistant/briefing": {
       "get": {
         "description": "Today: overdue, due, upcoming, in progress, a suggested order, suggestions to\nreview, Celius's open work and what waits for you. Computed, no model involved.",
@@ -10850,6 +11014,67 @@
         "summary": "Ready",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/v1/insights": {
+      "get": {
+        "operationId": "insights_api_v1_insights_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "maximum": 365,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "default": "me",
+              "enum": [
+                "me",
+                "everyone"
+              ],
+              "title": "Scope",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Insights Api V1 Insights Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Insights",
+        "tags": [
+          "insights"
         ]
       }
     },

@@ -2,6 +2,39 @@
 
 Newest first. Each entry: what changed, how it was verified, what is left.
 
+## 2026-11-07: Phase 7, continuous improvement
+
+**Existing implementation.** Everything needed for measurement was already stored (runs,
+tool calls, `run.started` with profile and prompt sections, agent-task events, skill
+events, memory statuses and usage parts, personal tasks, automation runs); only
+`message.delta` events are pruned. `prompt_eval.py` (Phase 4) existed.
+
+**Changes.** See C-12. `services/analytics.py` and `GET /insights`;
+`devtools/memory_eval.py` with `devtools/data/memory_eval.json`; light stemming in
+memory keyword matching; `MEMORY_MIN_KEYWORD_SCORE`; `memory/consolidate.py` (weekly
+job, queued from the worker's maintenance); `skill.improve` and the failure-cluster rule
+(after runs and after negative feedback); `services/autonomy.py` and
+`/assistant/autonomy`; `prompt_eval.py --save/--compare`; web: Account > Insights and
+"How much Celius does on its own", a review reason on memories sent back to review.
+
+**Measured.** Memory benchmark, keyword-only, bundled set: before precision 0.500 /
+recall 0.469 / MRR 0.500 / silence 0.750; after stemming 0.677 / 0.719 / 0.750 / 0.750. A
+stemmer variant that over-stemmed ("runs" → "run") measured 0.630 precision and was
+reverted. The four weight sets in `--grid` scored identically on this set, so the
+weights were left alone.
+
+**Verification.** `tests/test_continuous_improvement.py` (14): insights from real chats
+(completion, failure reasons, per-tool success, context by section, privacy and the
+admin-only scope), memory/agent/assistant figures, stemming, the benchmark as a regression
+guard and its grid, consolidation (duplicates once, stale back to review, approval
+confirms, queued once per period), skill improvement (cluster → one job → an improved
+version waiting for approval; feedback counts; conservative never), autonomy presets and
+an administrator's limit, benchmark comparison. e2e `insights.spec.ts`. Totals: API suite
+**622 passed, 7 skipped** (SQLite); Phase 7, memory, skills, attachments, isolation and
+migrations on PostgreSQL 16 + pgvector (125 passed); full e2e suite **97 passed**.
+
+**Left.** Real-model and real-embedding measurements on the server.
+
 ## 2026-11-05: Phase 6, integrations and automation
 
 **Existing implementation.** Sealed credentials (MCP servers), the SSRF-guarded HTTP

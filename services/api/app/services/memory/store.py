@@ -402,6 +402,8 @@ async def approve(db: AsyncSession, memory: Memory) -> None:
     memory.status = MemoryStatus.active
     memory.reviewed_at = utcnow()
     memory.confidence = 1.0
+    if memory.attributes and "review_reason" in memory.attributes:
+        memory.attributes = {k: v for k, v in memory.attributes.items() if k != "review_reason"}
     corrections = (
         await db.scalars(
             select(MemoryConflict).where(

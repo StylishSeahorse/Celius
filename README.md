@@ -162,6 +162,19 @@ The model can call tools in the conversation's private workspace:
   each keeps a history, and one that keeps failing switches itself off and tells you
 - Passwords are encrypted on the server and never shown again
 
+### Insights and improvement
+- **Insights** (Account): completed and failed replies and why, reply time, tool success
+  by tool, prompt size per part, multi-step tasks completed, verified and recovered,
+  skill reuse and success, memory use and kept suggestions, tasks and automations
+- **How much Celius does on its own**: Careful, Balanced or Hands-off sets memory review,
+  task suggestions, skill learning and default tool permissions together (sending email
+  always asks)
+- Weekly memory upkeep: likely duplicates to resolve, old unconfirmed guesses back to
+  review
+- A skill that keeps failing gets an improved version proposed for your approval
+- Benchmarks: `devtools/memory_eval.py` (retrieval precision and recall) and
+  `devtools/prompt_eval.py`, both able to save results and compare runs
+
 ### Local models
 - A capability registry per model: context size, tool calling, images, parallel tool
   calls, JSON output, thinking on/off; from the model server and checks (never from the
@@ -433,7 +446,7 @@ docs/                 Backlog, ADRs, deployment, operations, acceptance tests, s
   - [0009: Memory and recall](docs/adr/0009-memory-and-recall.md)
 - Assistant roadmap: [roadmap and status](docs/implementation/CELIUS_ROADMAP.md) ·
   [audit](docs/implementation/AUDIT.md) ·
-  [decisions C-01…C-11](docs/implementation/ARCHITECTURE_DECISIONS.md) ·
+  [decisions C-01…C-12](docs/implementation/ARCHITECTURE_DECISIONS.md) ·
   [implementation log](docs/implementation/IMPLEMENTATION_LOG.md)
 
 ## Not yet verified

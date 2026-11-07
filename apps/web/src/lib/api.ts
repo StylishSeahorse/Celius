@@ -45,6 +45,22 @@ import type {
   SyncChanges,
 } from "./types";
 
+/** GET /insights: rates are null when there is nothing to divide by. */
+export type Insights = Record<string, Record<string, unknown>> & { days: number; scope: string };
+
+export interface Autonomy {
+  preset: "careful" | "balanced" | "hands_off" | "custom";
+  memory_auto_extract: boolean;
+  memory_require_review: boolean;
+  suggest_tasks: boolean;
+  skill_trust: "conservative" | "balanced" | "autonomous";
+  skill_auto_generate: boolean;
+  tool_profile: string;
+  allowed_tool_profiles: string[];
+  always_asks: string[];
+  notes?: string[];
+}
+
 export interface TaskFields {
   title?: string;
   notes?: string | null;
@@ -334,6 +350,12 @@ export const api = {
     request<Automation>(`/automations/${id}`, json("PATCH", body)),
   deleteAutomation: (id: string) => request<void>(`/automations/${id}`, json("DELETE")),
   automationRuns: (id: string) => request<AutomationRun[]>(`/automations/${id}/runs`),
+
+  insights: (days = 30, scope: "me" | "everyone" = "me") =>
+    request<Insights>(`/insights?days=${days}&scope=${scope}`),
+  autonomy: () => request<Autonomy>("/assistant/autonomy"),
+  updateAutonomy: (body: Partial<Omit<Autonomy, "allowed_tool_profiles" | "always_asks" | "notes">>) =>
+    request<Autonomy>("/assistant/autonomy", json("PUT", body)),
 
   modelRegistry: () => request<ModelRegistryEntry[]>("/models/registry"),
   updateModelRegistry: (body: ModelRegistryUpdate) =>

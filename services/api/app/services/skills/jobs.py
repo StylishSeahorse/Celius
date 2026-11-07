@@ -91,7 +91,9 @@ in doubt."""
 
 async def queue_after_run(db, conversation: Conversation, run: Run, settings: Settings) -> None:
     """Called in the transaction that finishes a run (completed or failed)."""
-    await registry.settle_uses(db, run)
+    failed = await registry.settle_uses(db, run)
+    for skill_id in dict.fromkeys(failed):
+        await maybe_improve(db, skill_id, settings)
     if run.status != RunStatus.completed or not settings.skill_autogen_enabled:
         return
     prefs = await registry.user_skill_prefs(db, conversation.owner_id, settings)
@@ -285,6 +287,142 @@ async def propose_skill(
                 "version": version.version,
                 "outcome": outcome,
             }
+    finally:
+        if embedder is not None:
+            await embedder.aclose()
+
+
+# ---------------------------------------------------------------------- improvement
+
+
+async def maybe_improve(db, skill_id: uuid.UUID, settings: Settings) -> bool:
+    """Queue an improvement when a skill keeps failing (registry.needs_improvement), unless
+    the user's trust level or settings say not to."""
+    skill = await db.get(Skill, skill_id)
+    if skill is None or not settings.skill_autogen_enabled:
+        return False
+    prefs = await registry.user_skill_prefs(db, skill.owner_id, settings)
+    if prefs.trust == "conservative" or not prefs.auto_generate:
+        return False
+    if not await registry.needs_improvement(db, skill):
+        return False
+    registry.event(db, skill, "lifecycle", "pending", action="improvement_requested")
+    enqueue_job(db, skill.owner_id, "skill.improve", {"skill_id": str(skill.id)})
+    return True
+
+
+async def _failure_report(db, skill: Skill) -> str:
+    uses = (
+        await db.scalars(
+            select(SkillEvent)
+            .where(
+                SkillEvent.skill_id == skill.id,
+                SkillEvent.kind.in_(["use", "feedback"]),
+                SkillEvent.outcome.in_(["failure", "corrected"]),
+            )
+            .order_by(SkillEvent.created_at.desc())
+            .limit(5)
+        )
+    ).all()
+    lines = []
+    for use in uses:
+        if use.kind == "feedback":
+            lines.append(
+                f"- The user said it {use.outcome}: {_clip(use.detail.get('note') or '', 300)}"
+            )
+            continue
+        calls = (
+            await db.scalars(
+                select(ToolCall)
+                .where(ToolCall.run_id == use.run_id, ToolCall.is_error.is_(True))
+                .order_by(ToolCall.step, ToolCall.position)
+                .limit(5)
+            )
+        ).all()
+        if not calls:
+            lines.append("- A reply using it didn't complete")
+        for call in calls:
+            error = (call.result or {}).get("error") or ""
+            lines.append(
+                f"- {call.tool_name}({_clip(call.arguments, 200)}) failed: {_clip(error, 200)}"
+            )
+    return "\n".join(lines) or "(no details recorded)"
+
+
+@job_handler("skill.improve")
+async def improve_skill(
+    factory: SessionFactory, settings: Settings, job: Job, gateway=None
+) -> dict:
+    async with factory() as db:
+        skill = await db.get(Skill, uuid.UUID(job.payload["skill_id"]))
+        if skill is None or skill.owner_id != job.owner_id or skill.status != "active":
+            return {"skipped": "skill gone"}
+        version = await registry.get_version(db, skill)
+        report = await _failure_report(db, skill)
+        model_id = (
+            await db.scalar(
+                select(Run.model_id)
+                .where(Run.owner_id == skill.owner_id)
+                .order_by(Run.created_at.desc())
+                .limit(1)
+            )
+            or settings.model_default_id
+        )
+        current = version.files[SKILL_FILE] if version else ""
+    if gateway is None:
+        return {"skipped": "no model"}
+    request = ChatRequest(
+        model=model_id,
+        messages=[
+            ChatMessage(role="system", content=GENERATION_PROMPT),
+            ChatMessage(
+                role="user",
+                content=f"This skill keeps failing. Answer UPDATE {skill.name} with a corrected "
+                f"SKILL.md if the failures show what to change, or NONE.\n\n"
+                f'<used_skill name="{skill.name}">\n{current}\n</used_skill>\n\n'
+                f"<failures>\n{report}\n</failures>",
+            ),
+        ],
+        temperature=0,
+        max_tokens=1800,
+        reasoning=False,
+    )
+    pieces: list[str] = []
+    try:
+        async for chunk in gateway.stream_chat(request):
+            if chunk.text:
+                pieces.append(chunk.text)
+    except ModelGatewayError as exc:
+        return {"skipped": exc.code}
+    decision, name, skill_md = parse_decision("".join(pieces))
+    embedder = Embedder.from_settings(settings)
+    try:
+        async with factory() as db:
+            skill = await db.get(Skill, uuid.UUID(job.payload["skill_id"]))
+            if decision != "update" or not skill_md or (name and name != skill.name):
+                registry.event(db, skill, "lifecycle", "info", action="no_improvement_found")
+                await db.commit()
+                return {"decision": "none"}
+            current_version = await registry.get_version(db, skill, skill.latest_version)
+            files = {**(current_version.files if current_version else {}), SKILL_FILE: skill_md}
+            try:
+                new = await registry.add_version(
+                    db,
+                    skill,
+                    files,
+                    created_by="generated",
+                    changelog="Improved after repeated failures",
+                )
+            except AppError as exc:
+                return {"skipped": exc.code}
+            outcome = "candidate"
+            if new.validation.get("ok"):
+                await _maybe_test(settings, skill, new, db)
+                outcome = await registry.request_publish(
+                    db, skill, new, actor="generated", settings=settings, embedder=embedder
+                )
+            await db.commit()
+            return {"decision": "update", "version": new.version, "outcome": outcome}
     finally:
         if embedder is not None:
             await embedder.aclose()

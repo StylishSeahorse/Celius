@@ -464,9 +464,10 @@ async def record_use(
     event(db, skill, "use", "pending", version=version, run_id=run_id)
 
 
-async def settle_uses(db: AsyncSession, run: Run) -> int:
+async def settle_uses(db: AsyncSession, run: Run) -> list[uuid.UUID]:
     """At the end of a run: each skill used in it succeeded if the run completed and no
-    tool call failed after the skill was loaded; otherwise it failed."""
+    tool call failed after the skill was loaded; otherwise it failed. Returns the skills
+    whose use failed (candidates for an improvement)."""
     uses = (
         await db.scalars(
             select(SkillEvent).where(
@@ -495,7 +496,7 @@ async def settle_uses(db: AsyncSession, run: Run) -> int:
         await db.execute(
             update(Skill).where(Skill.id == use.skill_id).values({column.key: column + 1})
         )
-    return len(uses)
+    return [use.skill_id for use in uses if use.outcome == "failure"]
 
 
 async def feedback(db: AsyncSession, skill: Skill, outcome: str, note: str) -> None:
@@ -506,3 +507,38 @@ async def feedback(db: AsyncSession, skill: Skill, outcome: str, note: str) -> N
     elif outcome in ("failure", "corrected"):
         skill.failure_count += 1
     record_sync(db, skill.owner_id, "skill", skill.id)
+
+
+IMPROVE_WINDOW = 10  # look at the last this many outcomes
+IMPROVE_FAILURES = 3  # at least this many of them failed
+IMPROVE_EVERY = timedelta(days=7)
+
+
+async def needs_improvement(db: AsyncSession, skill: Skill) -> bool:
+    """A failure cluster: IMPROVE_FAILURES of the last IMPROVE_WINDOW outcomes (uses and
+    the user's feedback) failed, and no improvement was asked for in the last week."""
+    if skill.status != "active":
+        return False
+    outcomes = (
+        await db.scalars(
+            select(SkillEvent.outcome)
+            .where(
+                SkillEvent.skill_id == skill.id,
+                SkillEvent.kind.in_(["use", "feedback"]),
+                SkillEvent.outcome.in_(["success", "failure", "corrected"]),
+            )
+            .order_by(SkillEvent.created_at.desc())
+            .limit(IMPROVE_WINDOW)
+        )
+    ).all()
+    if sum(o in ("failure", "corrected") for o in outcomes) < IMPROVE_FAILURES:
+        return False
+    recent = await db.scalar(
+        select(SkillEvent.id).where(
+            SkillEvent.skill_id == skill.id,
+            SkillEvent.kind == "lifecycle",
+            SkillEvent.created_at >= utcnow() - IMPROVE_EVERY,
+            SkillEvent.detail["action"].as_string() == "improvement_requested",
+        )
+    )
+    return recent is None

@@ -217,6 +217,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assistant/autonomy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Autonomy
+         * @description How much Celius does on its own, from the memory, task, skill and tool settings.
+         */
+        get: operations["get_autonomy_api_v1_assistant_autonomy_get"];
+        /** Update Autonomy */
+        put: operations["update_autonomy_api_v1_assistant_autonomy_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assistant/briefing": {
         parameters: {
             query?: never;
@@ -972,6 +993,23 @@ export interface paths {
          *     since the app must stay usable (history, files) while inference is offline.
          */
         get: operations["ready_api_v1_health_ready_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/insights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Insights */
+        get: operations["insights_api_v1_insights_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2709,6 +2747,23 @@ export interface components {
             trigger?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /** AutonomyUpdate */
+        AutonomyUpdate: {
+            /** Memory Auto Extract */
+            memory_auto_extract?: boolean | null;
+            /** Memory Require Review */
+            memory_require_review?: boolean | null;
+            /** Preset */
+            preset?: ("careful" | "balanced" | "hands_off") | null;
+            /** Skill Auto Generate */
+            skill_auto_generate?: boolean | null;
+            /** Skill Trust */
+            skill_trust?: ("conservative" | "balanced" | "autonomous") | null;
+            /** Suggest Tasks */
+            suggest_tasks?: boolean | null;
+            /** Tool Profile */
+            tool_profile?: ("read_only" | "standard" | "developer" | "administrator") | null;
         };
         /** Briefing */
         Briefing: {
@@ -5425,6 +5480,63 @@ export interface operations {
             };
         };
     };
+    get_autonomy_api_v1_assistant_autonomy_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    update_autonomy_api_v1_assistant_autonomy_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutonomyUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_briefing_api_v1_assistant_briefing_get: {
         parameters: {
             query?: never;
@@ -6927,6 +7039,40 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    insights_api_v1_insights_get: {
+        parameters: {
+            query?: {
+                days?: number;
+                scope?: "me" | "everyone";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
