@@ -19,6 +19,7 @@ class FakeLlama:
     def __init__(self) -> None:
         self.reply = "Hello there, world"
         self.reasoning: str | None = None
+        self.reasoning_sent = 0
         self.context_tokens: int | None = None
         self.vision = False
         self.chat_template: str | None = None
@@ -163,7 +164,12 @@ class FakeLlama:
             reply = self.reply
         kwargs = (self.requests[-1].get("chat_template_kwargs") or {}) if self.requests else {}
         if self.reasoning and kwargs.get("enable_thinking") is not False:
-            yield _sse({"choices": [{"delta": {"reasoning_content": self.reasoning}}]})
+            # In pieces, like a real server (the loop guard stops reading part-way).
+            for i in range(0, len(self.reasoning), 200):
+                self.reasoning_sent += len(self.reasoning[i : i + 200])
+                yield _sse(
+                    {"choices": [{"delta": {"reasoning_content": self.reasoning[i : i + 200]}}]}
+                )
         for piece in re.findall(r"\S+\s*", reply):
             if self.fail_after_chunks is not None and self.chunks_sent >= self.fail_after_chunks:
                 yield _sse({"error": {"message": "slot crashed"}})

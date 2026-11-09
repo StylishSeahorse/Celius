@@ -192,6 +192,10 @@ The model can call tools in the conversation's private workspace:
   ones; chosen per model or automatically from the context size
 - The system prompt is built from modules, and each reply records how many tokens each
   part used
+- **Loop guard:** a reply stuck repeating itself (typically in its thinking) is stopped
+  as it happens and retried once without thinking, instead of running until it times
+  out; optional anti-repetition sampling (`MODEL_PRESENCE_PENALTY`,
+  `MODEL_DRY_MULTIPLIER`)
 - "Check tool calling" sends a test prompt and remembers the result for every reply
 - `devtools/prompt_eval.py` scores scenarios against your model server once per profile:
 

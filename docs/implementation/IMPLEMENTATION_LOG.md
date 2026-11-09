@@ -2,6 +2,47 @@
 
 Newest first. Each entry: what changed, how it was verified, what is left.
 
+## 2026-11-09: loop guard for replies stuck repeating themselves
+
+**Problem reported.** A local thinking model kept writing the same lines ("Okay. Let's
+write. One detail: …") until the reply timed out, with no answer.
+
+**Changes.** See C-15.
+- `services/model_gateway/repetition.py`: the streaming guard (repeated sentences, a
+  verbatim cycle, a length cap on thinking).
+- Executor:
+  - `_consume` feeds the guard and closes the stream when it trips;
+  - `_recover` retries a turn that looped in its thinking, once, with thinking off and
+    a one-turn nudge;
+  - otherwise it keeps the text from before the loop and adds a note;
+  - streaming moved into `_stream` so a turn can run twice.
+- Settings: `MODEL_LOOP_GUARD` and `MODEL_MAX_REASONING_CHARS`, plus optional
+  `MODEL_PRESENCE_PENALTY`, `MODEL_REPEAT_PENALTY` and `MODEL_DRY_MULTIPLIER`. The last
+  two are sent to llama.cpp only.
+
+**Measured** (the guard on samples):
+- A trace shaped like the reported one trips after about 1,500 characters. So do a
+  loop with varying details and a loop without sentence breaks.
+- No trips on the project's docs (200k characters, as thinking and as answer), 80 source
+  files (as both), or a code draft written twice in the thinking. The first version
+  tripped on source code as thinking; counting only a third use of a sentence fixed it.
+
+**Verification.** `tests/test_loop_guard.py` (9) covers:
+- the guard on loops and on normal text, and the length cap;
+- the sampling options sent only where understood;
+- a looping thought stopped early (well under a third of it generated), retried without
+  thinking, answered, the loop dropped from the stored thinking, and the nudge not left
+  in later turns;
+- a model that loops again ends with a note;
+- a looping answer cut without a retry;
+- the thinking cap;
+- the guard switched off, and the sampling settings in requests.
+
+Totals: API suite **650 passed, 7 skipped**; e2e chat and tools specs **24 passed**.
+
+**Left.** How often the real model loops, and whether DRY or a presence penalty stops it
+at the source, needs measuring on the GPU server (see the reply for settings to try).
+
 ## 2026-11-07: Gmail through "Sign in with Google"
 
 **Existing implementation.** IMAP/SMTP mailboxes with sealed passwords (C-11); Gmail

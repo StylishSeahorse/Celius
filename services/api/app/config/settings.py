@@ -46,6 +46,17 @@ class Settings(BaseSettings):
     model_default_id: str = "local-model"
     model_connect_timeout_seconds: float = 10
     model_read_timeout_seconds: float = 300
+    # Stop a reply that is repeating itself and recover (ADR C-15): retry the turn once
+    # without thinking, then end with a note. Thinking longer than this many characters
+    # (about 4 per token) is treated the same way; 0 for no cap.
+    model_loop_guard: bool = True
+    model_max_reasoning_chars: int = Field(default=48_000, ge=0)
+    # Optional anti-repetition sampling, sent with every chat request when set. DRY is
+    # llama.cpp's "don't repeat yourself" sampler (0.8 is a common start); presence
+    # penalty 1.0-1.5 is what Qwen suggests for thinking models that loop.
+    model_presence_penalty: float | None = Field(default=None, ge=-2, le=2)
+    model_repeat_penalty: float | None = Field(default=None, ge=0, le=2)
+    model_dry_multiplier: float | None = Field(default=None, ge=0, le=5)
     model_max_retries: int = Field(default=1, ge=0, le=5)
     model_default_context_tokens: int | None = None
     model_max_output_tokens: int | None = None

@@ -27,7 +27,7 @@ import json
 import logging
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -75,6 +75,7 @@ from app.services.memory.jobs import queue_after_reply
 from app.services.memory.retrieval import Retrieved, retrieve, usage_part
 from app.services.memory.retrieval import prompt_block as memory_prompt_block
 from app.services.model_gateway import ChatMessage, ChatRequest, ModelGateway, ModelGatewayError
+from app.services.model_gateway.repetition import ANSWER, REASONING, RepetitionGuard
 from app.services.model_gateway.textcalls import extract as extract_text_calls
 from app.services.model_gateway.textcalls import has_markup
 from app.services.model_gateway.textcalls import strip as strip_text_calls
@@ -230,6 +231,9 @@ class _StreamState:
     finish_reason: str | None = None
     cancel_requested: bool = False
     lease_lost: bool = False
+    # Stuck-in-a-loop detection (ADR C-15): None, or (where, why) once tripped.
+    guards: dict[str, RepetitionGuard] | None = None
+    loop: tuple[str, str] | None = None
 
 
 @dataclass
@@ -385,6 +389,8 @@ async def _consume(
             if chunk.reasoning:
                 state.reasoning.append(chunk.reasoning)
                 state.pending_reasoning += chunk.reasoning
+            if state.guards is not None and _looping(state, chunk):
+                return  # closing the stream (below) stops generation
             for delta in chunk.tool_calls:
                 call = state.tool_calls.setdefault(
                     delta.index, {"id": "", "name": "", "arguments": ""}
@@ -407,6 +413,73 @@ async def _consume(
     finally:
         # Closing the stream closes the HTTP response, which makes llama-server stop generating.
         await stream.aclose()
+
+
+LOOP_REASONING_NOTE = (
+    "\n\n…\n\n*(Celius stopped the thinking here: it was going round in circles. "
+    "Answering without more thinking.)*"
+)
+LOOP_NUDGE = (
+    "(Note from Celius: the previous attempt at this reply got stuck repeating itself while "
+    "thinking. Answer now, directly and concisely.)"
+)
+LOOP_NOTES = {
+    "repeating": (
+        "\n\n*(Stopped: the model kept repeating itself. Ask again, or turn thinking off "
+        "for this chat if it keeps happening.)*"
+    ),
+    "too_long": (
+        "\n\n*(Stopped: the model thought for too long without answering. Ask again, or "
+        "turn thinking off for this chat.)*"
+    ),
+}
+
+
+def _trim_loop(state: _StreamState) -> None:
+    """Keep what came before the repetition (all of it for a length cap)."""
+    if not state.loop or not state.guards:
+        return
+    where, why = state.loop
+    guard = state.guards[where]
+    parts = state.reasoning if where == "reasoning" else state.text
+    full = "".join(parts)
+    seen = guard.text()
+    prefix = full[: len(full) - len(seen)]  # what was there before this turn streamed
+    cut = len(seen) if why == "too_long" else (guard.loop_start or 0)
+    kept = (prefix + seen[:cut]).rstrip()
+    parts[:] = [kept] if kept else []
+
+
+def _note_loop(state: _StreamState) -> None:
+    note = LOOP_NOTES.get(state.loop[1] if state.loop else "", LOOP_NOTES["repeating"])
+    state.text.append(note)
+    state.pending_text += note
+
+
+def _nudge(request: ChatRequest):
+    """Add LOOP_NUDGE to the last message for one turn; returns the undo."""
+    last = request.messages[-1]
+    original = last.content
+    if isinstance(original, str):
+        last.content = f"{original}\n\n{LOOP_NUDGE}"
+    elif isinstance(original, list):
+        last.content = [*original, {"type": "text", "text": LOOP_NUDGE}]
+    else:
+        return lambda: None
+
+    def restore() -> None:
+        last.content = original
+
+    return restore
+
+
+def _looping(state: _StreamState, chunk) -> bool:
+    for where, text in (("reasoning", chunk.reasoning), ("text", chunk.text)):
+        guard = state.guards.get(where) if state.guards else None
+        if text and guard is not None and guard.feed(text):
+            state.loop = (where, guard.tripped or "repeating")
+            return True
+    return False
 
 
 async def _heartbeat(
@@ -493,39 +566,13 @@ class _Loop:
                 p.unresolved = []
             self._apply_limits()
 
-            state = _StreamState(step=p.step)
-            try:
-                await _supervised(
-                    _consume(
-                        self.factory,
-                        self.gateway,
-                        p.request,
-                        p.run_id,
-                        self.worker_id,
-                        self.settings,
-                        state,
-                    ),
-                    self.factory,
-                    p.run_id,
-                    self.worker_id,
-                    self.settings,
-                    state,
-                )
-            except asyncio.CancelledError:
-                if not (state.cancel_requested or state.lease_lost):
-                    raise  # worker shutdown: leave the run for lease recovery
-            except ModelGatewayError as exc:
-                await self._finish(state, error=exc)
+            state = self._new_state()
+            if not await self._stream(state):
                 return
-            except Exception:
-                log.exception("Run %s crashed while streaming", p.run_id)
-                await self._finish(
-                    state, error=ModelGatewayError("internal_error", "Internal error")
-                )
-                return
-            if state.lease_lost:
-                log.warning("Run %s: lease lost, abandoning without writing results", p.run_id)
-                return
+            if state.loop:
+                state = await self._recover(state)
+                if state is None:
+                    return
             self._add_usage(state.usage)
             unrun = _tidy_text_calls(
                 state, set(p.toolset.offered) if p.toolset and p.request.tools else set()
@@ -542,6 +589,83 @@ class _Loop:
                 continue
             await self._finish(state)
             return
+
+    def _new_state(self) -> _StreamState:
+        state = _StreamState(step=self.p.step)
+        if self.settings.model_loop_guard:
+            reasoning = replace(REASONING, max_chars=self.settings.model_max_reasoning_chars)
+            state.guards = {
+                "reasoning": RepetitionGuard(reasoning),
+                "text": RepetitionGuard(ANSWER),
+            }
+        return state
+
+    async def _stream(self, state: _StreamState) -> bool:
+        """One model turn into `state`. False when the run ended here (an error, a
+        cancellation is left to the caller via state, a lost lease, a shutdown)."""
+        p = self.p
+        try:
+            await _supervised(
+                _consume(
+                    self.factory,
+                    self.gateway,
+                    p.request,
+                    p.run_id,
+                    self.worker_id,
+                    self.settings,
+                    state,
+                ),
+                self.factory,
+                p.run_id,
+                self.worker_id,
+                self.settings,
+                state,
+            )
+        except asyncio.CancelledError:
+            if not (state.cancel_requested or state.lease_lost):
+                raise  # worker shutdown: leave the run for lease recovery
+        except ModelGatewayError as exc:
+            await self._finish(state, error=exc)
+            return False
+        except Exception:
+            log.exception("Run %s crashed while streaming", p.run_id)
+            await self._finish(state, error=ModelGatewayError("internal_error", "Internal error"))
+            return False
+        if state.lease_lost:
+            log.warning("Run %s: lease lost, abandoning without writing results", p.run_id)
+            return False
+        return True
+
+    async def _recover(self, state: _StreamState) -> _StreamState | None:
+        """The model got stuck repeating itself (or thought too long). In its thinking,
+        before any answer: drop the loop and retry the turn once with thinking off and a
+        nudge to answer. Otherwise, or if that loops too: keep what came before the loop
+        and end with a note. None when the run ended (error, lease lost)."""
+        p = self.p
+        where, why = state.loop or ("text", "repeating")
+        log.warning("Run %s: the model was %s in its %s; recovering", p.run_id, why, where)
+        _trim_loop(state)
+        has_answer = "".join(state.text).strip() or state.tool_calls
+        if where != "reasoning" or has_answer or state.cancel_requested:
+            _note_loop(state)
+            return state
+        self._add_usage(state.usage)
+        retry = self._new_state()
+        retry.reasoning = ["".join(state.reasoning), LOOP_REASONING_NOTE]
+        retry.pending_reasoning = LOOP_REASONING_NOTE
+        restore = _nudge(p.request)
+        thinking = p.request.reasoning
+        p.request.reasoning = False
+        try:
+            if not await self._stream(retry):
+                return None
+        finally:
+            p.request.reasoning = thinking
+            restore()
+        if retry.loop:
+            _trim_loop(retry)
+            _note_loop(retry)
+        return retry
 
     # ------------------------------------------------------------------ limits
 
@@ -1345,6 +1469,9 @@ async def _prepare(
                 top_p=run.params.get("top_p"),
                 max_tokens=max_tokens,
                 reasoning=run.params.get("reasoning"),
+                presence_penalty=settings.model_presence_penalty,
+                repeat_penalty=settings.model_repeat_penalty,
+                dry_multiplier=settings.model_dry_multiplier,
             ),
             toolset=toolset,
             iterations=run.tool_iterations,

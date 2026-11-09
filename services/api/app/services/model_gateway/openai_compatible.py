@@ -262,7 +262,7 @@ class OpenAICompatibleGateway:
             self.configured.tool_calling or self._verified_tools.get(request.model)
         ):
             raise ModelGatewayError("tools_unsupported", "Tool calling is disabled for this model")
-        payload = _chat_payload(request)
+        payload = _chat_payload(request, llama_cpp=self._is_llama_cpp)
         url = f"{self.base_url}/chat/completions"
 
         attempt = 0
@@ -322,14 +322,22 @@ class OpenAICompatibleGateway:
 # ---------------------------------------------------------------------- helpers
 
 
-def _chat_payload(request: ChatRequest) -> dict[str, Any]:
+def _chat_payload(request: ChatRequest, *, llama_cpp: bool = True) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "model": request.model,
         "messages": [_dump_message(m) for m in request.messages],
         "stream": True,
         "stream_options": {"include_usage": True},
     }
-    for field in ("temperature", "top_p", "max_tokens", "stop", "response_format"):
+    for field in (
+        "temperature",
+        "top_p",
+        "max_tokens",
+        "stop",
+        "response_format",
+        "presence_penalty",
+        *(("repeat_penalty", "dry_multiplier") if llama_cpp else ()),
+    ):
         value = getattr(request, field)
         if value is not None:
             payload[field] = value

@@ -561,3 +561,56 @@ nothing to show the user what was granted.
 - **Not covered yet:**
   - Google Calendar would use the same client and CalDAV with a bearer token.
   - Microsoft 365 would need the same flow against Entra ID.
+
+## C-15: Stop replies that are stuck repeating themselves
+
+**Context.** Local thinking models sometimes fall into a loop while thinking: the same
+few sentences ("Okay. Let's write. One detail: …") again and again. The reply never
+reaches an answer; it runs until the read timeout or the context fills. The user waits
+minutes and gets nothing.
+
+**Decision.** A guard (`services/model_gateway/repetition.py`) is fed the stream as it
+arrives, with separate settings for the thinking and for the answer. It trips on any of:
+
+- **Repeated sentences:** at least 90% of the last 40 sentences are ones already written
+  twice before. The answer's check is stricter: 95% of 60, and only sentences of 20
+  characters or more.
+  - Short fillers ("Okay.") don't count.
+  - A sentence must be on its third use: writing a draft and then the final copy is
+    normal.
+- **A verbatim cycle:** the last 1,200+ characters are one block repeated 4 times (5 in
+  answers). This catches loops with no sentence breaks.
+- **A length cap** (`MODEL_MAX_REASONING_CHARS`, 48,000 ≈ 12k tokens), thinking only.
+
+Measured on samples:
+- Real-looking loops trip within about 1,500 characters.
+- None of these trip: the project's docs (200k characters) as thinking or answer; 80
+  source files as thinking or answer; a code draft written twice.
+
+On a trip the executor closes the stream, which makes llama-server stop generating.
+What happens next depends on where the loop was:
+- **In the thinking, with no answer or tool call yet:**
+  - the thinking is cut back to just before the loop and gets a note;
+  - the turn is retried once with `enable_thinking=false`;
+  - for that turn only, a short "answer now, directly" note is added to the last
+    message.
+- **In the answer, or again on the retry:** the text is cut back to before the loop and
+  ends with a note suggesting to ask again or turn thinking off. It isn't retried,
+  because the text was already shown.
+
+Every case is logged; a run never fails because of it. `MODEL_LOOP_GUARD=false`
+switches it off.
+
+**Prevention.** Optional sampling settings are sent with every chat request:
+`MODEL_PRESENCE_PENALTY` (Qwen suggests 1.0–1.5 for thinking models that loop),
+`MODEL_REPEAT_PENALTY` and `MODEL_DRY_MULTIPLIER` (llama.cpp's DRY sampler). The last
+two go only to `llama_cpp` providers. They are off by default, because they change every
+model's output.
+
+**Consequences.**
+- The thinking shown live includes the loop until the run ends. The stored reply keeps
+  only what came before it.
+- A model that ignores `enable_thinking` may loop again on the retry; it then ends with
+  the note, not a timeout.
+- Very long legitimate thinking is cut at the cap; raise or disable it for models that
+  need more.

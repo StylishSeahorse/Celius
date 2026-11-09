@@ -90,6 +90,7 @@ Existing base kept: runs persist every tool call and resume after a worker crash
 | Attachments sized from what the system prompt leaves | ✅ | fixed in Phase 5 |
 | Admin UI (Account > Models) | ✅ | e2e `models.spec.ts` |
 | Prompt evaluation harness | ✅ | `devtools/prompt_eval.py` |
+| Loop guard: stop and recover from replies stuck repeating themselves | ✅ | C-15; retry without thinking; optional DRY / presence penalty |
 | Results on the real llama-server and a chosen profile per model | ⬜ | run the harness on the GPU machine (see README) |
 
 ## Phase 5: personal assistant foundation ✅
