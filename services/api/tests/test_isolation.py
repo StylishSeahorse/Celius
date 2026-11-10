@@ -33,6 +33,7 @@ BODIES = {
     ("POST", "/api/v1/messages/{message_id}/regenerate"): {"client_message_id": "iso-03-regen"},
     ("POST", "/api/v1/tool-calls/{call_id}/approve"): {"args_hash": "0" * 64},
     ("POST", "/api/v1/tool-calls/{call_id}/deny"): {"reason": "no"},
+    ("POST", "/api/v1/runs/{run_id}/steer"): {"content": "hijack", "client_id": "bob-steer-1"},
     ("POST", "/api/v1/memories/{memory_id}/approve"): {},
     ("POST", "/api/v1/memory/conflicts/{conflict_id}/resolve"): {"decision": "keep_new"},
     ("POST", "/api/v1/skills/{skill_id}/versions"): {"files": {"SKILL.md": "x"}},
@@ -202,6 +203,12 @@ async def alices_world(client, sessionmaker, settings, gateway, fake, admin_head
         headers=alice,
     )
     ids["task_id"] = schedule.json()["id"]
+    steered = await client.post(
+        f"/api/v1/runs/{ids['run_id']}/steer",
+        json={"content": "Alice's own words", "client_id": "isolation-steer"},
+        headers=alice,
+    )
+    ids["steer_id"] = steered.json()["id"]
     await client.post("/api/v1/push/subscriptions", json=Device().subscription(), headers=alice)
     invitation = await client.post("/api/v1/admin/invitations", json={}, headers=admin_headers)
     ids["invitation_id"] = invitation.json()["id"]

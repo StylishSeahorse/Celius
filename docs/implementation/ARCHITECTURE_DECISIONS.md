@@ -614,3 +614,58 @@ model's output.
   the note, not a timeout.
 - Very long legitimate thinking is cut at the cap; raise or disable it for models that
   need more.
+
+## C-16: Steering: messages sent while a reply is being written
+
+**Context.** A multi-step reply (plan, tools, answer) can take minutes. Until now, the
+only way to correct it was Stop: the work so far was lost, and you had to start again
+with a new message. Sending a new message mid-reply was refused (`run_in_progress`).
+
+**Decision.** You can send a message to the running reply. The reply reads it before its
+next model turn and takes it into account, without stopping.
+
+- **Storage:** `run_steers` (migration 0016) has the run, the owner, the content, a
+  client id for idempotent retries, and the status (pending, delivered or withdrawn).
+  It also records the step that read the message.
+- **API:**
+  - `POST /runs/{id}/steer`: 201 for a new message, 200 for a repeated client id.
+  - `GET /runs/{id}/steers`.
+  - `DELETE /runs/{id}/steers/{steer_id}` takes a message back while it is still
+    pending.
+  - Limits: 4,000 characters per message, 5 pending and 20 per reply. Only the owner of
+    the run can steer it.
+- **Delivery:** at the top of each loop iteration, before the model turn and after
+  approved tools ran, the worker reads the pending messages. For each one, it:
+  - marks it delivered with the step;
+  - adds a `steer` part to the reply where it was read;
+  - sends a `run.steered` event;
+  - gives it to the model as the user's words, with a short note. The note is merged
+    into the last user message when that is the last message, because some chat
+    templates need roles to alternate.
+- **Mid-answer:** a message that arrives while the final answer streams doesn't stop
+  it. When the answer ends, `_finish` locks the run row and finds the pending message.
+  It then writes nothing. The answer is kept as a step (`steered: true`), and the loop
+  continues with the message. The reply reads: first answer, your message, continued
+  answer.
+- **No lost messages:** the steer API locks the same run row. A message is therefore
+  either seen by `_finish`, or refused with `409 run_finished` because the reply already
+  ended. The web client then sends it as a normal message. A cancelled or failed reply
+  leaves its pending messages unread, and the client offers to send them as a message.
+- **While waiting for approval:** a message waits until the approval is answered. The
+  UI says so.
+- **Resume:** `_restore_steps` rebuilds tool steps, steered answer steps and steer
+  messages in order, so a reply that paused for approval or lost its worker resumes with
+  the same conversation.
+- **Later turns:** an assistant message with steer parts carries a "(While this reply was
+  written, the user added: …)" note in the history.
+- **Web:**
+  - While a reply runs, the composer shows Send next to Stop, text only (no
+    attachments).
+  - Queued messages show above the composer, with "Take back".
+  - A read message shows in the reply as a small "You, while Celius was working" bubble.
+
+**Consequences.**
+- **Timing:** a message is read at the next step boundary, not during a single long
+  tool call or a long stream; that matches Claude Code's behaviour. To interrupt now,
+  use Stop.
+- **Extra cost:** a message that arrives mid-answer costs one more model turn.

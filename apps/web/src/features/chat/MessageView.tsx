@@ -356,6 +356,16 @@ function splitReply(parts: Part[]) {
   return { work, answer };
 }
 
+/** A message the user sent while this reply was being written, where the reply read it. */
+function SteerNote({ text }: { text: string }) {
+  return (
+    <div className="ml-auto w-fit max-w-[85%] rounded-lg border border-line bg-panel px-3 py-1.5 text-sm" data-testid="steer">
+      <span className="block text-xs text-muted">You, while Celius was working</span>
+      <span className="whitespace-pre-wrap break-words">{text}</span>
+    </div>
+  );
+}
+
 const capitalise = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 function WorkPanel({
@@ -459,6 +469,7 @@ export function MessageView({
       {answer.map(({ part, index }) => {
         if (part.type === "text" && part.text) return <AssistantMarkdown key={index} text={part.text} />;
         if (part.type === "memory" && part.data) return <MemoryUsed key={index} data={part.data as unknown as MemoryUse} />;
+        if (part.type === "steer" && part.text) return <SteerNote key={index} text={part.text} />;
         return null;
       })}
       {!inProgress && <AttachmentList message={message} align="start" />}

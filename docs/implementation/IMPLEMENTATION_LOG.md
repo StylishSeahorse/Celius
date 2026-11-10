@@ -2,6 +2,44 @@
 
 Newest first. Each entry: what changed, how it was verified, what is left.
 
+## 2026-11-10: steering, messages to a reply while it works
+
+**Existing implementation.** Sending during a reply was refused (`run_in_progress`); the
+only way to change course was Stop.
+
+**Changes.** See C-16.
+- **Storage:** migration 0016, `run_steers`.
+- **API:** `services/steering.py` and the steer, list and withdraw routes on `/runs`.
+- **Executor:**
+  - `_deliver_steers` runs before every model turn;
+  - `_finish` holds back and `_record_text_step` keeps the answer, when a message
+    arrived mid-answer;
+  - `_restore_steps` also rebuilds steered steps and the messages read;
+  - later turns keep a note of what was said.
+- **Web:** the composer sends to the running reply (Send beside Stop), queued messages
+  can be taken back, a read message shows as a bubble in the reply, and a reply that
+  ended first gets the message as a normal one.
+
+**Verification.**
+- `tests/test_steering.py` (7) covers:
+  - a message read before the first turn (merged into the user message);
+  - one read while waiting for approval and after the tool result;
+  - one sent mid-answer: the reply continues, and later turns remember it;
+  - refused after the reply ended;
+  - idempotent retries, limits, taking back, and "already read";
+  - only the owner can steer;
+  - a message read before a pause survives the resume.
+- The isolation sweep covers the new routes.
+- e2e `chat.spec.ts` "steering…" on desktop and mobile: a message sent while a slow
+  answer streams is queued, read, shown, and the reply continues.
+- Totals:
+  - API suite **660 passed, 7 skipped** (SQLite);
+  - steering, tools, migrations and isolation on PostgreSQL 16: **31 passed**;
+  - full e2e **103 passed**.
+
+**Left.** No test races two real concurrent requests on PostgreSQL. The guarantee rests
+on both sides locking the run row (the same pattern as cancel and approval).
+
 ## 2026-11-09: loop guard for replies stuck repeating themselves
 
 **Problem reported.** A local thinking model kept writing the same lines ("Okay. Let's

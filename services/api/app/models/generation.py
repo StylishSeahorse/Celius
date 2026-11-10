@@ -16,7 +16,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base, JSONType, Timestamps, UUIDPrimaryKey
+from app.db.base import Base, JSONType, Timestamps, UUIDPrimaryKey, utcnow
 
 BigIntPK = BigInteger().with_variant(Integer, "sqlite")
 
@@ -69,6 +69,31 @@ class Run(UUIDPrimaryKey, Timestamps, Base):
     usage: Mapped[dict | None] = mapped_column(JSONType)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class RunSteer(UUIDPrimaryKey, Base):
+    """A message the user sent while a reply was still being written (ADR C-16). The run
+    reads it before its next model turn: between tool steps, or after an answer it then
+    continues. Shown in the reply where it was read."""
+
+    __tablename__ = "run_steers"
+    __table_args__ = (Index("ix_run_steers_run_id_status", "run_id", "status"),)
+
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("runs.id", ondelete="CASCADE"), nullable=False
+    )
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    # The client's id for the submission, so a retried POST doesn't add it twice.
+    client_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    step: Mapped[int | None] = mapped_column(Integer)  # the turn that read it
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class RunEvent(Base):

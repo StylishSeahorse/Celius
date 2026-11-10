@@ -47,7 +47,16 @@ interface Options {
 
 const LIVE_STATUSES = ["queued", "running", "reconnecting", "awaiting_approval"];
 // Events after which the persisted message changed (a step was saved, a call finished).
-const RELOAD_EVENTS = new Set(["tool_call.proposed", "tool_call.completed", "tool_call.decided"]);
+const RELOAD_EVENTS = new Set(["tool_call.proposed", "tool_call.completed", "tool_call.decided", "run.steered"]);
+
+/** A message sent to the reply being written, until the reply reads it. */
+export interface QueuedSteer {
+  clientId: string;
+  id?: string;
+  content: string;
+  state: "sending" | "waiting" | "unread";
+  waitsForApproval?: boolean;
+}
 
 function placeholder(id: string, draft: Options["draft"], title: string): ConversationDetail {
   const now = new Date().toISOString();
@@ -72,6 +81,7 @@ function placeholder(id: string, draft: Options["draft"], title: string): Conver
 export function useChat({ conversationId, draft, onConversationCreated, onChanged }: Options) {
   const [detail, setDetailState] = useState<ConversationDetail | null>(null);
   const [live, setLive] = useState<LiveRun | null>(null);
+  const [queued, setQueued] = useState<QueuedSteer[]>([]);
   const [pending, setPending] = useState<OutboxItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [fromCache, setFromCache] = useState(false);
@@ -118,6 +128,14 @@ export function useChat({ conversationId, draft, onConversationCreated, onChange
         if (event.type === "run.failed") notifyInBackground(title, "The reply failed.");
         if (event.type === "tool_call.awaiting_approval") notifyInBackground(title, "A tool is waiting for your approval.");
         setLive((current) => applyEvent(current, event));
+        if (event.type === "run.steered") {
+          const read = (event.data as { steer_id?: string }).steer_id;
+          setQueued((list) => list.filter((s) => s.id !== read));
+        }
+        if (["run.completed", "run.failed", "run.cancelled"].includes(event.type)) {
+          // Anything still waiting wasn't read: offer to send it as a message.
+          setQueued((list) => list.map((s) => ({ ...s, state: "unread" as const })));
+        }
         // Saved steps and tool results show from the server's copy of the message.
         if (RELOAD_EVENTS.has(event.type) && !reload) {
           reload = setTimeout(() => {
@@ -183,6 +201,8 @@ export function useChat({ conversationId, draft, onConversationCreated, onChange
   }, [conversationId, follow, setDetail]);
 
   // Load the selected conversation: cached copy first, then the server.
+  useEffect(() => setQueued([]), [conversationId]);
+
   useEffect(() => {
     setError(null);
     if (conversationId === null) {
@@ -273,6 +293,47 @@ export function useChat({ conversationId, draft, onConversationCreated, onChange
     [detail?.id, draft, onConversationCreated],
   );
 
+  /** Send `content` to the reply being written (ADR C-16); a normal message otherwise. */
+  const steer = useCallback(
+    async (content: string) => {
+      const run = liveRef.current;
+      if (!run || !LIVE_STATUSES.includes(run.status)) return send(content);
+      setError(null);
+      const clientId = newId();
+      setQueued((list) => [...list, { clientId, content, state: "sending" }]);
+      try {
+        const out = await api.steerRun(run.runId, { content, client_id: clientId });
+        setQueued((list) =>
+          out.status === "pending"
+            ? list.map((s) =>
+                s.clientId === clientId ? { ...s, id: out.id, state: "waiting", waitsForApproval: out.waits_for_approval } : s,
+              )
+            : list.filter((s) => s.clientId !== clientId),
+        );
+      } catch (err) {
+        setQueued((list) => list.filter((s) => s.clientId !== clientId));
+        if (err instanceof ApiError && err.code === "run_finished") return send(content);
+        setError(isNetworkError(err) ? "You're offline: messages to a running reply need a connection." : err instanceof ApiError ? err.message : String(err));
+        throw err;
+      }
+    },
+    [send],
+  );
+
+  const withdrawSteer = useCallback(async (item: QueuedSteer) => {
+    const run = liveRef.current;
+    setQueued((list) => list.filter((s) => s.clientId !== item.clientId));
+    if (run && item.id && item.state === "waiting") await api.withdrawSteer(run.runId, item.id).catch(() => undefined);
+  }, []);
+
+  const resendSteer = useCallback(
+    async (item: QueuedSteer) => {
+      setQueued((list) => list.filter((s) => s.clientId !== item.clientId));
+      await send(item.content);
+    },
+    [send],
+  );
+
   const cancel = useCallback(async () => {
     if (live) await api.cancelRun(live.runId).catch(() => undefined);
   }, [live]);
@@ -356,6 +417,10 @@ export function useChat({ conversationId, draft, onConversationCreated, onChange
     busy,
     error,
     send,
+    steer,
+    queued,
+    withdrawSteer,
+    resendSteer,
     cancel,
     regenerate,
     edit,
@@ -400,6 +465,9 @@ export function applyEvent(current: LiveRun | null, event: RunEvent): LiveRun | 
       const call = (event.data as { tool_call?: ToolCall }).tool_call;
       return call ? { ...current, toolCalls: { ...current.toolCalls, [call.id]: call } } : current;
     }
+    case "run.steered":
+      // What was written so far is saved on the message; the reply goes on from here.
+      return { ...current, status: "running", text: "", reasoning: "" };
     case "run.progress":
       if (data.stage === "restarted") {
         // The worker restarted this step from scratch; discard its partial output.

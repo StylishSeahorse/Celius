@@ -73,6 +73,7 @@ Existing base kept: runs persist every tool call and resume after a worker crash
 | Error-recovery hint after consecutive tool failures | ✅ | executor `RECOVERY_*` |
 | Activity view: task card in the chat (plan, progress, blockers, checks, files; resume, done, stop) | ✅ | `TaskCard.tsx`, e2e `tasks.spec.ts` |
 | Task list across chats (dashboard) | ⬜ | API ready (`GET /agent-tasks?status=…`); belongs with the Phase 5 dashboard |
+| Steering: send messages to a reply while it works (read before the next step) | ✅ | C-16; migration 0016; e2e `chat.spec.ts` |
 | Per-task limits (replies, tool calls) | ⬜ | per-reply limits exist; counts are recorded per task for a later cap |
 
 ## Phase 4: local model intelligence ✅ (measurement on the real GPU pending)

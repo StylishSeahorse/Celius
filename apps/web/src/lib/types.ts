@@ -70,6 +70,7 @@ export type RunEventType =
   | "tool_call.started"
   | "tool_call.completed"
   | "run.progress"
+  | "run.steered"
   | "run.completed"
   | "run.failed"
   | "run.cancelled";

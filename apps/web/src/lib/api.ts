@@ -48,6 +48,17 @@ import type {
 /** GET /insights: rates are null when there is nothing to divide by. */
 export type Insights = Record<string, Record<string, unknown>> & { days: number; scope: string };
 
+/** A message sent while a reply is being written (POST /runs/{id}/steer). */
+export interface Steer {
+  id: string;
+  content: string;
+  status: "pending" | "delivered" | "withdrawn";
+  step: number | null;
+  created_at: string;
+  delivered_at: string | null;
+  waits_for_approval: boolean;
+}
+
 export interface Autonomy {
   preset: "careful" | "balanced" | "hands_off" | "custom";
   memory_auto_extract: boolean;
@@ -205,6 +216,10 @@ export const api = {
   selectMessage: (id: string) =>
     request<ConversationDetail>(`/messages/${id}/select`, json("POST")),
   cancelRun: (id: string) => request<Run>(`/runs/${id}/cancel`, json("POST")),
+  steerRun: (id: string, body: { content: string; client_id: string }) =>
+    request<Steer>(`/runs/${id}/steer`, json("POST", body)),
+  withdrawSteer: (runId: string, steerId: string) =>
+    request<Steer>(`/runs/${runId}/steers/${steerId}`, json("DELETE")),
 
   listProjects: () => request<Project[]>("/projects"),
   createProject: (body: { id?: string; name: string; instructions?: string | null }) =>

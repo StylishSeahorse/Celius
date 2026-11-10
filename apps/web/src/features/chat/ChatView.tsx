@@ -174,6 +174,37 @@ export function ChatView(props: Props) {
             onResumed={() => void chat.refresh()}
           />
         )}
+        {chat.queued.length > 0 && (
+          <ul className="space-y-1" aria-label="Messages for the reply being written">
+            {chat.queued.map((item) => (
+              <li key={item.clientId} className="flex items-center gap-2 rounded-lg border border-dashed border-line px-3 py-1.5 text-sm" data-testid="queued-steer">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate">{item.content}</span>
+                  <span className="block text-xs text-muted">
+                    {item.state === "unread"
+                      ? "The reply ended before reading this"
+                      : item.waitsForApproval
+                        ? "Celius reads this after you answer the approval above"
+                        : item.state === "sending"
+                          ? "Sending…"
+                          : "Celius reads this before its next step"}
+                  </span>
+                </span>
+                {item.state === "unread" ? (
+                  <button className="rounded-md border border-line px-2 py-0.5 text-xs hover:bg-panel" onClick={() => void chat.resendSteer(item)}>
+                    Send as a message
+                  </button>
+                ) : (
+                  item.state === "waiting" && (
+                    <button className="rounded-md border border-line px-2 py-0.5 text-xs hover:bg-panel" onClick={() => void chat.withdrawSteer(item)}>
+                      Take back
+                    </button>
+                  )
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
         <Composer
           canStop={canStop}
           online={online}
@@ -182,7 +213,9 @@ export function ChatView(props: Props) {
           reasoningSupported={model?.capabilities?.reasoning_toggle ?? false}
           extraAttach={props.extraAttach}
           onSend={(content, files: StoredFile[]) =>
-            chat.send(content, files.map((f) => ({ id: f.id, filename: f.relative_path ?? f.filename })))
+            canStop && !files.length
+              ? chat.steer(content)
+              : chat.send(content, files.map((f) => ({ id: f.id, filename: f.relative_path ?? f.filename })))
           }
           onStop={() => void chat.cancel()}
           onReasoning={(value) => (savedOnServer ? void save({ reasoning: value }) : props.onDraftReasoning(value))}

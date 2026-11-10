@@ -52,6 +52,7 @@ from app.models import (
     PushSubscription,
     Run,
     RunStatus,
+    RunSteer,
     StoredFile,
     ToolCall,
     ToolCallStatus,
@@ -565,6 +566,8 @@ class _Loop:
                     return  # paused for approval, cancelled, or lease lost
                 p.unresolved = []
             self._apply_limits()
+            if not await self._deliver_steers():
+                return
 
             state = self._new_state()
             if not await self._stream(state):
@@ -587,8 +590,12 @@ class _Loop:
                 p.step += 1
                 p.iterations += 1
                 continue
-            await self._finish(state)
-            return
+            if await self._finish(state, steerable=True):
+                return
+            # The user sent a message while this answer was written: keep the answer as a
+            # step and continue with their message (read at the top of the loop).
+            if not await self._record_text_step(state):
+                return
 
     def _new_state(self) -> _StreamState:
         state = _StreamState(step=self.p.step)
@@ -1162,10 +1169,18 @@ class _Loop:
             await finish_cancelled(db, run)
             await db.commit()
 
-    async def _finish(self, state: _StreamState, *, error: ModelGatewayError | None = None) -> None:
+    async def _finish(
+        self,
+        state: _StreamState,
+        *,
+        error: ModelGatewayError | None = None,
+        steerable: bool = False,
+    ) -> bool:
+        """False only when `steerable` and the user sent a message meanwhile: nothing was
+        written and the reply goes on."""
         # One model turn: its usage as reported. Several: the sum of their token counts.
         usage = self.p.usage if self.p.step else state.usage
-        await _finish(
+        return await _finish(
             self.factory,
             self.p.run_id,
             self.worker_id,
@@ -1173,7 +1188,118 @@ class _Loop:
             usage=usage,
             error=error,
             settings=self.settings,
+            steerable=steerable,
         )
+
+    # ------------------------------------------------------------------ steering
+
+    async def _deliver_steers(self) -> bool:
+        """Read messages the user sent while this reply was being written (ADR C-16):
+        shown in the reply where they were read, and given to the model as the user's
+        words before its next turn. False when the run is no longer this worker's."""
+        p = self.p
+        async with self.factory() as db:
+            run = await db.scalar(select(Run).where(Run.id == p.run_id).with_for_update())
+            if run is None or run.worker_id != self.worker_id or run.status != RunStatus.running:
+                return False
+            steers = (
+                await db.scalars(
+                    select(RunSteer)
+                    .where(RunSteer.run_id == run.id, RunSteer.status == "pending")
+                    .order_by(RunSteer.created_at)
+                )
+            ).all()
+            if not steers:
+                await db.rollback()
+                return True
+            message = await db.get(Message, p.message_id)
+            assert message is not None
+            position = await _next_position(db, message)
+            now = utcnow()
+            for steer in steers:
+                steer.status, steer.step, steer.delivered_at = "delivered", p.step, now
+                db.add(
+                    MessagePart(
+                        message_id=message.id,
+                        revision=message.current_revision,
+                        position=position,
+                        type="steer",
+                        text=steer.content,
+                        data={"step": p.step, "steer_id": str(steer.id)},
+                    )
+                )
+                position += 1
+                await append_event(
+                    db,
+                    run.id,
+                    RunEventType.run_steered,
+                    {
+                        "message_id": str(message.id),
+                        "steer_id": str(steer.id),
+                        "text": steer.content,
+                        "step": p.step,
+                    },
+                )
+            record_sync(
+                db,
+                run.owner_id,
+                "message",
+                message.id,
+                payload={"conversation_id": str(run.conversation_id)},
+            )
+            contents = [s.content for s in steers]
+            await db.commit()
+        _add_steer_messages(p.request, contents)
+        return True
+
+    async def _record_text_step(self, state: _StreamState) -> bool:
+        """Keep an answer the user steered away from as a step of this reply."""
+        p = self.p
+        async with self.factory() as db:
+            run = await db.scalar(select(Run).where(Run.id == p.run_id).with_for_update())
+            if run is None or run.worker_id != self.worker_id or run.status != RunStatus.running:
+                return False
+            message = await db.get(Message, p.message_id)
+            assert message is not None
+            if state.pending_text or state.pending_reasoning:
+                await append_event(
+                    db, run.id, RunEventType.message_delta, _delta_event(message.id, state)
+                )
+            position = await _next_position(db, message)
+            text = "".join(state.text)
+            for kind, value in (("reasoning", "".join(state.reasoning)), ("text", text)):
+                if value:
+                    db.add(
+                        MessagePart(
+                            message_id=message.id,
+                            revision=message.current_revision,
+                            position=position,
+                            type=kind,
+                            text=value,
+                            # "steered": an answer turn, not a tool step (see _restore_steps)
+                            data={"step": state.step, "steered": True},
+                        )
+                    )
+                    position += 1
+            await db.commit()
+        self._add_usage(state.usage)
+        p.request.messages.append(ChatMessage(role="assistant", content=text or "…"))
+        p.step += 1
+        return True
+
+
+STEER_NOTE = "(Sent while you were working on this reply; take it into account from here:)"
+
+
+def _add_steer_messages(request: ChatRequest, contents: list[str]) -> None:
+    text = f"{STEER_NOTE}\n" + "\n\n".join(contents)
+    last = request.messages[-1] if request.messages else None
+    if last is not None and last.role == "user" and isinstance(last.content, str):
+        last.content = f"{last.content}\n\n{text}"  # templates want roles to alternate
+    elif last is not None and last.role == "user" and isinstance(last.content, list):
+        last.content = [*last.content, {"type": "text", "text": text}]
+    else:
+        request.messages.append(ChatMessage(role="user", content=text))
 
 
 def _tidy_text_calls(state: _StreamState, offered: set[str]) -> list[str]:
@@ -1446,6 +1572,10 @@ async def _prepare(
                     message.status == MessageStatus.complete
                 ):
                     note = tool_notes.get(message.id)
+                    steered = [p.text for p in parts[message.id] if p.type == "steer" and p.text]
+                    if steered:
+                        said = " / ".join(f"“{t}”" for t in steered)
+                        text = f"{text}\n\n(While this reply was written, the user added: {said})"
                     history.append(HistoryItem("assistant", f"{note}\n\n{text}" if note else text))
 
             built = build_context(prompt.render(), history, budget)
@@ -1530,7 +1660,8 @@ async def _prepare(
 
 
 async def _restore_steps(db, prepared: _Prepared, output: Message) -> bool:
-    """Rebuild the earlier steps of this run (when resuming) into the model's messages."""
+    """Rebuild the earlier steps of this run (when resuming) into the model's messages:
+    tool steps, answers the user steered away from, and the messages they sent."""
     calls = (
         await db.scalars(
             select(ToolCall)
@@ -1539,8 +1670,6 @@ async def _restore_steps(db, prepared: _Prepared, output: Message) -> bool:
             .order_by(ToolCall.step, ToolCall.position)
         )
     ).all()
-    if not calls:
-        return False
     parts = (
         await db.scalars(
             select(MessagePart)
@@ -1551,19 +1680,38 @@ async def _restore_steps(db, prepared: _Prepared, output: Message) -> bool:
         )
     ).all()
     text_by_step: dict[int, str] = {}
+    answered: set[int] = set()  # answer turns the user steered away from
+    steers_by_step: dict[int, list[str]] = {}
     for part in parts:
-        if part.type == "text" and part.data and "step" in part.data:
-            text_by_step[part.data["step"]] = text_by_step.get(part.data["step"], "") + (
-                part.text or ""
-            )
+        step = (part.data or {}).get("step")
+        if step is None:
+            continue
+        if part.type == "text":
+            text_by_step[step] = text_by_step.get(step, "") + (part.text or "")
+            if (part.data or {}).get("steered"):
+                answered.add(step)
+        elif part.type == "steer":
+            steers_by_step.setdefault(step, []).append(part.text or "")
     by_step: dict[int, list[ToolCall]] = {}
     for call in calls:
         by_step.setdefault(call.step, []).append(call)
         if call.is_error:
             prepared.failed.add((call.tool_name, call.args_hash))
-    last = max(by_step)
-    for step in sorted(by_step):
-        rows = by_step[step]
+    turns = set(by_step) | answered
+    if not turns and not steers_by_step:
+        return False
+    last = max(turns) if turns else None
+    for step in sorted(turns | set(steers_by_step)):
+        if step in steers_by_step:
+            _add_steer_messages(prepared.request, steers_by_step[step])
+        if step not in turns:
+            continue
+        rows = by_step.get(step)
+        if not rows:  # an answer the user steered away from
+            prepared.request.messages.append(
+                ChatMessage(role="assistant", content=text_by_step.get(step) or "…")
+            )
+            continue
         prepared.request.messages.append(
             ChatMessage(
                 role="assistant",
@@ -1593,7 +1741,8 @@ async def _restore_steps(db, prepared: _Prepared, output: Message) -> bool:
                         content=row.model_content or DENIED.get(row.status, "No result."),
                     )
                 )
-    prepared.step = last + 1
+    # The next turn: after the last one, or the one steered messages were read for.
+    prepared.step = max(last + 1 if last is not None else 0, max(steers_by_step, default=0))
     return True
 
 
@@ -1635,11 +1784,26 @@ async def _finish(
     usage: dict[str, Any] | None = None,
     error: ModelGatewayError | None = None,
     settings: Settings | None = None,
-) -> None:
+    steerable: bool = False,
+) -> bool:
     async with factory() as db:
         run = await db.scalar(select(Run).where(Run.id == run_id).with_for_update())
         if run is None or run.worker_id != worker_id or run.status != RunStatus.running:
-            return  # another worker took over, or it was finished elsewhere
+            return True  # another worker took over, or it was finished elsewhere
+        if (
+            steerable
+            and error is None
+            and not (state.cancel_requested or run.cancel_requested)
+            and await db.scalar(
+                select(RunSteer.id)
+                .where(RunSteer.run_id == run.id, RunSteer.status == "pending")
+                .limit(1)
+            )
+        ):
+            # A message arrived while this answer was written. The run row is locked, as
+            # the steer API locks it: a later message is refused as "finished" instead.
+            await db.rollback()
+            return False
         message = await db.get(Message, run.output_message_id)
         assert message is not None
 

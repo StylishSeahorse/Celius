@@ -39,6 +39,10 @@ real hardware: see [Not yet verified](#not-yet-verified).
 - Markdown with code blocks you can copy or download
 - Edit a message or regenerate a reply, then switch between the versions
 - Stop a reply and keep what it wrote so far
+- **Steer a reply while it works:** type and send while Celius is still answering or
+  using tools. It reads your message before its next step, without stopping. Until then
+  you can take it back. If the answer was already being written, it continues from your
+  message. Your message shows in the reply where it was read
 - Thinking on, off or the model's default, per chat
 - Pick the model per chat
 - Reasoning, tool calls and what the model said between them fold into one panel above

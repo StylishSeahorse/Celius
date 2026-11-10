@@ -30,6 +30,11 @@ describe("applyEvent", () => {
     expect(live).toMatchObject({ text: "Hello", reasoning: "hmm ok", status: "running" });
   });
 
+  it("starts a fresh live part when the reply reads a steering message", () => {
+    const live = applyEvent({ ...base, text: "first answer", reasoning: "r", status: "running" }, ev("run.steered", { steer_id: "s1", text: "in French" }));
+    expect(live).toMatchObject({ text: "", reasoning: "", status: "running" });
+  });
+
   it("discards partial output when the worker restarts the run", () => {
     const live = applyEvent({ ...base, text: "partial", status: "running" }, ev("run.progress", { stage: "restarted" }));
     expect(live).toMatchObject({ text: "", reasoning: "", status: "queued" });
