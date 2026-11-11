@@ -54,9 +54,10 @@ class Settings(BaseSettings):
     # Send each tool step's thinking back with that step for the rest of the same reply,
     # as interleaved-thinking templates (Qwen3.x) expect. Earlier turns never include it.
     model_keep_tool_reasoning: bool = True
-    # Optional anti-repetition sampling, sent with every chat request when set. DRY is
-    # llama.cpp's "don't repeat yourself" sampler (0.8 is a common start); presence
-    # penalty 1.0-1.5 is what Qwen suggests for thinking models that loop.
+    # Optional anti-repetition sampling, sent with every chat request when set. Presence
+    # penalty 0-1.5 is Qwen's range for thinking models. Avoid DRY (llama.cpp's "don't
+    # repeat yourself") for reasoning models: it stops an answer restating the numbers
+    # its thinking derived, which can itself cause a loop (see .env.example).
     model_presence_penalty: float | None = Field(default=None, ge=-2, le=2)
     model_repeat_penalty: float | None = Field(default=None, ge=0, le=2)
     model_dry_multiplier: float | None = Field(default=None, ge=0, le=5)
