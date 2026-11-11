@@ -57,6 +57,7 @@ class OpenAICompatibleGateway:
         configured: ModelCapabilities,
         default_context_tokens: int | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
+        keep_tool_reasoning: bool = True,
     ):
         self.provider = provider
         self.base_url = base_url.rstrip("/")
@@ -64,6 +65,7 @@ class OpenAICompatibleGateway:
         self.max_retries = max_retries
         self.configured = configured
         self.default_context_tokens = default_context_tokens
+        self.keep_tool_reasoning = keep_tool_reasoning
         self._verified_tools: dict[str, bool] = {}
         self._models_cache: tuple[float, list[ModelInfo]] | None = None
         headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
@@ -93,6 +95,7 @@ class OpenAICompatibleGateway:
             ),
             default_context_tokens=settings.model_default_context_tokens,
             transport=transport,
+            keep_tool_reasoning=settings.model_keep_tool_reasoning,
         )
 
     @property
@@ -262,7 +265,11 @@ class OpenAICompatibleGateway:
             self.configured.tool_calling or self._verified_tools.get(request.model)
         ):
             raise ModelGatewayError("tools_unsupported", "Tool calling is disabled for this model")
-        payload = _chat_payload(request, llama_cpp=self._is_llama_cpp)
+        payload = _chat_payload(
+            request,
+            llama_cpp=self._is_llama_cpp,
+            tool_reasoning=self._is_llama_cpp and self.keep_tool_reasoning,
+        )
         url = f"{self.base_url}/chat/completions"
 
         attempt = 0
@@ -322,10 +329,12 @@ class OpenAICompatibleGateway:
 # ---------------------------------------------------------------------- helpers
 
 
-def _chat_payload(request: ChatRequest, *, llama_cpp: bool = True) -> dict[str, Any]:
+def _chat_payload(
+    request: ChatRequest, *, llama_cpp: bool = True, tool_reasoning: bool = False
+) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "model": request.model,
-        "messages": [_dump_message(m) for m in request.messages],
+        "messages": [_dump_message(m, tool_reasoning=tool_reasoning) for m in request.messages],
         "stream": True,
         "stream_options": {"include_usage": True},
     }
@@ -350,8 +359,11 @@ def _chat_payload(request: ChatRequest, *, llama_cpp: bool = True) -> dict[str, 
     return payload
 
 
-def _dump_message(message: ChatMessage) -> dict[str, Any]:
-    return message.model_dump(exclude_none=True)
+def _dump_message(message: ChatMessage, *, tool_reasoning: bool = False) -> dict[str, Any]:
+    # llama-server reads `reasoning_content` on assistant messages and the template renders
+    # it for steps after the last user message; other servers may reject the field.
+    exclude = None if tool_reasoning else {"reasoning_content"}
+    return message.model_dump(exclude_none=True, exclude=exclude)
 
 
 async def _parse_sse(response: httpx.Response) -> AsyncIterator[StreamChunk]:

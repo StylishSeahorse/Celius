@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     # (about 4 per token) is treated the same way; 0 for no cap.
     model_loop_guard: bool = True
     model_max_reasoning_chars: int = Field(default=48_000, ge=0)
+    # Send each tool step's thinking back with that step for the rest of the same reply,
+    # as interleaved-thinking templates (Qwen3.x) expect. Earlier turns never include it.
+    model_keep_tool_reasoning: bool = True
     # Optional anti-repetition sampling, sent with every chat request when set. DRY is
     # llama.cpp's "don't repeat yourself" sampler (0.8 is a common start); presence
     # penalty 1.0-1.5 is what Qwen suggests for thinking models that loop.

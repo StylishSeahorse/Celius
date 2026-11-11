@@ -52,6 +52,11 @@ class ChatMessage(BaseModel):
     content: str | list[dict[str, Any]] | None = None
     tool_calls: list[dict[str, Any]] | None = None
     tool_call_id: str | None = None
+    # The model's thinking for an earlier tool-calling step of the *current* run, so the
+    # next step continues from it instead of re-deriving its plan (interleaved thinking,
+    # e.g. Qwen3.x). Never set for earlier turns of the conversation. Only sent to
+    # llama_cpp when MODEL_KEEP_TOOL_REASONING is on.
+    reasoning_content: str | None = None
 
 
 class ChatRequest(BaseModel):

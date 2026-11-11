@@ -212,3 +212,25 @@ async def test_guard_off_and_sampling_settings(
     assert fake.reasoning_sent == len(fake.reasoning)  # not stopped
     [request] = fake.requests
     assert request["presence_penalty"] == 1.5 and request["dry_multiplier"] == 0.8
+
+
+def test_step_reasoning_is_sent_only_to_llama_cpp_when_enabled():
+    step = ChatMessage(
+        role="assistant",
+        content=None,
+        tool_calls=[{"id": "c1", "type": "function", "function": {"name": "f", "arguments": "{}"}}],
+        reasoning_content="Plan: call f.",
+    )
+    request = ChatRequest(model="m", messages=[ChatMessage(role="user", content="hi"), step])
+    sent = _chat_payload(request, llama_cpp=True, tool_reasoning=True)["messages"][1]
+    assert sent["reasoning_content"] == "Plan: call f."
+    for kwargs in ({"llama_cpp": True, "tool_reasoning": False}, {"llama_cpp": False}):
+        assert "reasoning_content" not in _chat_payload(request, **kwargs)["messages"][1]
+
+
+def test_reasoning_cut_by_the_loop_guard_is_not_sent_back():
+    from app.worker.executor import LOOP_REASONING_NOTE, _step_reasoning
+
+    assert _step_reasoning("  Plan: read the file.  ") == "Plan: read the file."
+    assert _step_reasoning("") is None
+    assert _step_reasoning("Plan, then a loop" + LOOP_REASONING_NOTE) is None

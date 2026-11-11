@@ -435,6 +435,17 @@ LOOP_NOTES = {
 }
 
 
+def _step_reasoning(reasoning: str) -> str | None:
+    """A tool step's thinking, to send back with that step for the rest of the run.
+
+    Thinking the loop guard cut short is left out: feeding a loop back to the model
+    invites it to continue the loop."""
+    reasoning = reasoning.strip()
+    if not reasoning or LOOP_REASONING_NOTE.strip() in reasoning:
+        return None
+    return reasoning
+
+
 def _trim_loop(state: _StreamState) -> None:
     """Keep what came before the repetition (all of it for a length cap)."""
     if not state.loop or not state.guards:
@@ -787,7 +798,12 @@ class _Loop:
             )
             await db.commit()
         p.request.messages.append(
-            ChatMessage(role="assistant", content=text or None, tool_calls=model_calls)
+            ChatMessage(
+                role="assistant",
+                content=text or None,
+                tool_calls=model_calls,
+                reasoning_content=_step_reasoning(reasoning),
+            )
         )
         return rows
 
@@ -1551,11 +1567,11 @@ async def _restore_steps(db, prepared: _Prepared, output: Message) -> bool:
         )
     ).all()
     text_by_step: dict[int, str] = {}
+    reasoning_by_step: dict[int, str] = {}
     for part in parts:
-        if part.type == "text" and part.data and "step" in part.data:
-            text_by_step[part.data["step"]] = text_by_step.get(part.data["step"], "") + (
-                part.text or ""
-            )
+        if part.type in ("text", "reasoning") and part.data and "step" in part.data:
+            target = text_by_step if part.type == "text" else reasoning_by_step
+            target[part.data["step"]] = target.get(part.data["step"], "") + (part.text or "")
     by_step: dict[int, list[ToolCall]] = {}
     for call in calls:
         by_step.setdefault(call.step, []).append(call)
@@ -1568,6 +1584,7 @@ async def _restore_steps(db, prepared: _Prepared, output: Message) -> bool:
             ChatMessage(
                 role="assistant",
                 content=text_by_step.get(step) or None,
+                reasoning_content=_step_reasoning(reasoning_by_step.get(step, "")),
                 tool_calls=[
                     {
                         "id": row.model_call_id,
