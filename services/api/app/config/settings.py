@@ -54,6 +54,15 @@ class Settings(BaseSettings):
     # Send each tool step's thinking back with that step for the rest of the same reply,
     # as interleaved-thinking templates (Qwen3.x) expect. Earlier turns never include it.
     model_keep_tool_reasoning: bool = True
+    # Thinking budget (llama.cpp): after this many thinking tokens the server ends the
+    # thinking with MODEL_REASONING_BUDGET_MESSAGE and the model answers from what it has.
+    # A deployment default; a model's own limit (model registry) takes precedence. None: off.
+    model_reasoning_budget_tokens: int | None = Field(default=None, ge=256)
+    model_reasoning_budget_message: str = (
+        "\n\nOkay, I have thought about this long enough. I will go with the best-supported "
+        "answer from my work above, note any remaining uncertainty, and write the final "
+        "response now.\n"
+    )
     # Optional anti-repetition sampling, sent with every chat request when set. Presence
     # penalty 0-1.5 is Qwen's range for thinking models. Avoid DRY (llama.cpp's "don't
     # repeat yourself") for reasoning models: it stops an answer restating the numbers

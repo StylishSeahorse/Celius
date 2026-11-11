@@ -435,6 +435,22 @@ LOOP_NOTES = {
 }
 
 
+# Characters per thinking token, generously: the budget, not the guard, should end long
+# thinking, so the guard's length cap stays above it.
+BUDGET_CHARS_PER_TOKEN = 6
+
+
+def _length_cap(settings: Settings, request: ChatRequest) -> int:
+    """The loop guard's thinking-length cap. With a thinking budget the server ends long
+    thinking gracefully (the model still answers from its work); the guard's cap, which
+    retries without thinking, is only a backstop above it."""
+    cap = settings.model_max_reasoning_chars
+    budget = request.reasoning_budget_tokens
+    if cap and budget:
+        cap = max(cap, budget * BUDGET_CHARS_PER_TOKEN)
+    return cap
+
+
 def _step_reasoning(reasoning: str) -> str | None:
     """A tool step's thinking, to send back with that step for the rest of the run.
 
@@ -604,7 +620,7 @@ class _Loop:
     def _new_state(self) -> _StreamState:
         state = _StreamState(step=self.p.step)
         if self.settings.model_loop_guard:
-            reasoning = replace(REASONING, max_chars=self.settings.model_max_reasoning_chars)
+            reasoning = replace(REASONING, max_chars=_length_cap(self.settings, self.p.request))
             state.guards = {
                 "reasoning": RepetitionGuard(reasoning),
                 "text": RepetitionGuard(ANSWER),
@@ -1488,6 +1504,10 @@ async def _prepare(
                 presence_penalty=settings.model_presence_penalty,
                 repeat_penalty=settings.model_repeat_penalty,
                 dry_multiplier=settings.model_dry_multiplier,
+                reasoning_budget_tokens=profile.reasoning_budget_tokens,
+                reasoning_budget_message=settings.model_reasoning_budget_message
+                if profile.reasoning_budget_tokens
+                else None,
             ),
             toolset=toolset,
             iterations=run.tool_iterations,

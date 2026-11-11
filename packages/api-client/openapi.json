@@ -4491,6 +4491,19 @@
               }
             ],
             "title": "Max Tool Iterations"
+          },
+          "reasoning_budget_tokens": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 256.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Budget Tokens"
           }
         },
         "title": "ModelLimits",
@@ -4590,6 +4603,17 @@
             "title": "Provider",
             "type": "string"
           },
+          "reasoning_budget_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Budget Tokens"
+          },
           "reasoning_toggle": {
             "title": "Reasoning Toggle",
             "type": "boolean"
@@ -4635,6 +4659,7 @@
           "structured_output",
           "max_tool_iterations",
           "max_output_tokens",
+          "reasoning_budget_tokens",
           "compact_tools",
           "memory_items",
           "recall_chunks",

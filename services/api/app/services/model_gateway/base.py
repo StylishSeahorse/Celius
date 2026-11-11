@@ -74,6 +74,10 @@ class ChatRequest(BaseModel):
     presence_penalty: float | None = None
     repeat_penalty: float | None = None
     dry_multiplier: float | None = None
+    # Thinking budget in tokens and the text that closes the thinking when it runs out
+    # (llama.cpp only; None: no budget).
+    reasoning_budget_tokens: int | None = None
+    reasoning_budget_message: str | None = None
     # Constrain the output, e.g. {"type": "json_object"} (only when the model registry
     # says the server supports it; llama-server turns it into a grammar).
     response_format: dict[str, Any] | None = None

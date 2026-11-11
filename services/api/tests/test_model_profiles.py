@@ -338,3 +338,26 @@ async def test_tool_definitions_leave_room_on_a_small_context(
     for name in ("task_update", "skill_create", "daily_briefing", "plan_status"):
         if name not in names:
             assert name not in note, name
+
+
+async def test_reasoning_budget_is_per_model_with_a_deployment_default(
+    client, auth_headers, sessionmaker, gateway, settings, fake
+):
+    # No budget anywhere: nothing is sent.
+    await chat(client, auth_headers, "Hi", sessionmaker, gateway, settings)
+    assert "reasoning_budget_tokens" not in fake.requests[-1]
+
+    # Deployment default.
+    settings.model_reasoning_budget_tokens = 9000
+    await chat(client, auth_headers, "Hi", sessionmaker, gateway, settings)
+    sent = fake.requests[-1]
+    assert sent["reasoning_budget_tokens"] == 9000
+    assert "write the final response now" in sent["reasoning_budget_message"]
+
+    # The model's own limit wins.
+    entry = await set_registry(client, auth_headers, limits={"reasoning_budget_tokens": 12000})
+    effective = entry["effective"]
+    assert effective["reasoning_budget_tokens"] == 12000
+    assert effective["sources"]["reasoning_budget_tokens"] == "admin"
+    await chat(client, auth_headers, "Hi", sessionmaker, gateway, settings)
+    assert fake.requests[-1]["reasoning_budget_tokens"] == 12000

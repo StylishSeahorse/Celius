@@ -345,7 +345,16 @@ def _chat_payload(
         "stop",
         "response_format",
         "presence_penalty",
-        *(("repeat_penalty", "dry_multiplier") if llama_cpp else ()),
+        *(
+            (
+                "repeat_penalty",
+                "dry_multiplier",
+                "reasoning_budget_tokens",
+                "reasoning_budget_message",
+            )
+            if llama_cpp
+            else ()
+        ),
     ):
         value = getattr(request, field)
         if value is not None:
