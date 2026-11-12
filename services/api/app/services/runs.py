@@ -43,6 +43,13 @@ async def request_cancel(db: AsyncSession, run: Run) -> Run:
     if run.status in TERMINAL_RUN_STATUSES:
         return run
     run.cancel_requested = True
+    if run.execution == "external":
+        # No worker holds it: interrupt the agent on its machine and finish now (ADR C-16).
+        from app.services.remote import external
+
+        await external.cancel(db, run)
+        await finish_cancelled(db, run)
+        return run
     if run.status in (RunStatus.queued, RunStatus.awaiting_approval):
         await finish_cancelled(db, run)
     return run

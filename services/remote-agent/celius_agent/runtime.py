@@ -191,7 +191,9 @@ class Runtime:
             elif kind == "interrupt":
                 await self._interrupt(session_id)
             elif kind in ("session.message", "permission.decision"):
-                adapter = self.adapters.get(session_id or "")
+                adapter = await self._adapter_for(
+                    session_id, run_id if kind == "session.message" else None
+                )
                 if adapter is None:
                     log.warning("%s for session %s without an adapter", kind, session_id)
                 elif kind == "session.message":
@@ -279,6 +281,37 @@ class Runtime:
                 "shell": shell_name(),
             },
         )
+
+    async def _adapter_for(self, session_id: str | None, run_id: str | None):
+        """The session's external agent, started again (resuming its own session id) if
+        this agent restarted since. If it can't start, the turn fails visibly."""
+        adapter = self.adapters.get(session_id or "")
+        session = self.sessions.get(session_id or "")
+        if adapter is not None or session is None or session.status != "open":
+            return adapter
+        if session.adapter != "claude_code":
+            return None
+        from celius_agent.adapters.claude_code import ClaudeCodeAdapter
+
+        try:
+            adapter = ClaudeCodeAdapter(self, session)
+            await adapter.start()
+        except Exception as exc:
+            log.exception("Claude Code could not restart for session %s", session.id)
+            if run_id:
+                await self.emit(
+                    session.id,
+                    "turn.completed",
+                    {
+                        "is_error": True,
+                        "subtype": "adapter_error",
+                        "result": f"Claude Code could not start: {exc}",
+                    },
+                    run_id,
+                )
+            return None
+        self.adapters[session.id] = adapter
+        return adapter
 
     def _stop_session_work(self, session_id: str) -> None:
         for env in self.running.values():

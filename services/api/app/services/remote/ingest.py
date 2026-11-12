@@ -153,6 +153,13 @@ async def _command_update(
     command.status = status if status in ("completed", "failed", "cancelled") else "failed"
     result = event.data.get("result")
     command.result = result if isinstance(result, dict) else None
+    if command.kind == "file.fetch" and isinstance(result, dict):
+        # The file itself is handed to the download and pruned with the command; the
+        # session's permanent event log keeps only what was fetched.
+        data = dict(result.get("data") or {})
+        data.pop("content_b64", None)
+        event.data = {**event.data, "result": {**result, "data": data}}
+        command.result = {**(result.get("data") or {}), "is_error": result.get("is_error")}
     error = event.data.get("error")
     command.error = str(error)[:2000] if error else None
     command.completed_at = utcnow()

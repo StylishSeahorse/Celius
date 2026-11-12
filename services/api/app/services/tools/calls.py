@@ -153,6 +153,10 @@ async def _decided(db: AsyncSession, call: ToolCall) -> None:
         call.message_id,
         payload={"conversation_id": str(call.conversation_id)},
     )
+    from app.services.remote import external  # import cycle: external uses call_event
+
+    if await external.on_decision(db, call):
+        return  # an external agent's call: the decision goes to the machine (ADR C-16)
     await resume_if_decided(db, call.run_id)
 
 

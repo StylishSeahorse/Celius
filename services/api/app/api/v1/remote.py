@@ -574,14 +574,23 @@ async def fetch_file(
         async with factory() as poll:
             current = await poll.get(RemoteCommand, command_id)
             if current is not None and current.status in FINAL_COMMAND_STATUSES:
-                if current.status != "completed" or not current.result:
+                result = current.result or {}
+                if (
+                    current.status != "completed"
+                    or result.get("is_error")
+                    or "content_b64" not in result
+                ):
                     raise AppError(
-                        404 if current.status == "failed" else 504,
+                        404 if current.status == "completed" else 504,
                         "file_unavailable",
-                        current.error or "The machine could not send this file",
+                        str(
+                            result.get("error")
+                            or current.error
+                            or "The machine could not send this file"
+                        ),
                     )
-                content = base64.b64decode(current.result.get("content_b64") or "")
-                name = str(current.result.get("name") or "download").replace('"', "")
+                content = base64.b64decode(result["content_b64"])
+                name = str(result.get("name") or "download").replace('"', "")
                 return Response(
                     content,
                     media_type="application/octet-stream",
