@@ -1,0 +1,47 @@
+[project]
+name = "celius-agent"
+version = "0.1.0"
+description = "Celius Remote Agent: runs Celius sessions on this machine"
+requires-python = ">=3.10"
+dependencies = [
+    "websockets>=13",
+]
+
+[project.optional-dependencies]
+# Faster, more complete resource figures (CPU, memory) than the built-in fallbacks.
+monitor = ["psutil>=5.9"]
+# Claude Code sessions (mode 2). The SDK bundles the Claude Code CLI.
+claude = ["claude-agent-sdk>=0.1"]
+
+[project.scripts]
+celius-agent = "celius_agent.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.6",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "ASYNC"]
+ignore = ["UP041"]  # asyncio.TimeoutError is distinct from TimeoutError on Python 3.10
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ASYNC110", "ASYNC230", "ASYNC240", "ASYNC109"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["celius_agent"]

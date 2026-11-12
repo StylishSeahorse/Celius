@@ -190,8 +190,13 @@ class AgentConnection:
             "connection_id": self.connection_id,
             "heartbeat_seconds": self.settings.remote_heartbeat_seconds,
             "server_time": now.isoformat(),
+            # Enough for an agent that lost its state (reinstalled) to restore its sessions.
             "sessions": {
-                str(s.id): {"last_seq": s.last_seq, "status": s.status, "mode": s.mode}
+                str(s.id): {
+                    "last_seq": s.last_seq,
+                    "status": s.status,
+                    **session_payload(s, agent),
+                }
                 for s in sessions
             },
         }

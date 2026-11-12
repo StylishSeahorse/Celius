@@ -34,3 +34,7 @@ backups/
 test-results/
 playwright-report/
 *.tsbuildinfo
+
+# Celius Remote Agent build output
+services/remote-agent/build/
+services/remote-agent/*.spec.bak
