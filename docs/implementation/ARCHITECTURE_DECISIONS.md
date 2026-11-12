@@ -614,3 +614,38 @@ model's output.
   the note, not a timeout.
 - Very long legitimate thinking is cut at the cap; raise or disable it for models that
   need more.
+
+---
+
+## C-16: Celius Remote — execution on registered machines through Central
+
+Status: accepted · 2026-11-12
+
+**Context.** Celius should run agent work on the user's own Windows and Linux machines and
+show it as ordinary conversations, including external coding agents (Claude Code). Central
+already has durable runs, events, approvals, leases and sync on PostgreSQL; API and
+worker share nothing but the database. Details: [docs/remote/ARCHITECTURE.md](../remote/ARCHITECTURE.md).
+
+**Decision.**
+- A lightweight Python agent (`services/remote-agent`, one dependency) connects *out* over
+  one WebSocket to the API; enrollment and token exchange use HTTPS. No inbound ports.
+- PostgreSQL is the bus: `remote_commands` (Central → agent, at-least-once delivery,
+  executed at most once thanks to durable command ids on the agent) and
+  `remote_session_events` (agent → Central, per-session `seq`, unique, contiguous acks,
+  agent-side disk outbox, replay on reconnect). Redis stays unused.
+- Native mode keeps orchestration in the existing worker: a run with `execution=remote`
+  uses tool specs with the built-in names whose handlers dispatch to the machine. Prompts,
+  memory, model profiles, policy, approvals, leases and the never-re-run rule are unchanged.
+- External mode (Claude Code via the official Agent SDK, `can_use_tool`) is projected into
+  the same conversation: runs with `execution=external` are not claimed by the worker;
+  ingested events create message parts, `tool_calls` and run events; permission prompts
+  are `tool_calls` in `pending_approval`, decided through the existing routes.
+- Machines are not trusted by registration: explicit authorisation, a local policy file on
+  the machine (no folders, no shell by default) intersected with Central's per-machine
+  config, and remote write/execute tools ask every time unless configured otherwise.
+
+**Rejected.** Running the full Celius stack on each machine (duplicates orchestration and
+the source of truth); SSH or exposed ports; terminal-text scraping of Claude Code when the
+Agent SDK gives structured messages and a permission callback; a second approval system;
+a message broker or new microservice; automatic failover to another machine (risks running
+a task twice).
