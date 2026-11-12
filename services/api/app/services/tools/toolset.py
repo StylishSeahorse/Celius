@@ -56,13 +56,34 @@ class Toolset:
 
 
 async def available_tools(
-    db: AsyncSession, owner_id: uuid.UUID, settings: Settings, *, sandbox: bool
+    db: AsyncSession,
+    owner_id: uuid.UUID,
+    settings: Settings,
+    *,
+    sandbox: bool,
+    remote=None,
 ) -> tuple[dict[str, ToolSpec], dict[str, str]]:
-    """All tools for this user, and the reasons some of them can't be used right now."""
+    """All tools for this user, and the reasons some of them can't be used right now.
+
+    `remote` (a RemoteTarget, ADR C-16): the file, shell, Python and git tools act on that
+    machine instead of the central workspace and sandbox."""
     prefs = tool_preferences(await db.get(UserSettings, owner_id))
     disabled = set(prefs.get("disabled_tools") or [])
     known: dict[str, ToolSpec] = dict(BUILTIN)
     unavailable: dict[str, str] = {}
+    if remote is not None:
+        from app.services.remote.tools import (
+            CENTRAL_ONLY_TOOLS,
+            UNAVAILABLE_REMOTELY,
+            remote_specs,
+        )
+
+        specs, not_offered = remote_specs(remote)
+        known.update(specs)
+        unavailable.update(not_offered)
+        for name in CENTRAL_ONLY_TOOLS:
+            if name in known:
+                unavailable[name] = UNAVAILABLE_REMOTELY
     servers = (
         await db.scalars(
             select(McpServer).where(McpServer.owner_id == owner_id, McpServer.enabled.is_(True))
@@ -72,6 +93,8 @@ async def available_tools(
         for spec in specs_for(server, settings, server_headers(settings, server)):
             known[spec.name] = spec
     for name, spec in known.items():
+        if name in unavailable:
+            continue
         if name in disabled:
             unavailable[name] = "Turned off in settings"
         elif spec.needs_sandbox and not sandbox:
@@ -137,9 +160,12 @@ async def build_toolset(
     sandbox: bool,
     compact: bool = False,
     max_tool_tokens: int | None = None,
+    remote=None,
 ) -> Toolset:
     profile = await conversation_profile(db, conversation, settings)
-    known, unavailable = await available_tools(db, conversation.owner_id, settings, sandbox=sandbox)
+    known, unavailable = await available_tools(
+        db, conversation.owner_id, settings, sandbox=sandbox, remote=remote
+    )
     if not await memory_active_for(db, conversation, settings):
         for name in MEMORY_TOOLS:
             unavailable.setdefault(name, "Memory is off for this chat")

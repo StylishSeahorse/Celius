@@ -29,6 +29,9 @@ class ToolContext:
     web_transport: Any = None  # tests only: replaces the guarded transport
     # Seconds this call may take (per-call timeout, capped by what is left of the run's budget).
     time_limit: float = 120
+    # Celius Remote (ADR C-16): the machine this run's tools act on, and the call's id.
+    remote: Any = None  # app.services.remote.tools.RemoteTarget | None
+    tool_call_id: uuid.UUID | None = None
 
 
 @dataclass

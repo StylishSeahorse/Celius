@@ -86,6 +86,7 @@ from app.services.prompt_files import (
     project_files_block,
 )
 from app.services.prompting import PRINCIPLES, PromptBuilder
+from app.services.remote import tools as remote_tools
 from app.services.runs import append_event, finish_cancelled
 from app.services.skills.jobs import queue_after_run
 from app.services.skills.prompt import skills_block
@@ -117,7 +118,12 @@ async def claim_next_run(
     async with factory() as db:
         candidate = await db.scalar(
             select(Run.id)
-            .where(Run.status == RunStatus.queued, Run.cancel_requested.is_(False))
+            .where(
+                Run.status == RunStatus.queued,
+                Run.cancel_requested.is_(False),
+                # Driven by an external agent on a machine, not by this worker (ADR C-16).
+                Run.execution != "external",
+            )
             .order_by(Run.created_at)
             .limit(1)
             .with_for_update(skip_locked=True)
@@ -263,6 +269,8 @@ class _Prepared:
     review: Any = None
     reviewed: int = 0
     structured_output: bool = False
+    # Celius Remote (ADR C-16): the machine the tools act on, for execution = remote.
+    remote: Any = None
 
 
 def _delta_event(message_id: uuid.UUID, state: _StreamState) -> dict[str, Any]:
@@ -882,6 +890,9 @@ class _Loop:
                 if outcome != "done":
                     return outcome
             elif row.status == ToolCallStatus.running:
+                if self.p.remote is not None:
+                    # It may still be running on the machine: stop it, never re-run it.
+                    await remote_tools.cancel_for_tool_call(self.factory, row.id)
                 await self._set_final(
                     row,
                     ToolCallStatus.interrupted,
@@ -991,6 +1002,8 @@ class _Loop:
             workspace=ws.workspace_dir(settings, p.conversation_id),
             sandbox=self.sandbox,
             time_limit=min(settings.tool_call_timeout_seconds, remaining),
+            remote=p.remote,
+            tool_call_id=row.id,
             **self.overrides,
         )
         state = _StreamState()
@@ -1302,12 +1315,16 @@ async def _prepare(
             )
 
             toolset = None
+            remote = None
+            if run.execution == "remote" and run.remote_session_id:
+                remote = await remote_tools.load_target(db, run.remote_session_id)
             if tool_calling:
                 toolset = await build_toolset(
                     db,
                     conversation,
                     settings,
                     sandbox=sandbox,
+                    remote=remote,
                     compact=profile.compact_tools,
                     max_tool_tokens=int(context_tokens * settings.tool_context_share)
                     if context_tokens
@@ -1400,10 +1417,12 @@ async def _prepare(
             if toolset is not None and "task_list" in toolset.offered:
                 prompt.set("assistant", ASSISTANT_NOTE)
             if toolset is not None:
-                prompt.set(
-                    "tools",
-                    TOOL_GUIDANCE + _network_note(toolset, settings) + _missing_tools_note(toolset),
+                guidance = (
+                    remote_tools.guidance(remote)
+                    if remote is not None
+                    else TOOL_GUIDANCE + _network_note(toolset, settings)
                 )
+                prompt.set("tools", guidance + _missing_tools_note(toolset))
                 await _copy_attachments(settings, conversation.id, attachments)
 
             # The newest message's files share a part of the context; files on earlier
@@ -1481,6 +1500,7 @@ async def _prepare(
             parallel_tools=profile.parallel_tools,
             review=review_prefs(settings, await db.get(UserSettings, run.owner_id)),
             structured_output=profile.structured_output,
+            remote=remote,
         )
         resumed = await _restore_steps(db, prepared, output)
         if not retrieved.empty and not await db.scalar(

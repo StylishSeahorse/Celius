@@ -18,7 +18,7 @@ import logging
 import uuid
 from typing import Any, Protocol
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import select, update
 
 from app.config import Settings
 from app.db import SessionFactory
@@ -317,31 +317,40 @@ class AgentConnection:
                 raise _Closed(CLOSE_REVOKED, "revoked")
             if agent.connection_id != self.connection_id:
                 raise _Closed(CLOSE_SUPERSEDED, "superseded")
-            # Never deliver what nobody waits for any more.
-            await db.execute(
-                update(RemoteCommand)
-                .where(
-                    RemoteCommand.agent_id == self.agent_id,
-                    RemoteCommand.status == "pending",
-                    RemoteCommand.expires_at.is_not(None),
-                    RemoteCommand.expires_at < now,
-                )
-                .values(status="expired", completed_at=now, error="Not delivered in time")
+            # Read-only while there is nothing to send: an idle machine costs one SELECT
+            # per poll, no write transaction.
+            waiting = await db.scalar(
+                select(RemoteCommand.id)
+                .where(RemoteCommand.agent_id == self.agent_id, RemoteCommand.status == "pending")
+                .limit(1)
             )
-            commands = (
+            if waiting is None:
+                await db.rollback()
+                return
+            candidates = (
                 await db.scalars(
                     select(RemoteCommand)
                     .where(
                         RemoteCommand.agent_id == self.agent_id,
                         RemoteCommand.status == "pending",
-                        or_(RemoteCommand.expires_at.is_(None), RemoteCommand.expires_at >= now),
                     )
                     .order_by(RemoteCommand.created_at, RemoteCommand.id)
                     .limit(COMMAND_BATCH)
                     .with_for_update(skip_locked=True)
                 )
             ).all()
-            for command in commands:
+            commands = []
+            for command in candidates:
+                expires = command.expires_at
+                if expires is not None and expires.tzinfo is None:
+                    expires = expires.replace(tzinfo=now.tzinfo)
+                if expires is not None and expires < now:
+                    # Nobody waits for it any more: it must never run.
+                    command.status = "expired"
+                    command.completed_at = now
+                    command.error = "Not delivered in time"
+                    continue
+                commands.append(command)
                 command.status = "delivered"
                 command.delivered_at = now
                 if command.kind == "session.open" and command.session_id:

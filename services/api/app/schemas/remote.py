@@ -48,6 +48,21 @@ class RemoteAgentUpdate(BaseModel):
     config: RemoteAgentConfig | None = None
 
 
+class RemoteSessionSummary(BaseModel):
+    """Shown with a conversation: where it runs."""
+
+    id: uuid.UUID
+    agent_id: uuid.UUID | None
+    agent_name: str | None
+    agent_os: str | None
+    agent_online: bool
+    mode: str
+    adapter: str
+    working_directory: str
+    status: str
+    status_detail: str | None
+
+
 class RemoteSessionBrief(BaseModel):
     id: uuid.UUID
     conversation_id: uuid.UUID

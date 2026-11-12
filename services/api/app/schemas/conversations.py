@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import BaseModel, Field, model_validator
 
 from app.models import MessageRole, MessageStatus, RunStatus
+from app.schemas.remote import RemoteSessionSummary
 from app.schemas.tools import ToolCallOut
 
 
@@ -46,6 +47,8 @@ class ConversationSummary(BaseModel):
     archived: bool
     created_at: datetime
     updated_at: datetime
+    # Celius Remote (ADR C-16): the machine this conversation runs on, if any.
+    remote: RemoteSessionSummary | None = None
 
 
 class ConversationList(BaseModel):

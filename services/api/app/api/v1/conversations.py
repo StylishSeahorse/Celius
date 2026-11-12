@@ -19,6 +19,7 @@ from app.schemas.conversations import (
 )
 from app.services import conversations as svc
 from app.services.chat import submit_message
+from app.services.remote import sessions as remote_sessions
 from app.services.tools.calls import calls_for_messages
 from app.services.tools.policy import conversation_grants
 
@@ -37,8 +38,11 @@ async def conversation_detail(db: AsyncSession, conversation) -> ConversationDet
         out = svc.message_out(m, parts[m.id], siblings[m.id])
         out.tool_calls = calls.get(m.id, [])
         messages.append(out)
+    remote = await remote_sessions.summaries_for(db, get_settings(), [conversation.id])
+    summary = svc.conversation_summary(conversation)
+    summary.remote = remote.get(conversation.id)
     return ConversationDetail(
-        **svc.conversation_summary(conversation).model_dump(),
+        **summary.model_dump(),
         messages=messages,
         tool_grants=sorted(await conversation_grants(db, conversation.id)),
         active_run=svc.run_out(run) if run else None,
@@ -49,6 +53,7 @@ async def conversation_detail(db: AsyncSession, conversation) -> ConversationDet
 async def list_conversations(
     auth: CurrentAuth,
     db: DB,
+    settings: Annotated[Settings, Depends(get_settings)],
     q: Annotated[str | None, Query(max_length=200)] = None,
     project_id: uuid.UUID | None = None,
     archived: bool = False,
@@ -64,9 +69,11 @@ async def list_conversations(
         limit=limit,
         cursor=cursor,
     )
-    return ConversationList(
-        items=[svc.conversation_summary(c) for c in rows], next_cursor=next_cursor
-    )
+    items = [svc.conversation_summary(c) for c in rows]
+    remote = await remote_sessions.summaries_for(db, settings, [c.id for c in rows])
+    for item in items:
+        item.remote = remote.get(item.id)
+    return ConversationList(items=items, next_cursor=next_cursor)
 
 
 @router.post(

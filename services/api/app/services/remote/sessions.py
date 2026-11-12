@@ -48,18 +48,24 @@ def is_online(agent: RemoteAgent, settings: Settings) -> bool:
     )
 
 
-def agent_state(agent: RemoteAgent, settings: Settings, sessions: list[RemoteSession]) -> str:
+def agent_state(
+    agent: RemoteAgent,
+    settings: Settings,
+    sessions: list[RemoteSession],
+    live: dict[uuid.UUID, str] | None = None,
+) -> str:
     """One word for the UI: awaiting_authorization, revoked, needs_attention, busy, idle,
-    disconnected (unexpectedly), offline."""
+    disconnected (unexpectedly), offline. `live`: live_statuses() of the sessions."""
     if agent.status == "pending":
         return "awaiting_authorization"
     if agent.status == "revoked":
         return "revoked"
-    open_sessions = [s for s in sessions if s.status not in ENDED_SESSION_STATUSES]
+    live = live or {}
+    states = [live.get(s.id, s.status) for s in sessions if s.status not in ENDED_SESSION_STATUSES]
     if is_online(agent, settings):
-        if any(s.status == "awaiting_approval" for s in open_sessions):
+        if "awaiting_approval" in states:
             return "needs_attention"
-        if any(s.status == "running" for s in open_sessions):
+        if "running" in states:
             return "busy"
         return "idle"
     if agent.connection_id is not None or agent.disconnect_reason == "lost":
@@ -337,3 +343,122 @@ async def end_session(
 async def end_agent_sessions(db: AsyncSession, agent: RemoteAgent, detail: str) -> None:
     for session in (await sessions_by_agent(db, [agent.id])).get(agent.id, []):
         await end_session(db, session, "terminated", detail, notify_agent=False)
+
+
+# ---------------------------------------------------------------------- runs
+
+
+async def latest_session_for(db: AsyncSession, conversation_id: uuid.UUID) -> RemoteSession | None:
+    return await db.scalar(
+        select(RemoteSession)
+        .where(RemoteSession.conversation_id == conversation_id)
+        .order_by(RemoteSession.created_at.desc())
+        .limit(1)
+    )
+
+
+async def attach_run(
+    db: AsyncSession, conversation_id: uuid.UUID, run: Run, trigger_parts: list, *, reason: str
+) -> None:
+    """Route a new run of a remote conversation to its machine. A conversation whose
+    session ended is not silently moved back to the sandbox (or anywhere else): the user
+    opens a session again, on the same or another machine."""
+    session = await latest_session_for(db, conversation_id)
+    if session is None:
+        return
+    if session.status in ENDED_SESSION_STATUSES:
+        raise AppError(
+            409,
+            "remote_session_ended",
+            "This conversation's session on its machine has ended. Open a session again "
+            "(on this or another machine) to continue.",
+        )
+    if session.mode == "external" and reason != "created":
+        raise AppError(
+            409,
+            "not_supported_for_external_agent",
+            "An external agent's history can't be edited or regenerated; send a new message",
+        )
+    run.execution = "remote" if session.mode == "native" else "external"
+    run.remote_session_id = session.id
+    session.current_run_id = run.id
+    if session.mode == "external" and session.agent_id:
+        text = "\n\n".join(p.text for p in trigger_parts if p.type == "text" and p.text)
+        names = [p.data.get("filename") for p in trigger_parts if p.type == "file" and p.data]
+        if names:
+            text += (
+                "\n\n[Files attached in Celius are not on this machine: "
+                + ", ".join(str(n) for n in names)
+                + "]"
+            )
+        enqueue_command(
+            db,
+            session.agent_id,
+            "session.message",
+            session_id=session.id,
+            run_id=run.id,
+            payload={"text": text},
+        )
+
+
+def live_status(session: RemoteSession, run_status: str | None) -> str:
+    """The session's state for display: stored lifecycle state, refined by its run."""
+    if session.status in ENDED_SESSION_STATUSES or session.status == "opening":
+        return session.status
+    if run_status == "awaiting_approval":
+        return "awaiting_approval"
+    if run_status in ("queued", "running"):
+        return "running"
+    return "idle"
+
+
+async def live_statuses(db: AsyncSession, sessions: list[RemoteSession]) -> dict[uuid.UUID, str]:
+    run_ids = [s.current_run_id for s in sessions if s.current_run_id]
+    statuses: dict = {}
+    if run_ids:
+        rows = await db.execute(select(Run.id, Run.status).where(Run.id.in_(run_ids)))
+        statuses = {run_id: status.value for run_id, status in rows.all()}
+    return {s.id: live_status(s, statuses.get(s.current_run_id)) for s in sessions}
+
+
+async def summaries_for(db: AsyncSession, settings: Settings, conversation_ids: list[uuid.UUID]):
+    """The latest remote session of each conversation, for the chat list and header."""
+    from app.schemas.remote import RemoteSessionSummary
+
+    if not conversation_ids:
+        return {}
+    rows = (
+        await db.scalars(
+            select(RemoteSession)
+            .where(RemoteSession.conversation_id.in_(conversation_ids))
+            .order_by(RemoteSession.created_at)
+        )
+    ).all()
+    latest = {row.conversation_id: row for row in rows}  # newest wins
+    agents = {
+        a.id: a
+        for a in (
+            await db.scalars(
+                select(RemoteAgent).where(
+                    RemoteAgent.id.in_({s.agent_id for s in latest.values() if s.agent_id})
+                )
+            )
+        ).all()
+    }
+    live = await live_statuses(db, list(latest.values()))
+    out = {}
+    for conversation_id, session in latest.items():
+        agent = agents.get(session.agent_id)
+        out[conversation_id] = RemoteSessionSummary(
+            id=session.id,
+            agent_id=session.agent_id,
+            agent_name=agent.name if agent else None,
+            agent_os=agent.os if agent else None,
+            agent_online=is_online(agent, settings) if agent else False,
+            mode=session.mode,
+            adapter=session.adapter,
+            working_directory=session.working_directory,
+            status=live.get(session.id, session.status),
+            status_detail=session.status_detail,
+        )
+    return out

@@ -47,6 +47,7 @@ from app.services.conversations import (
     run_out,
     touch,
 )
+from app.services.remote import sessions as remote_sessions
 from app.services.sync import record_sync
 
 TITLE_LENGTH = 80
@@ -217,6 +218,11 @@ async def _enqueue_reply(
     db.add(assistant)
     await db.flush()
     db.add_all([MessageRevision(message_id=assistant.id, revision=1, reason=reason), run])
+    await db.flush()
+    # A conversation running on a machine sends its runs there (ADR C-16).
+    await remote_sessions.attach_run(
+        db, conversation.id, run, await _parts_of(db, trigger), reason=reason
+    )
     branch.head_message_id = assistant.id
     record_sync(
         db, user.id, "message", assistant.id, payload={"conversation_id": str(conversation.id)}

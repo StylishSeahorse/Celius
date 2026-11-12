@@ -79,7 +79,9 @@ def _ip(request: Request) -> str | None:
 # ---------------------------------------------------------------------- serialization
 
 
-def _brief(session: RemoteSession, title: str | None = None) -> RemoteSessionBrief:
+def _brief(
+    session: RemoteSession, title: str | None = None, status: str | None = None
+) -> RemoteSessionBrief:
     return RemoteSessionBrief(
         id=session.id,
         conversation_id=session.conversation_id,
@@ -87,7 +89,7 @@ def _brief(session: RemoteSession, title: str | None = None) -> RemoteSessionBri
         mode=session.mode,
         adapter=session.adapter,
         working_directory=session.working_directory,
-        status=session.status,
+        status=status or session.status,
         status_detail=session.status_detail,
         created_at=session.created_at,
         ended_at=session.ended_at,
@@ -109,8 +111,10 @@ def agent_out(
     settings: Settings,
     sessions: list[RemoteSession],
     titles: dict[uuid.UUID, str | None] | None = None,
+    live: dict[uuid.UUID, str] | None = None,
 ) -> RemoteAgentOut:
     titles = titles or {}
+    live = live or {}
     return RemoteAgentOut(
         id=agent.id,
         name=agent.name,
@@ -120,7 +124,7 @@ def agent_out(
         arch=agent.arch,
         agent_version=agent.agent_version,
         status=agent.status,
-        state=svc.agent_state(agent, settings, sessions),
+        state=svc.agent_state(agent, settings, sessions, live),
         online=svc.is_online(agent, settings),
         capabilities=agent.capabilities or {},
         local_policy=agent.local_policy or {},
@@ -135,7 +139,7 @@ def agent_out(
         revoked_at=agent.revoked_at,
         created_at=agent.created_at,
         active_sessions=[
-            _brief(s, titles.get(s.conversation_id))
+            _brief(s, titles.get(s.conversation_id), live.get(s.id))
             for s in sessions
             if s.status not in ENDED_SESSION_STATUSES
         ],
@@ -149,12 +153,13 @@ async def session_out(
     open_sessions = (await svc.sessions_by_agent(db, [agent.id])).get(agent.id, []) if agent else []
     if title is None:
         title = (await _titles(db, [session])).get(session.conversation_id)
+    live = await svc.live_statuses(db, [session, *open_sessions])
     return RemoteSessionOut(
-        **_brief(session, title).model_dump(),
+        **_brief(session, title, live.get(session.id)).model_dump(),
         agent_id=session.agent_id,
         agent_name=agent.name if agent else None,
         agent_os=agent.os if agent else None,
-        agent_state=svc.agent_state(agent, settings, open_sessions) if agent else None,
+        agent_state=svc.agent_state(agent, settings, open_sessions, live) if agent else None,
         agent_online=svc.is_online(agent, settings) if agent else False,
         permissions=session.permissions or {},
         effective_permissions=svc.effective_permissions(agent, session) if agent else {},
@@ -193,9 +198,11 @@ async def list_agents(auth: CurrentAuth, db: DB, settings: AppSettings) -> Remot
         )
     ).all()
     grouped = await svc.sessions_by_agent(db, [a.id for a in agents])
-    titles = await _titles(db, [s for group in grouped.values() for s in group])
+    every = [s for group in grouped.values() for s in group]
+    titles = await _titles(db, every)
+    live = await svc.live_statuses(db, every)
     return RemoteAgentList(
-        items=[agent_out(a, settings, grouped.get(a.id, []), titles) for a in agents]
+        items=[agent_out(a, settings, grouped.get(a.id, []), titles, live) for a in agents]
     )
 
 
@@ -205,7 +212,13 @@ async def get_agent(
 ) -> RemoteAgentOut:
     agent = await svc.owned_agent(db, auth.user.id, agent_id)
     sessions = (await svc.sessions_by_agent(db, [agent.id])).get(agent.id, [])
-    return agent_out(agent, settings, sessions, await _titles(db, sessions))
+    return agent_out(
+        agent,
+        settings,
+        sessions,
+        await _titles(db, sessions),
+        await svc.live_statuses(db, sessions),
+    )
 
 
 @router.patch("/agents/{agent_id}", response_model=RemoteAgentOut)
