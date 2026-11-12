@@ -242,6 +242,21 @@ The model can call tools in the conversation's private workspace:
 - A second person can't reach the first person's data through any route: this is tested
   for every API route automatically
 
+### Remote machines (Celius Remote)
+- Run a chat on one of your own computers — a Windows PC, a Linux workstation, server or
+  VM — and follow it from any device: the conversation, a live terminal, changed files
+  with diffs and downloads, and the machine's CPU, memory, disk and GPU
+- Two kinds of agent: Celius's own (this chat's model, memory and tools, acting on the
+  machine) or **Claude Code** running there, whose permission requests come to you as
+  ordinary approvals
+- The machine connects out to the server; no open ports or SSH. Pairing codes, explicit
+  authorisation, per-machine credentials, revocation
+- Nothing runs outside the folders the machine's owner allows in its policy file; commands
+  are off by default and ask before running unless you choose otherwise
+- Work continues when every client is closed or the network drops; nothing is lost or
+  run twice when it comes back
+- [Install the agent](docs/remote/INSTALL.md) · [how it works](docs/remote/ARCHITECTURE.md)
+
 ### Running it
 - Encrypted backups (database, files, workspaces, settings) with an off-site copy,
   restore, and a restore drill that proves the latest backup works
@@ -431,6 +446,7 @@ apps/web/             React + Vite + Tailwind web app and PWA (service worker, o
 apps/desktop/         Tauri v2 Windows app (folders, notifications, tray)
 services/api/         FastAPI API, worker, migrations, tests, dev tools (fake llama-server)
 services/sandbox/     Code execution service and egress proxy
+services/remote-agent/ Celius Remote Agent for Windows and Linux machines (Python)
 packages/api-client/  TypeScript types generated from the API
 packages/contracts/   Run-event JSON Schema shared with clients
 infra/                Dockerfiles, Compose files, operations scripts
@@ -446,6 +462,11 @@ docs/                 Backlog, ADRs, deployment, operations, acceptance tests, s
   [upgrade and rollback](docs/operations/upgrade-and-rollback.md) ·
   [monitoring](docs/operations/monitoring.md)
 - [Security review](docs/security-review.md)
+- Celius Remote: [architecture](docs/remote/ARCHITECTURE.md) · [audit](docs/remote/AUDIT.md) ·
+  [install the agent](docs/remote/INSTALL.md) · [API and protocol](docs/remote/API.md) ·
+  [operations](docs/remote/OPERATIONS.md) · [troubleshooting](docs/remote/TROUBLESHOOTING.md) ·
+  [testing](docs/remote/TESTING.md) · [progress](docs/remote/PROGRESS.md) ·
+  [roadmap](docs/remote/ROADMAP.md)
 - [Acceptance tests](docs/acceptance-tests/), phases 2–10
 - Architecture decisions:
   - [0001: Separate app, inference and execution](docs/adr/0001-separate-app-inference-execution.md)
@@ -459,7 +480,7 @@ docs/                 Backlog, ADRs, deployment, operations, acceptance tests, s
   - [0009: Memory and recall](docs/adr/0009-memory-and-recall.md)
 - Assistant roadmap: [roadmap and status](docs/implementation/CELIUS_ROADMAP.md) ·
   [audit](docs/implementation/AUDIT.md) ·
-  [decisions C-01…C-12](docs/implementation/ARCHITECTURE_DECISIONS.md) ·
+  [decisions C-01…C-16](docs/implementation/ARCHITECTURE_DECISIONS.md) ·
   [implementation log](docs/implementation/IMPLEMENTATION_LOG.md)
 
 ## Not yet verified

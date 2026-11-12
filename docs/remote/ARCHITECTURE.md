@@ -1,7 +1,10 @@
 # Celius Remote — distributed agent execution
 
-Status: design accepted (ADR C-16), implemented incrementally. See [PROGRESS.md](PROGRESS.md)
-for what is done, tested and outstanding. The audit this builds on is [AUDIT.md](AUDIT.md).
+Status: accepted (ADR C-16) and implemented through Phase 6. See [PROGRESS.md](PROGRESS.md)
+for what is done and outstanding, [TESTING.md](TESTING.md) for how each part is tested.
+The audit this builds on is [AUDIT.md](AUDIT.md). Also: [INSTALL.md](INSTALL.md),
+[API.md](API.md), [OPERATIONS.md](OPERATIONS.md), [TROUBLESHOOTING.md](TROUBLESHOOTING.md),
+[ROADMAP.md](ROADMAP.md).
 
 ## 1. Shape of the system
 
@@ -138,7 +141,11 @@ Frames are JSON objects with a `type`. `PROTOCOL_VERSION = 1`.
 - `welcome` tells the agent Central's `last_seq` per session, so a reinstalled agent
   continues numbering after it.
 
-Canonical event types: `session.opened`, `session.failed`, `session.closed`,
+Frames stay below uvicorn's 16 MB WebSocket limit: agents send at most ~2 MB per events
+frame and trim any single event above 8 MB when writing it to the outbox, so no event can
+block the stream.
+
+Canonical event types: `session.opened`, `session.failed`, `session.closed`, `session.started` (external agent's own session id),
 `command.started`, `command.completed` (`{command_id, status, result}`), `terminal.output`
 (`{command_id, stream, text}`), `file.changed` (`{path, action, size, sha256, diff?}`),
 `turn.started`, `assistant.text`, `assistant.reasoning`, `tool.started`, `tool.completed`,
@@ -210,7 +217,7 @@ Agent-facing (credential or access token, never user sessions):
 
 | Requirement | Implementation |
 |---|---|
-| Encrypted transport | Agents refuse non-`https`/`wss` servers unless `--insecure-dev` (localhost testing). |
+| Encrypted transport | Agents refuse non-`https`/`wss` servers (except `localhost`) unless registered with `--allow-insecure-http`; `--ca-file` for a private CA. |
 | Per-device identity, rotation, revocation, short-lived tokens | §4.1. Credentials hashed (SHA-256 of 256-bit random); tokens HMAC-signed, 15 min. |
 | Explicit authorisation | New machines are `pending` until a user authorises them. |
 | Secure credential storage | Windows: DPAPI (CurrentUser) via ctypes; Linux: file 0600 in a 0700 directory. |

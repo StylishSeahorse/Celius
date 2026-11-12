@@ -2,6 +2,26 @@
 
 Newest first. Each entry: what changed, how it was verified, what is left.
 
+## 2026-11-12: Celius Remote (ADR C-16)
+
+Run conversations on registered Windows and Linux machines, from any client.
+Details: [docs/remote/](../remote/), status in [PROGRESS.md](../remote/PROGRESS.md).
+
+- Central: migration 0016 (`remote_agents`, credentials, enrollments, sessions, commands,
+  session events; `runs.execution`, `runs.remote_session_id`); pairing codes, explicit
+  authorisation, hashed credentials with rotation, HMAC access tokens, revocation; the
+  agent WebSocket hub; durable commands and events on PostgreSQL; native remote tools in
+  the existing worker; Claude Code sessions projected into conversations, with their
+  permission prompts as ordinary approvals; retention; audit.
+- `services/remote-agent`: the agent (outbox, command journal, path confinement, process
+  trees, monitoring, Claude Code via the Agent SDK), installers for Windows and Linux, a
+  PyInstaller build.
+- Web app: Remote machines, the target selector, the session bar and monitor.
+- Tests: API (SQLite and PostgreSQL), end to end with the real server, worker and agent,
+  agent tests on Linux and Windows in CI, a Playwright walkthrough of the UI.
+- Found on the way: CI's API job has failed on `main` since `d6a1f63`
+  (`devtools/data/memory_eval.json` is ignored by `.gitignore` and was never committed).
+
 ## 2026-11-09: loop guard for replies stuck repeating themselves
 
 **Problem reported.** A local thinking model kept writing the same lines ("Okay. Let's
