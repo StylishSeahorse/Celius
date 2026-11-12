@@ -17,6 +17,7 @@ from app.api.v1 import (
     models,
     projects,
     push,
+    remote,
     runs,
     skills,
     sync,
@@ -43,4 +44,5 @@ router.include_router(assistant.router)
 router.include_router(integrations.router)
 router.include_router(insights.router)
 router.include_router(push.router)
+router.include_router(remote.router)
 router.include_router(admin.router)

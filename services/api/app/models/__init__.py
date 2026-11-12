@@ -72,6 +72,14 @@ from app.models.memory import (
     MemoryStatus,
 )
 from app.models.push import PushSubscription
+from app.models.remote import (
+    RemoteAgent,
+    RemoteAgentCredential,
+    RemoteCommand,
+    RemoteEnrollment,
+    RemoteSession,
+    RemoteSessionEvent,
+)
 from app.models.skills import Skill, SkillEvent, SkillVersion
 from app.models.tools import (
     FINAL_TOOL_CALL_STATUSES,
@@ -113,6 +121,12 @@ __all__ = [
     "MemoryRelation",
     "MemoryStatus",
     "PushSubscription",
+    "RemoteAgent",
+    "RemoteAgentCredential",
+    "RemoteCommand",
+    "RemoteEnrollment",
+    "RemoteSession",
+    "RemoteSessionEvent",
     "Skill",
     "SkillEvent",
     "SkillVersion",

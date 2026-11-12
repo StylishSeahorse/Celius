@@ -69,6 +69,15 @@ class Run(UUIDPrimaryKey, Timestamps, Base):
     usage: Mapped[dict | None] = mapped_column(JSONType)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Where the run executes (ADR C-16). local: the worker with the sandbox; remote: the
+    # worker, with tools running on a registered machine; external: an external agent on
+    # that machine drives it (the worker never claims these).
+    execution: Mapped[str] = mapped_column(
+        String(16), default="local", server_default="local", nullable=False
+    )
+    remote_session_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("remote_sessions.id", ondelete="SET NULL"), index=True
+    )
 
 
 class RunEvent(Base):

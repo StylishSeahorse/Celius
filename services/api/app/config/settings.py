@@ -262,6 +262,25 @@ class Settings(BaseSettings):
     # Bearer token for GET /api/v1/metrics (Prometheus). Unset: the endpoint is off.
     metrics_token: SecretStr | None = None
 
+    # Celius Remote (ADR C-16, docs/remote/). Machines connect out to this server over a
+    # WebSocket; nothing is reachable on them. Off: the remote endpoints answer 404.
+    remote_agents_enabled: bool = True
+    remote_enrollment_ttl_minutes: int = Field(default=15, ge=1, le=1440)
+    # Short-lived access tokens agents exchange their credential for.
+    remote_token_ttl_seconds: int = Field(default=900, ge=60, le=86400)
+    # After a credential rotation, the old credential works this long (or until the new
+    # one is first used).
+    remote_credential_grace_minutes: int = Field(default=60, ge=0)
+    remote_heartbeat_seconds: int = Field(default=15, ge=2, le=300)
+    remote_poll_interval_seconds: float = Field(default=0.25, gt=0)
+    # A tool call waits this long for an offline machine to come back before failing.
+    remote_offline_wait_seconds: int = Field(default=60, ge=0)
+    remote_max_events_per_batch: int = Field(default=500, ge=1, le=5000)
+    remote_max_frame_bytes: int = Field(default=4 * 1024 * 1024, ge=64 * 1024)
+    # Terminal output kept for finished sessions; other session events stay with the chat.
+    remote_output_retention_days: int = Field(default=30, ge=1)
+    remote_file_fetch_max_bytes: int = Field(default=20 * 1024 * 1024, ge=1024)
+
     @model_validator(mode="after")
     def _check_production_secrets(self) -> "Settings":
         if self.app_env == "production":
