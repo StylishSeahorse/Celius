@@ -28,6 +28,8 @@ BACKOFF_START = 1.0
 BACKOFF_MAX = 60.0
 STABLE_SECONDS = 60
 SEND_BATCH = 200
+# Bytes per events frame (one event may exceed it alone; state.py caps single events).
+SEND_BATCH_BYTES = 2 * 1024 * 1024
 MAX_IN_FLIGHT = 2000
 TOKEN_MARGIN_SECONDS = 60
 
@@ -241,7 +243,16 @@ class Connection:
             upto = max(self.sent_upto.get(session.id, session.acked), session.acked)
             if upto - session.acked >= MAX_IN_FLIGHT:
                 continue  # wait for acks before sending more
-            batch = [e for e in session.pending if e["seq"] > upto][:SEND_BATCH]
+            batch: list[dict] = []
+            size = 0
+            for event in session.pending:
+                if event["seq"] <= upto:
+                    continue
+                event_size = len(json.dumps(event, separators=(",", ":")))
+                if batch and (len(batch) >= SEND_BATCH or size + event_size > SEND_BATCH_BYTES):
+                    break
+                batch.append(event)
+                size += event_size
             if not batch:
                 continue
             await ws.send(json.dumps({"type": "events", "session_id": session.id, "events": batch}))

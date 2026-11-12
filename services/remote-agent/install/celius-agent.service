@@ -1,0 +1,32 @@
+# Celius Remote Agent (installed by install-linux.sh; placeholders are filled in there).
+[Unit]
+Description=Celius Remote Agent
+Documentation=https://github.com/StylishSeahorse/Celius/tree/main/docs/remote
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+Environment=CELIUS_AGENT_HOME=@HOME@
+Environment=PYTHONUNBUFFERED=1
+ExecStart=@PREFIX@/bin/celius-agent run
+# Reconnecting is the agent's job; this only covers crashes.
+Restart=always
+RestartSec=5
+# Running commands are stopped with the agent (they would be reported as interrupted).
+KillMode=control-group
+TimeoutStopSec=30
+
+# Hardening that leaves the user's own folders (the policy's roots) usable.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

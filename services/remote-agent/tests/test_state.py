@@ -54,3 +54,24 @@ def test_journal_reports_unfinished_commands(tmp_path):
     store.journal_put("c-2", {"id": "c-2", "kind": "tool.execute", "state": "done"})
     assert [e["id"] for e in StateStore(tmp_path).journal_unfinished()] == ["c-1"]
     assert store.journal_get("c-2")["state"] == "done"
+
+
+def test_oversized_events_are_trimmed_to_fit_a_frame(tmp_path):
+    import json
+
+    from celius_agent.state import MAX_EVENT_BYTES
+
+    store = StateStore(tmp_path)
+    session = SessionState(id="s1")
+    store.save_session(session)
+    huge = "x" * (MAX_EVENT_BYTES + 10)
+    event = store.append(
+        session,
+        "command.completed",
+        {"command_id": "c1", "result": {"content": huge, "data": {"content_b64": huge}}},
+    )
+    assert len(json.dumps(event)) < MAX_EVENT_BYTES
+    assert event["data"]["command_id"] == "c1"
+    assert event["data"]["result"]["data"]["content_b64"].startswith("[removed")
+    reloaded = StateStore(tmp_path).load_sessions()["s1"]
+    assert reloaded.pending[0]["data"]["command_id"] == "c1"

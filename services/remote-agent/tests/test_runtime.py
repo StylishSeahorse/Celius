@@ -194,3 +194,35 @@ def test_state_files_are_private(tmp_path, workdir):
     runtime.store.journal_put("c1", {"id": "c1", "state": "started"})
     mode = (tmp_path / "state" / "commands" / "c1.json").stat().st_mode
     assert mode & 0o077 == 0
+
+
+async def test_frames_stay_small(tmp_path, workdir):
+    """Many large events are sent in several frames, never one huge one."""
+    import json
+
+    from celius_agent.connection import SEND_BATCH_BYTES, Connection
+
+    runtime = make_runtime(tmp_path, workdir)
+    await open_session(runtime, workdir)
+    session = runtime.sessions["s1"]
+    for _ in range(40):
+        runtime.store.append(session, "terminal.output", {"text": "y" * 200_000})
+
+    class Socket:
+        def __init__(self):
+            self.frames = []
+
+        async def send(self, text):
+            self.frames.append(text)
+
+    sock = Socket()
+    connection = Connection.__new__(Connection)
+    connection.runtime = runtime
+    connection.sent_upto = {"s1": 0}
+    while await connection._flush(sock):
+        pass
+    sizes = [len(f) for f in sock.frames]
+    assert len(sock.frames) > 1
+    assert max(sizes) <= SEND_BATCH_BYTES + 300_000
+    sent = [e["seq"] for f in sock.frames for e in json.loads(f)["events"]]
+    assert sent == list(range(1, len(session.pending) + 1))

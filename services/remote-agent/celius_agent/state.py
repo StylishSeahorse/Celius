@@ -22,6 +22,10 @@ from pathlib import Path
 
 IS_WINDOWS = sys.platform == "win32"
 COMPACT_AFTER = 200  # acked lines in an outbox file before it is rewritten
+# One event must always fit in one WebSocket frame (Celius accepts 16 MB): bigger ones are
+# trimmed when they are written, never left to block the outbox.
+MAX_EVENT_BYTES = 8 * 1024 * 1024
+TRIMMED_TEXT_CHARS = 200_000
 JOURNAL_TTL_SECONDS = 7 * 24 * 3600
 # Events worth an fsync: losing one would leave Celius waiting.
 DURABLE_TYPES = frozenset(
@@ -119,10 +123,14 @@ class StateStore:
         }
         if run_id:
             event["run_id"] = run_id
+        line = json.dumps(event, separators=(",", ":"))
+        if len(line.encode()) > MAX_EVENT_BYTES:
+            event["data"] = _trim(data)
+            line = json.dumps(event, separators=(",", ":"))
         session.next_seq += 1
         path = self.outbox_dir / f"{session.id}.jsonl"
         with path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(event, separators=(",", ":")) + "\n")
+            handle.write(line + "\n")
             handle.flush()
             if type_ in DURABLE_TYPES:
                 os.fsync(handle.fileno())
@@ -189,6 +197,20 @@ class StateStore:
             if entry.get("state") == "started":
                 unfinished.append(entry)
         return unfinished
+
+
+def _trim(value, depth: int = 0):
+    """Shorten long strings (and drop embedded file contents) until the event fits."""
+    if isinstance(value, dict):
+        return {
+            k: ("[removed: too large to send]" if k == "content_b64" else _trim(v, depth + 1))
+            for k, v in value.items()
+        }
+    if isinstance(value, list):
+        return [_trim(v, depth + 1) for v in value[:1000]]
+    if isinstance(value, str) and len(value) > TRIMMED_TEXT_CHARS:
+        return value[:TRIMMED_TEXT_CHARS] + f"\n[…{len(value) - TRIMMED_TEXT_CHARS} characters cut]"
+    return value
 
 
 def _safe_id(command_id: str) -> str:

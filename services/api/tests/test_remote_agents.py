@@ -456,3 +456,47 @@ async def test_remote_can_be_turned_off(http, headers, remote_settings):
     response = await http.get("/api/v1/remote/agents", headers=headers)
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "remote_disabled"
+
+
+async def test_retention_prunes_old_output_commands_and_codes(
+    app, http, headers, sessionmaker, remote_settings
+):
+    from datetime import timedelta
+
+    from app.models import RemoteSession
+    from app.services.remote import maintenance
+
+    machine = await register_machine(http, headers)
+    session = await _open_session(http, headers, machine)
+    async with ws(app, machine["token"]) as sock:
+        await sock.send_json(hello())
+        await sock.receive_json()
+        await sock.receive_until("command")
+        await sock.send_json(
+            {
+                "type": "events",
+                "session_id": session["id"],
+                "events": [
+                    {"seq": 1, "type": "session.opened", "data": {}},
+                    {"seq": 2, "type": "terminal.output", "data": {"text": "old"}},
+                    {"seq": 3, "type": "file.changed", "data": {"path": "a"}},
+                ],
+            }
+        )
+        await sock.receive_until("ack")
+    old = utcnow() - timedelta(days=remote_settings.remote_output_retention_days + 1)
+    async with sessionmaker() as db:
+        for event in (await db.scalars(select(RemoteSessionEvent))).all():
+            event.created_at = old
+        for command in (await db.scalars(select(RemoteCommand))).all():
+            command.status = "completed"
+            command.updated_at = utcnow() - timedelta(days=31)
+        for code in (await db.scalars(select(RemoteEnrollment))).all():
+            code.expires_at = utcnow() - timedelta(days=2)
+        await db.commit()
+    removed = await maintenance.prune(sessionmaker, remote_settings)
+    assert removed == {"terminal_output": 1, "commands": 1, "pairing_codes": 1}
+    async with sessionmaker() as db:
+        kept = [e.type for e in (await db.scalars(select(RemoteSessionEvent))).all()]
+        assert sorted(kept) == ["file.changed", "session.opened"]
+        assert await db.get(RemoteSession, uuid.UUID(session["id"])) is not None

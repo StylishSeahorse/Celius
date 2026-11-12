@@ -20,6 +20,7 @@ from celius_agent.tools import TOOLS, ToolEnv, error, fetch_file, find_python, s
 log = logging.getLogger("celius_agent.runtime")
 
 MAX_TOOL_TIMEOUT = 24 * 3600
+MAX_RESULT_CHARS = 200_000
 
 
 class Runtime:
@@ -387,6 +388,10 @@ class Runtime:
                         outcome = await handler(env, arguments)
                     finally:
                         self.running.pop(command_id, None)
+        content = outcome.get("content")
+        if isinstance(content, str) and len(content) > MAX_RESULT_CHARS:
+            # Celius gives the model far less than this; the rest only costs bandwidth.
+            outcome = {**outcome, "content": content[:MAX_RESULT_CHARS] + "\n[…output cut]"}
         await emit(
             "command.completed",
             {"command_id": command_id, "status": "completed", "result": outcome},

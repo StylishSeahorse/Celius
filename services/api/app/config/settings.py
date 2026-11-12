@@ -276,10 +276,12 @@ class Settings(BaseSettings):
     # A tool call waits this long for an offline machine to come back before failing.
     remote_offline_wait_seconds: int = Field(default=60, ge=0)
     remote_max_events_per_batch: int = Field(default=500, ge=1, le=5000)
-    remote_max_frame_bytes: int = Field(default=4 * 1024 * 1024, ge=64 * 1024)
+    # Uvicorn's own WebSocket message limit is 16 MB; agents keep frames well below it.
+    remote_max_frame_bytes: int = Field(default=16 * 1024 * 1024, ge=64 * 1024)
     # Terminal output kept for finished sessions; other session events stay with the chat.
     remote_output_retention_days: int = Field(default=30, ge=1)
-    remote_file_fetch_max_bytes: int = Field(default=20 * 1024 * 1024, ge=1024)
+    # Downloads travel base64-encoded in one frame: 8 MB of file is about 11 MB.
+    remote_file_fetch_max_bytes: int = Field(default=8 * 1024 * 1024, ge=1024, le=10 * 1024 * 1024)
 
     @model_validator(mode="after")
     def _check_production_secrets(self) -> "Settings":

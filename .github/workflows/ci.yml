@@ -68,6 +68,59 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run pytest -q
 
+  # Celius Remote Agent (services/remote-agent): Linux and Windows, Python 3.10 and 3.12.
+  remote-agent:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.10", "3.12"]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: services/remote-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest -q
+      - name: The Windows installer parses
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile("$PWD/install/install-windows.ps1", [ref]$null, [ref]$errors) | Out-Null
+          if ($errors) { $errors; exit 1 }
+      - name: Linux installer lints
+        if: runner.os == 'Linux'
+        run: shellcheck install/install-linux.sh
+
+  # A portable celius-agent.exe for Windows machines without Python.
+  remote-agent-exe:
+    runs-on: windows-latest
+    needs: [remote-agent]
+    defaults:
+      run:
+        working-directory: services/remote-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv sync --frozen
+      - name: Build
+        run: uv run --with pyinstaller pyinstaller --onefile --name celius-agent --collect-submodules celius_agent install/entry.py
+      - name: Smoke test
+        run: ./dist/celius-agent.exe --version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: celius-agent-windows
+          path: services/remote-agent/dist/celius-agent.exe
+
   web:
     runs-on: ubuntu-latest
     steps:

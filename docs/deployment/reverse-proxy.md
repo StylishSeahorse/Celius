@@ -23,6 +23,11 @@ Remove `BOOTSTRAP_PASSWORD` from `.env` once the first login works.
   that upload in one request need `MAX_UPLOAD_BYTES`), and stream uploads
   (`PUT /api/v1/files/uploads/*/content`) rather than buffering them in the proxy.
 - Do not expose the llama.cpp server through the proxy.
+- **Celius Remote** (docs/remote/): pass WebSocket upgrades on
+  `/api/v1/remote/agent/connect` (agents keep one connection open for hours; allow idle
+  reads of at least 120 s, the agents ping every 20 s), and disable buffering on
+  `/api/v1/remote/sessions/*/stream` (SSE) like the run events. No new port is needed:
+  machines connect out to the same HTTPS address as the clients.
 
 ### Caddy
 
@@ -36,6 +41,8 @@ ai.example.com {
 }
 ```
 
+Caddy passes WebSocket upgrades (Celius Remote agents) without extra configuration.
+
 ### nginx
 
 ```nginx
@@ -44,6 +51,24 @@ location /api/v1/runs/ {
     proxy_http_version 1.1;
     proxy_buffering off;
     proxy_cache off;
+    proxy_read_timeout 310s;
+    proxy_set_header Connection "";
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+location /api/v1/remote/agent/connect {
+    proxy_pass http://127.0.0.1:8000;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_read_timeout 3600s;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+location ~ ^/api/v1/remote/sessions/[^/]+/stream$ {
+    proxy_pass http://127.0.0.1:8000;
+    proxy_http_version 1.1;
+    proxy_buffering off;
     proxy_read_timeout 310s;
     proxy_set_header Connection "";
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
