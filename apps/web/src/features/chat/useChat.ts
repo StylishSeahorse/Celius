@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { ApiError, api, isNetworkError } from "../../lib/api";
+import { ApiError, api, isNetworkError, type RemoteTarget } from "../../lib/api";
 import { notifyInBackground } from "../../lib/desktop";
 import { newId } from "../../lib/ids";
 import { followRun } from "../../lib/sse";
@@ -40,6 +40,8 @@ interface Options {
     reasoning: boolean | null;
     toolProfile: string | null;
     memoryEnabled: boolean;
+    /** Celius Remote: run the new chat on this machine instead of the sandbox. */
+    remote?: RemoteTarget | null;
   };
   onConversationCreated: (id: string) => void;
   onChanged: () => void;
@@ -258,6 +260,7 @@ export function useChat({ conversationId, draft, onConversationCreated, onChange
           reasoning: draft.reasoning,
           tool_profile: draft.toolProfile,
           memory_enabled: draft.memoryEnabled,
+          ...(draft.remote ? { remote: draft.remote } : {}),
         };
         setDetailState(placeholder(id, draft, content.slice(0, 80) || attachments[0]?.filename || "New chat"));
         onConversationCreated(id);

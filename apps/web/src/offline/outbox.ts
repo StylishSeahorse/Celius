@@ -106,7 +106,17 @@ export class Outbox {
       }
       try {
         if (item.create_conversation) {
-          await this.client.createConversation({ id: item.conversation_id, ...item.create_conversation });
+          const { remote, ...fields } = item.create_conversation;
+          await this.client.createConversation({ id: item.conversation_id, ...fields });
+          if (remote) {
+            // Before the first message, so it runs on the machine (docs/remote/).
+            await this.client
+              .createRemoteSession({ ...remote, conversation_id: item.conversation_id })
+              .catch((error) => {
+                // A retry after the session was opened: it's there already.
+                if (!(error instanceof ApiError && error.code === "session_exists")) throw error;
+              });
+          }
           delete item.create_conversation;
           await cache.putOutbox(item);
         }

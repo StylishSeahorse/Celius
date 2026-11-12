@@ -43,6 +43,11 @@ import type {
   Run,
   SubmitResponse,
   SyncChanges,
+  RemoteAgent,
+  RemoteAgentConfig,
+  RemoteSession,
+  RemoteEventPage,
+  Enrollment,
 } from "./types";
 
 /** GET /insights: rates are null when there is nothing to divide by. */
@@ -135,6 +140,13 @@ export interface MessageBody {
   attachment_ids?: string[];
 }
 
+/** Where a new chat runs (Celius Remote, docs/remote/). */
+export interface RemoteTarget {
+  agent_id: string;
+  adapter: "celius" | "claude_code";
+  working_directory: string;
+}
+
 export const api = {
   login: (username: string, password: string) =>
     request<Me>("/auth/login", json("POST", { username, password })),
@@ -205,6 +217,30 @@ export const api = {
   selectMessage: (id: string) =>
     request<ConversationDetail>(`/messages/${id}/select`, json("POST")),
   cancelRun: (id: string) => request<Run>(`/runs/${id}/cancel`, json("POST")),
+
+  // Celius Remote: machines and sessions.
+  remoteAgents: () => request<{ items: RemoteAgent[] }>("/remote/agents"),
+  remoteAgent: (id: string) => request<RemoteAgent>(`/remote/agents/${id}`),
+  createEnrollment: (name?: string) =>
+    request<Enrollment>("/remote/enrollments", json("POST", { name: name || null })),
+  updateRemoteAgent: (id: string, body: { name?: string; config?: RemoteAgentConfig }) =>
+    request<RemoteAgent>(`/remote/agents/${id}`, json("PATCH", body)),
+  authorizeRemoteAgent: (id: string) => request<RemoteAgent>(`/remote/agents/${id}/authorize`, json("POST")),
+  revokeRemoteAgent: (id: string) => request<RemoteAgent>(`/remote/agents/${id}/revoke`, json("POST")),
+  disconnectRemoteAgent: (id: string) => request<void>(`/remote/agents/${id}/disconnect`, json("POST")),
+  deleteRemoteAgent: (id: string) => request<void>(`/remote/agents/${id}`, json("DELETE")),
+  remoteAgentSessions: (id: string) => request<{ items: RemoteSession[] }>(`/remote/agents/${id}/sessions`),
+  createRemoteSession: (body: RemoteTarget & { conversation_id?: string; title?: string | null }) =>
+    request<RemoteSession>("/remote/sessions", json("POST", body)),
+  remoteSession: (id: string) => request<RemoteSession>(`/remote/sessions/${id}`),
+  remoteSessionEvents: (id: string, after = 0, types?: string[]) =>
+    request<RemoteEventPage>(
+      `/remote/sessions/${id}/events?after=${after}&limit=1000${types ? `&types=${types.join(",")}` : ""}`,
+    ),
+  interruptRemoteSession: (id: string) => request<RemoteSession>(`/remote/sessions/${id}/interrupt`, json("POST")),
+  terminateRemoteSession: (id: string) => request<RemoteSession>(`/remote/sessions/${id}/terminate`, json("POST")),
+  remoteFileUrl: (id: string, path: string) =>
+    `/api/v1/remote/sessions/${id}/file?path=${encodeURIComponent(path)}`,
 
   listProjects: () => request<Project[]>("/projects"),
   createProject: (body: { id?: string; name: string; instructions?: string | null }) =>

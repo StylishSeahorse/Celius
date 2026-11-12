@@ -122,4 +122,34 @@ describe("Outbox", () => {
     await box.flush();
     expect(delivered.map((d) => d.client_message_id)).toEqual(["elsewhere", "after-bad"]);
   });
+
+  it("opens the remote session between creating the chat and sending (Celius Remote)", async () => {
+    const order: string[] = [];
+    const { client } = fakeClient(() => "ok");
+    client.createConversation.mockImplementation(async () => (order.push("conversation"), {}) as never);
+    client.sendMessage.mockImplementation(async () => (order.push("message"), { run: { id: "r" } }) as never);
+    const remote = { agent_id: "m1", adapter: "celius" as const, working_directory: "/srv/app" };
+    let sessionCalls = 0;
+    const withSession = {
+      ...client,
+      createRemoteSession: vi.fn(async (body: { conversation_id: string }) => {
+        sessionCalls += 1;
+        order.push("session");
+        expect(body.conversation_id).toBe("new-chat");
+        // A retry after the first attempt opened it: the server says it exists.
+        if (sessionCalls > 1) throw new ApiError(409, "session_exists", "exists");
+        return {} as never;
+      }),
+    };
+    const box = new Outbox(withSession as never);
+    await box.enqueue(
+      item("first", "new-chat", {
+        create_conversation: { model_override: null, project_id: null, remote },
+      }),
+    );
+    await box.flush();
+    expect(order).toEqual(["conversation", "session", "message"]);
+    expect(withSession.createRemoteSession).toHaveBeenCalledWith({ ...remote, conversation_id: "new-chat" });
+    expect(box.size).toBe(0);
+  });
 });

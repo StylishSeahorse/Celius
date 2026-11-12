@@ -27,6 +27,8 @@ interface Props {
   onOpenMemory: () => void;
   skillsToReview: number;
   onOpenSkills: () => void;
+  remoteAttention: number;
+  onOpenRemote: () => void;
   todayCount: number;
   onOpenToday: () => void;
   onOpenAccount: () => void;
@@ -123,6 +125,15 @@ export function Sidebar(props: Props) {
                 c.id === selectedId ? "bg-canvas font-medium" : "hover:bg-canvas/60"
               }`}
             >
+              {c.remote && (
+                <span
+                  className="mr-1"
+                  title={`Runs on ${c.remote.agent_name ?? "a machine"}`}
+                  aria-label={`Runs on ${c.remote.agent_name ?? "a machine"}`}
+                >
+                  {c.remote.status === "awaiting_approval" ? "⏳" : c.remote.status === "running" ? "▶" : "🖥"}
+                </span>
+              )}
               {c.title || "Untitled"}
             </button>
             <button
@@ -172,6 +183,22 @@ export function Sidebar(props: Props) {
               aria-label={`${props.pendingApprovals} waiting for approval`}
             >
               {props.pendingApprovals}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={props.onOpenRemote}
+          disabled={!props.online}
+          className="flex w-full items-center gap-2 rounded-lg px-1 py-1 text-left hover:bg-canvas/60 disabled:opacity-40"
+        >
+          <span aria-hidden="true">🖥</span>
+          <span className="flex-1">Remote machines</span>
+          {props.remoteAttention > 0 && (
+            <span
+              className="rounded-full bg-amber-500 px-1.5 text-xs font-medium text-white"
+              aria-label={`${props.remoteAttention} machines need attention`}
+            >
+              {props.remoteAttention}
             </span>
           )}
         </button>

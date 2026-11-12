@@ -57,6 +57,14 @@ export type {
   SubmitResponse,
   SyncChange,
   SyncChanges,
+  RemoteAgent,
+  RemoteAgentConfig,
+  RemoteSession,
+  RemoteSessionSummary,
+  RemoteSessionBrief,
+  RemoteEvent,
+  RemoteEventPage,
+  Enrollment,
 } from "@celius/api-client";
 
 export type MessageRole = "system" | "user" | "assistant" | "tool";

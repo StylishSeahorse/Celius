@@ -70,6 +70,9 @@ export function ToolCallCard({
   onDecided?: () => void;
 }) {
   const pending = call.status === "pending_approval";
+  // Tools that ask every time (sending email, commands on a remote machine): a grant
+  // would never be used, so don't offer one (services/tools/policy.py).
+  const asksEveryTime = (call.decision_reason ?? "").startsWith("Asks every time");
   const [open, setOpen] = useState(pending);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -144,22 +147,26 @@ export function ToolCallCard({
                 >
                   Allow once
                 </button>
-                <button
-                  disabled={busy}
-                  onClick={() => void decide("tool")}
-                  className="rounded-md border border-line px-3 py-1 hover:bg-panel disabled:opacity-40"
-                  title="Don't ask again for this tool in this chat"
-                >
-                  Always allow {toolLabel(call.tool_name)}
-                </button>
-                <button
-                  disabled={busy}
-                  onClick={() => void decide("all")}
-                  className="rounded-md border border-line px-3 py-1 hover:bg-panel disabled:opacity-40"
-                  title="Run every tool in this chat without asking (what the permission profile forbids stays forbidden)"
-                >
-                  Allow all for this chat
-                </button>
+                {!asksEveryTime && (
+                  <>
+                    <button
+                      disabled={busy}
+                      onClick={() => void decide("tool")}
+                      className="rounded-md border border-line px-3 py-1 hover:bg-panel disabled:opacity-40"
+                      title="Don't ask again for this tool in this chat"
+                    >
+                      Always allow {toolLabel(call.tool_name)}
+                    </button>
+                    <button
+                      disabled={busy}
+                      onClick={() => void decide("all")}
+                      className="rounded-md border border-line px-3 py-1 hover:bg-panel disabled:opacity-40"
+                      title="Run every tool in this chat without asking (what the permission profile forbids stays forbidden)"
+                    >
+                      Allow all for this chat
+                    </button>
+                  </>
+                )}
                 <button
                   disabled={busy}
                   onClick={() => void decide("deny")}

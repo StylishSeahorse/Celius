@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { api, isNetworkError } from "../../lib/api";
+import { api, isNetworkError, type RemoteTarget } from "../../lib/api";
 import type { ConversationSummary, Me, ModelList, Project, StorageUsage, SyncChange } from "../../lib/types";
 import { cache } from "../../offline/db";
 import { outbox } from "../../offline/outbox";
@@ -11,6 +11,7 @@ import { type Shared, takeShared } from "../../lib/share";
 import { AccountPanel } from "../account/AccountPanel";
 import { DeleteConversationDialog } from "../memory/DeleteConversationDialog";
 import { MemoryPanel } from "../memory/MemoryPanel";
+import { RemoteMachinesPanel } from "../remote/RemoteMachinesPanel";
 import { SkillsPanel } from "../skills/SkillsPanel";
 import { TodayPanel } from "../today/TodayPanel";
 import { ToolsPanel } from "../tools/ToolsPanel";
@@ -46,6 +47,9 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const [draftReasoning, setDraftReasoning] = useState<boolean | null>(null);
   const [draftToolProfile, setDraftToolProfile] = useState<string | null>(null);
   const [draftMemory, setDraftMemory] = useState(true);
+  const [draftRemote, setDraftRemote] = useState<RemoteTarget | null>(null);
+  const [remoteOpen, setRemoteOpen] = useState(false);
+  const [remoteAttention, setRemoteAttention] = useState(0);
   const [memoryOpen, setMemoryOpen] = useState(false);
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [todayOpen, setTodayOpen] = useState(() => isTodayHash(window.location.hash));
@@ -114,6 +118,23 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
     const timer = setInterval(refreshMemory, 30_000);
     return () => clearInterval(timer);
   }, [refreshMemory]);
+
+  // Machines waiting to be authorised or needing attention (Celius Remote).
+  const refreshRemote = useCallback(() => {
+    api
+      .remoteAgents()
+      .then((page) =>
+        setRemoteAttention(
+          page.items.filter((a) => a.state === "awaiting_authorization" || a.state === "needs_attention").length,
+        ),
+      )
+      .catch(() => undefined);
+  }, []);
+  useEffect(() => {
+    refreshRemote();
+    const timer = setInterval(refreshRemote, 20_000);
+    return () => clearInterval(timer);
+  }, [refreshRemote]);
 
   const refreshApprovals = useCallback(() => {
     api.pendingApprovals().then((items) => setPendingApprovals(items.length)).catch(() => undefined);
@@ -191,8 +212,12 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
       reasoning: draftReasoning,
       toolProfile: draftToolProfile,
       memoryEnabled: draftMemory,
+      remote: draftRemote,
     },
-    onConversationCreated: (id) => select(id),
+    onConversationCreated: (id) => {
+      setDraftRemote(null); // the next new chat starts in the sandbox again
+      select(id);
+    },
     onChanged: () => {
       void refreshList();
       refreshApprovals();
@@ -320,6 +345,11 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
             setSkillsOpen(true);
             setSidebarOpen(false);
           }}
+          remoteAttention={remoteAttention}
+          onOpenRemote={() => {
+            setRemoteOpen(true);
+            setSidebarOpen(false);
+          }}
         />
       </aside>
       {sidebarOpen && (
@@ -338,6 +368,8 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
         onDraftToolProfile={setDraftToolProfile}
         draftMemory={draftMemory}
         onDraftMemory={setDraftMemory}
+        draftRemote={draftRemote}
+        onDraftRemote={setDraftRemote}
         onOpenSidebar={() => setSidebarOpen(true)}
         onStorageChanged={refreshStorage}
         extraAttach={extraAttach}
@@ -419,6 +451,22 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
           onClose={() => {
             setToolsOpen(false);
             refreshApprovals();
+          }}
+        />
+      )}
+      {remoteOpen && (
+        <RemoteMachinesPanel
+          onChanged={() => {
+            refreshRemote();
+            void refreshList();
+          }}
+          onOpenConversation={(id) => {
+            setRemoteOpen(false);
+            select(id);
+          }}
+          onClose={() => {
+            setRemoteOpen(false);
+            refreshRemote();
           }}
         />
       )}

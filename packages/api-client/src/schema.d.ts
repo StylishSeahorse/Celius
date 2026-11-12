@@ -1694,6 +1694,346 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/remote/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Agents */
+        get: operations["list_agents_api_v1_remote_agents_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remote/agents/{agent_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Agent */
+        get: operations["get_agent_api_v1_remote_agents__agent_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Agent
+         * @description Revoke and forget a machine. Its conversations stay.
+         */
+        delete: operations["delete_agent_api_v1_remote_agents__agent_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Agent */
+        patch: operations["update_agent_api_v1_remote_agents__agent_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/remote/agents/{agent_id}/authorize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Authorize Agent
+         * @description Explicit authorisation: a newly registered machine gets no work until this.
+         */
+        post: operations["authorize_agent_api_v1_remote_agents__agent_id__authorize_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remote/agents/{agent_id}/disconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Disconnect Agent
+         * @description Ask the agent to close its connection and reconnect (sessions keep running).
+         */
+        post: operations["disconnect_agent_api_v1_remote_agents__agent_id__disconnect_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remote/agents/{agent_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke Agent
+         * @description Revoke the machine's credentials; its connection closes and its sessions end.
+         */
+        post: operations["revoke_agent_api_v1_remote_agents__agent_id__revoke_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remote/agents/{agent_id}/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Agent Sessions
+         * @description Running sessions first, then the machine's history.
+         */
+        get: operations["agent_sessions_api_v1_remote_agents__agent_id__sessions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remote/credentials/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate
+         * @description A new credential for the calling machine; the old one keeps working for a grace
+         *     period, or until the new one is first used.
+         */
+        post: operations["rotate_api_v1_remote_credentials_rotate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remote/enroll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enroll
+         * @description Called by `celius-agent register` with a pairing code.
+         */
+        post: operations["enroll_api_v1_remote_enroll_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remote/enrollments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Enrollment
+         * @description A one-time pairing code (valid a few minutes) to register a machine.
+         */
+        post: operations["create_enrollment_api_v1_remote_enrollments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remote/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sessions */
+        get: operations["list_sessions_api_v1_remote_sessions_get"];
+        put?: never;
+        /**
+         * Create Session
+         * @description Run a conversation on a machine: an existing one, or a new one created here.
+         */
+        post: operations["create_session_api_v1_remote_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remote/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Session */
+        get: operations["get_session_api_v1_remote_sessions__session_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remote/sessions/{session_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Session Events
+         * @description Replay the session's events after `after` (a sequence number), in order.
+         */
+        get: operations["session_events_api_v1_remote_sessions__session_id__events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remote/sessions/{session_id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fetch File
+         * @description Download a file from the session's working directory (read by the agent, which
+         *     applies its own path checks). Waits up to 30 s for the machine.
+         */
+        get: operations["fetch_file_api_v1_remote_sessions__session_id__file_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remote/sessions/{session_id}/interrupt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Interrupt Session
+         * @description Stop what the session is doing now (the current reply); the session stays open.
+         */
+        post: operations["interrupt_session_api_v1_remote_sessions__session_id__interrupt_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remote/sessions/{session_id}/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Session Stream
+         * @description Server-Sent Events of the session (terminal output, files, activity). Resume with
+         *     `Last-Event-ID` (the sequence number) or `?after=`.
+         */
+        get: operations["session_stream_api_v1_remote_sessions__session_id__stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remote/sessions/{session_id}/terminate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Terminate Session
+         * @description End the session on the machine. The conversation and its history stay.
+         */
+        post: operations["terminate_session_api_v1_remote_sessions__session_id__terminate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remote/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Token
+         * @description Trade a machine credential for a short-lived access token.
+         */
+        post: operations["token_api_v1_remote_token_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/runs/{run_id}": {
         parameters: {
             query?: never;
@@ -2939,6 +3279,7 @@ export interface components {
             project_id: string | null;
             /** Reasoning */
             reasoning: boolean | null;
+            remote?: components["schemas"]["RemoteSessionSummary"] | null;
             /** Title */
             title: string | null;
             /** Tool Grants */
@@ -2996,6 +3337,7 @@ export interface components {
             project_id: string | null;
             /** Reasoning */
             reasoning: boolean | null;
+            remote?: components["schemas"]["RemoteSessionSummary"] | null;
             /** Title */
             title: string | null;
             /** Tool Profile */
@@ -3092,6 +3434,54 @@ export interface components {
             to: string;
             /** Unread */
             unread: boolean;
+        };
+        /** EnrollRequest */
+        EnrollRequest: {
+            /** Agent Version */
+            agent_version?: string | null;
+            /** Arch */
+            arch?: string | null;
+            /** Code */
+            code: string;
+            /** Hostname */
+            hostname?: string | null;
+            /** Os */
+            os?: ("windows" | "linux" | "macos") | null;
+            /** Os Version */
+            os_version?: string | null;
+            /** Protocol Version */
+            protocol_version?: number | null;
+        };
+        /** EnrollResponse */
+        EnrollResponse: {
+            /**
+             * Agent Id
+             * Format: uuid
+             */
+            agent_id: string;
+            /** Credential */
+            credential: string;
+            /** Name */
+            name: string;
+            /** Status */
+            status: string;
+        };
+        /** EnrollmentCreate */
+        EnrollmentCreate: {
+            /** Name */
+            name?: string | null;
+        };
+        /** EnrollmentOut */
+        EnrollmentOut: {
+            /** Code */
+            code: string;
+            /** Command */
+            command: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
         };
         /** EntityBrief */
         EntityBrief: {
@@ -4277,6 +4667,298 @@ export interface components {
             source: components["schemas"]["EntityBrief"];
             target: components["schemas"]["EntityBrief"];
         };
+        /** RemoteAgentConfig */
+        RemoteAgentConfig: {
+            /** Adapters */
+            adapters?: ("celius" | "claude_code")[];
+            /**
+             * Allow Shell
+             * @default true
+             */
+            allow_shell: boolean;
+            /**
+             * Allow Write
+             * @default true
+             */
+            allow_write: boolean;
+            /**
+             * Approval
+             * @default always
+             * @enum {string}
+             */
+            approval: "always" | "profile";
+            /**
+             * Max Sessions
+             * @default 4
+             */
+            max_sessions: number;
+            /**
+             * Network
+             * @default unrestricted
+             * @enum {string}
+             */
+            network: "unrestricted" | "restricted";
+        };
+        /** RemoteAgentList */
+        RemoteAgentList: {
+            /** Items */
+            items: components["schemas"]["RemoteAgentOut"][];
+        };
+        /** RemoteAgentOut */
+        RemoteAgentOut: {
+            /** Active Sessions */
+            active_sessions?: components["schemas"]["RemoteSessionBrief"][];
+            /** Agent Version */
+            agent_version: string | null;
+            /** Arch */
+            arch: string | null;
+            /** Authorized At */
+            authorized_at: string | null;
+            /** Capabilities */
+            capabilities: {
+                [key: string]: unknown;
+            };
+            /** Config */
+            config: {
+                [key: string]: unknown;
+            };
+            /** Connected At */
+            connected_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Disconnect Reason */
+            disconnect_reason: string | null;
+            /** Disconnected At */
+            disconnected_at: string | null;
+            /** Hostname */
+            hostname: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Seen At */
+            last_seen_at: string | null;
+            /** Local Policy */
+            local_policy: {
+                [key: string]: unknown;
+            };
+            /** Name */
+            name: string;
+            /** Online */
+            online: boolean;
+            /** Os */
+            os: string | null;
+            /** Os Version */
+            os_version: string | null;
+            /** Permissions */
+            permissions: {
+                [key: string]: unknown;
+            };
+            /** Resources */
+            resources: {
+                [key: string]: unknown;
+            } | null;
+            /** Revoked At */
+            revoked_at: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "awaiting_authorization" | "revoked" | "needs_attention" | "busy" | "idle" | "disconnected" | "offline";
+            /** Status */
+            status: string;
+        };
+        /** RemoteAgentUpdate */
+        RemoteAgentUpdate: {
+            config?: components["schemas"]["RemoteAgentConfig"] | null;
+            /** Name */
+            name?: string | null;
+        };
+        /** RemoteEventOut */
+        RemoteEventOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Data */
+            data: {
+                [key: string]: unknown;
+            };
+            /** Occurred At */
+            occurred_at: string | null;
+            /** Run Id */
+            run_id: string | null;
+            /** Seq */
+            seq: number;
+            /** Type */
+            type: string;
+        };
+        /** RemoteEventPage */
+        RemoteEventPage: {
+            /** Items */
+            items: components["schemas"]["RemoteEventOut"][];
+            /** Last Seq */
+            last_seq: number;
+            /** More */
+            more: boolean;
+        };
+        /** RemoteSessionBrief */
+        RemoteSessionBrief: {
+            /** Adapter */
+            adapter: string;
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Conversation Title */
+            conversation_title?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Ended At */
+            ended_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Mode */
+            mode: string;
+            /** Status */
+            status: string;
+            /** Status Detail */
+            status_detail: string | null;
+            /** Working Directory */
+            working_directory: string;
+        };
+        /** RemoteSessionCreate */
+        RemoteSessionCreate: {
+            /**
+             * Adapter
+             * @default celius
+             * @enum {string}
+             */
+            adapter: "celius" | "claude_code";
+            /**
+             * Agent Id
+             * Format: uuid
+             */
+            agent_id: string;
+            /** Conversation Id */
+            conversation_id?: string | null;
+            permissions?: components["schemas"]["SessionPermissions"];
+            /** Project Id */
+            project_id?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Working Directory */
+            working_directory: string;
+        };
+        /** RemoteSessionList */
+        RemoteSessionList: {
+            /** Items */
+            items: components["schemas"]["RemoteSessionOut"][];
+        };
+        /** RemoteSessionOut */
+        RemoteSessionOut: {
+            /** Adapter */
+            adapter: string;
+            /** Agent Id */
+            agent_id: string | null;
+            /** Agent Name */
+            agent_name: string | null;
+            /** Agent Online */
+            agent_online: boolean;
+            /** Agent Os */
+            agent_os: string | null;
+            /** Agent State */
+            agent_state: ("awaiting_authorization" | "revoked" | "needs_attention" | "busy" | "idle" | "disconnected" | "offline") | null;
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Conversation Title */
+            conversation_title?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current Run Id */
+            current_run_id: string | null;
+            /** Effective Permissions */
+            effective_permissions: {
+                [key: string]: unknown;
+            };
+            /** Ended At */
+            ended_at: string | null;
+            /** External Session Id */
+            external_session_id: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Seq */
+            last_seq: number;
+            /** Mode */
+            mode: string;
+            /** Opened At */
+            opened_at: string | null;
+            /** Permissions */
+            permissions: {
+                [key: string]: unknown;
+            };
+            /** Status */
+            status: string;
+            /** Status Detail */
+            status_detail: string | null;
+            /** Working Directory */
+            working_directory: string;
+        };
+        /**
+         * RemoteSessionSummary
+         * @description Shown with a conversation: where it runs.
+         */
+        RemoteSessionSummary: {
+            /** Adapter */
+            adapter: string;
+            /** Agent Id */
+            agent_id: string | null;
+            /** Agent Name */
+            agent_name: string | null;
+            /** Agent Online */
+            agent_online: boolean;
+            /** Agent Os */
+            agent_os: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Mode */
+            mode: string;
+            /** Status */
+            status: string;
+            /** Status Detail */
+            status_detail: string | null;
+            /** Working Directory */
+            working_directory: string;
+        };
+        /** RotateResponse */
+        RotateResponse: {
+            /** Credential */
+            credential: string;
+        };
         /** RunOut */
         RunOut: {
             /**
@@ -4436,6 +5118,17 @@ export interface components {
             tool_profile?: string | null;
             /** Weekdays */
             weekdays?: number[] | null;
+        };
+        /** SessionPermissions */
+        SessionPermissions: {
+            /** Allow Shell */
+            allow_shell?: boolean | null;
+            /** Allow Write */
+            allow_write?: boolean | null;
+            /** Approval */
+            approval?: ("always" | "profile") | null;
+            /** Time Limit Seconds */
+            time_limit_seconds?: number | null;
         };
         /** SkillDetail */
         SkillDetail: {
@@ -4726,6 +5419,28 @@ export interface components {
         SyncCursor: {
             /** Cursor */
             cursor: number;
+        };
+        /** TokenRequest */
+        TokenRequest: {
+            /** Credential */
+            credential: string;
+        };
+        /** TokenResponse */
+        TokenResponse: {
+            /** Access Token */
+            access_token: string;
+            /**
+             * Agent Id
+             * Format: uuid
+             */
+            agent_id: string;
+            /** Expires At */
+            expires_at: number;
+            /**
+             * Websocket Path
+             * @default /api/v1/remote/agent/connect
+             */
+            websocket_path: string;
         };
         /** ToolCallOut */
         ToolCallOut: {
@@ -8643,6 +9358,629 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    list_agents_api_v1_remote_agents_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoteAgentList"];
+                };
+            };
+        };
+    };
+    get_agent_api_v1_remote_agents__agent_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoteAgentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_agent_api_v1_remote_agents__agent_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_agent_api_v1_remote_agents__agent_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RemoteAgentUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoteAgentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    authorize_agent_api_v1_remote_agents__agent_id__authorize_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoteAgentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    disconnect_agent_api_v1_remote_agents__agent_id__disconnect_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_agent_api_v1_remote_agents__agent_id__revoke_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoteAgentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    agent_sessions_api_v1_remote_agents__agent_id__sessions_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoteSessionList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rotate_api_v1_remote_credentials_rotate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RotateResponse"];
+                };
+            };
+        };
+    };
+    enroll_api_v1_remote_enroll_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnrollRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrollResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_enrollment_api_v1_remote_enrollments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnrollmentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrollmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sessions_api_v1_remote_sessions_get: {
+        parameters: {
+            query?: {
+                conversation_id?: string | null;
+                agent_id?: string | null;
+                active?: boolean | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoteSessionList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_session_api_v1_remote_sessions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RemoteSessionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoteSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_session_api_v1_remote_sessions__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoteSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    session_events_api_v1_remote_sessions__session_id__events_get: {
+        parameters: {
+            query?: {
+                after?: number;
+                limit?: number;
+                types?: string | null;
+            };
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoteEventPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fetch_file_api_v1_remote_sessions__session_id__file_get: {
+        parameters: {
+            query: {
+                path: string;
+            };
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interrupt_session_api_v1_remote_sessions__session_id__interrupt_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoteSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    session_stream_api_v1_remote_sessions__session_id__stream_get: {
+        parameters: {
+            query?: {
+                after?: number | null;
+            };
+            header?: {
+                "last-event-id"?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    terminate_session_api_v1_remote_sessions__session_id__terminate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoteSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    token_api_v1_remote_token_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

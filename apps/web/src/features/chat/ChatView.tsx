@@ -3,6 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../../lib/api";
 import type { ModelList, StoredFile } from "../../lib/types";
 import { outbox } from "../../offline/outbox";
+import type { RemoteTarget } from "../../lib/api";
+import { RemoteSessionBar } from "../remote/RemoteSessionBar";
+import { TargetPicker } from "../remote/TargetPicker";
 import { ToolProfilePicker } from "../tools/ToolProfilePicker";
 import { Composer } from "./Composer";
 import { runExport } from "./exporting";
@@ -24,6 +27,8 @@ interface Props {
   onDraftToolProfile: (value: string | null) => void;
   draftMemory: boolean;
   onDraftMemory: (value: boolean) => void;
+  draftRemote: RemoteTarget | null;
+  onDraftRemote: (value: RemoteTarget | null) => void;
   onOpenSidebar: () => void;
   onStorageChanged: () => void;
   shared?: { key: string; text: string; files: File[] } | null;
@@ -82,7 +87,10 @@ export function ChatView(props: Props) {
           />
         </div>
         {/* On phones the pickers get their own row, so the title keeps its space. */}
-        <div className="flex min-w-0 items-center gap-2 max-sm:order-last max-sm:w-full">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 max-sm:order-last max-sm:w-full">
+          {!savedOnServer && (
+            <TargetPicker value={props.draftRemote} onChange={props.onDraftRemote} disabled={!online} />
+          )}
           <ToolProfilePicker
             value={detail && savedOnServer ? (detail.tool_profile ?? null) : props.draftToolProfile}
             disabled={savedOnServer && !online}
@@ -105,6 +113,20 @@ export function ChatView(props: Props) {
         {savedOnServer && online && <ExportMenu conversationId={detail!.id} />}
       </header>
 
+      {savedOnServer && detail!.remote && (
+        <RemoteSessionBar
+          summary={detail!.remote}
+          conversationId={detail!.id}
+          online={online}
+          onChanged={() => void chat.refresh()}
+        />
+      )}
+      {!savedOnServer && props.draftRemote && (
+        <div role="status" className="border-b border-line bg-panel/60 px-4 py-1.5 text-xs text-muted">
+          This chat will run on the chosen machine, in{" "}
+          <span className="font-mono">{props.draftRemote.working_directory}</span>.
+        </div>
+      )}
       {savedOnServer && detail!.tool_grants?.includes("*") && (
         <div role="status" className="flex items-center justify-center gap-2 border-b border-line bg-amber-50/60 px-4 py-1.5 text-xs dark:bg-amber-950/20">
           <span>Tools run without asking in this chat.</span>

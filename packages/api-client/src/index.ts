@@ -65,3 +65,13 @@ export type AssistantSettings = Schemas["AssistantSettings"];
 export type ModelRegistryEntry = Schemas["ModelRegistryEntry"];
 export type ModelRegistryUpdate = Schemas["ModelRegistryUpdate"];
 export type AgentTaskDetail = Schemas["AgentTaskDetail"];
+
+// Celius Remote (docs/remote/)
+export type RemoteAgent = Schemas["RemoteAgentOut"];
+export type RemoteAgentConfig = Schemas["RemoteAgentConfig"];
+export type RemoteSession = Schemas["RemoteSessionOut"];
+export type RemoteSessionSummary = Schemas["RemoteSessionSummary"];
+export type RemoteSessionBrief = Schemas["RemoteSessionBrief"];
+export type RemoteEvent = Schemas["RemoteEventOut"];
+export type RemoteEventPage = Schemas["RemoteEventPage"];
+export type Enrollment = Schemas["EnrollmentOut"];
