@@ -7,7 +7,7 @@ import pytest
 
 from celius_agent.config import Policy
 from celius_agent.process import run_process
-from celius_agent.tools import TOOLS, ToolEnv, compare, snapshot
+from celius_agent.tools import TOOLS, ToolEnv, command_env, compare, snapshot
 
 PY = sys.executable
 
@@ -23,6 +23,7 @@ async def test_output_is_streamed_and_exit_code_captured(tmp_path):
         cwd=str(tmp_path),
         timeout=30,
         output_limit=10_000,
+        env=command_env(Policy()),  # what the agent runs commands with
         on_output=on_output,
     )
     assert result.exit_code == 3
@@ -33,16 +34,23 @@ async def test_output_is_streamed_and_exit_code_captured(tmp_path):
 
 async def test_timeout_kills_the_process_tree(tmp_path):
     marker = tmp_path / "child-alive"
-    # The child spawns a grandchild that would write a file after 3 s.
-    code = (
-        "import subprocess, sys, time;"
-        f"subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(3); "
-        f'open(r"{marker}", "w").write("x")\']);'
-        "time.sleep(60)"
+    grandchild = tmp_path / "grandchild.py"
+    grandchild.write_text("import sys, time\ntime.sleep(3)\nopen(sys.argv[1], 'w').write('x')\n")
+    child = tmp_path / "child.py"
+    # The child starts a grandchild that would write a file after 3 s, then waits.
+    child.write_text(
+        "import subprocess, sys, time\n"
+        "subprocess.Popen([sys.executable, sys.argv[1], sys.argv[2]])\n"
+        "time.sleep(60)\n"
     )
     started = time.monotonic()
-    result = await run_process([PY, "-c", code], cwd=str(tmp_path), timeout=1, output_limit=1000)
-    assert result.killed_reason == "timeout"
+    result = await run_process(
+        [PY, str(child), str(grandchild), str(marker)],
+        cwd=str(tmp_path),
+        timeout=1,
+        output_limit=1000,
+    )
+    assert result.killed_reason == "timeout", result
     assert time.monotonic() - started < 15
     await asyncio.sleep(4)
     assert not marker.exists()  # the grandchild was killed too

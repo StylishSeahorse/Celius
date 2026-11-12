@@ -99,7 +99,9 @@ def shell_name() -> str:
 def command_env(policy: Policy) -> dict[str, str]:
     deny = {"CELIUS_AGENT_CREDENTIAL", "CELIUS_AGENT_HOME", *policy.env_deny}
     env = {k: v for k, v in os.environ.items() if k not in deny}
+    # Output is read as UTF-8; on Windows, Python would otherwise write the ANSI code page.
     env.setdefault("PYTHONIOENCODING", "utf-8")
+    env.setdefault("PYTHONUTF8", "1")
     env["GIT_TERMINAL_PROMPT"] = "0"
     return env
 

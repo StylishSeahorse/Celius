@@ -16,12 +16,14 @@ import pytest
 from app.main import create_app
 from app.models import AgentTask, Conversation
 from tests.fakes import FakeLlama, drain_jobs, drain_runs
+from tests.remote_helpers import register_machine
 from tests.test_files import upload
 from tests.test_push import Device
 from tests.test_sharing import person
 
 # Bodies that pass validation, so the ownership check is what answers.
 BODIES = {
+    ("PATCH", "/api/v1/remote/agents/{agent_id}"): {"name": "Bob's now"},
     ("POST", "/api/v1/conversations/{conversation_id}/messages"): {
         "client_message_id": "isolation-test-01",
         "content": "hi",
@@ -55,6 +57,7 @@ QUERIES = {
     ("DELETE", "/api/v1/admin/users/{user_id}"): "?confirm=alice",
     ("GET", "/api/v1/conversations/{conversation_id}/workspace/file"): "?path=a.txt",
     ("GET", "/api/v1/email/messages/{email_id}"): "?account_id={account_id}",
+    ("GET", "/api/v1/remote/sessions/{session_id}/file"): "?path=a.txt",
 }
 # Not about someone's data.
 SKIP = {
@@ -205,6 +208,16 @@ async def alices_world(client, sessionmaker, settings, gateway, fake, admin_head
     await client.post("/api/v1/push/subscriptions", json=Device().subscription(), headers=alice)
     invitation = await client.post("/api/v1/admin/invitations", json={}, headers=admin_headers)
     ids["invitation_id"] = invitation.json()["id"]
+    # Celius Remote: a machine of Alice's, and a session on it.
+    machine = await register_machine(client, alice, name="Alice laptop")
+    ids["agent_id"] = machine["agent_id"]
+    remote = await client.post(
+        "/api/v1/remote/sessions",
+        json={"agent_id": machine["agent_id"], "working_directory": "/home/alice/code"},
+        headers=alice,
+    )
+    assert remote.status_code == 201, remote.text
+    ids["session_id"] = remote.json()["id"]
     ids["server_id"] = "00000000-0000-4000-8000-00000000000a"  # admin-only routes
     ids["token"] = "x" * 43
     await drain_jobs(sessionmaker, settings)
