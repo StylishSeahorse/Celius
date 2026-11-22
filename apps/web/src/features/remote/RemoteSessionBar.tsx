@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { ApiError, api } from "../../lib/api";
 import type { RemoteSession, RemoteSessionSummary } from "../../lib/types";
 import { SessionMonitor } from "./SessionMonitor";
-import { ADAPTER_LABEL, OS_LABEL, SESSION_LABEL, osIcon } from "./status";
+import { ORIGIN_LABEL, OS_LABEL, SESSION_LABEL, osIcon } from "./status";
 
 const button = "rounded-md border border-line px-2 py-0.5 text-xs hover:bg-canvas disabled:opacity-40";
 
@@ -53,7 +53,7 @@ export function RemoteSessionBar({
         {osIcon(summary.agent_os)} {summary.agent_name ?? "Removed machine"}
       </span>
       <span className="text-muted">
-        {OS_LABEL[summary.agent_os ?? ""] ?? ""} · {ADAPTER_LABEL[summary.adapter] ?? summary.adapter}
+        {OS_LABEL[summary.agent_os ?? ""] ?? ""} · {ORIGIN_LABEL[summary.origin] ?? summary.origin}
       </span>
       <span className="max-w-[16rem] truncate font-mono text-muted" title={summary.working_directory}>
         {summary.working_directory}
@@ -92,8 +92,7 @@ export function RemoteSessionBar({
           End session
         </button>
       ) : (
-        summary.agent_id &&
-        summary.mode === "native" && (
+        summary.agent_id && (
           <button
             className={button}
             disabled={!online}
@@ -102,7 +101,6 @@ export function RemoteSessionBar({
                 api.createRemoteSession({
                   conversation_id: conversationId,
                   agent_id: summary.agent_id!,
-                  adapter: "celius",
                   working_directory: summary.working_directory,
                 }),
               )

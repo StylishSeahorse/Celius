@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { api } from "../../lib/api";
 import type { RemoteAgent, RemoteEvent, RemoteSession } from "../../lib/types";
-import { ADAPTER_LABEL, SESSION_LABEL, ago, percent, resourcesOf } from "./status";
+import { ORIGIN_LABEL, SESSION_LABEL, ago, percent, resourcesOf } from "./status";
 
 const button = "rounded-md border border-line px-2.5 py-1 text-sm hover:bg-panel disabled:opacity-40";
 const MAX_TERMINAL_CHARS = 300_000;
@@ -113,7 +113,7 @@ export function SessionMonitor({ session, onClose }: { session: RemoteSession; o
         <header className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
           <div className="min-w-0 flex-1">
             <h2 id="monitor-title" className="truncate font-semibold">
-              {session.agent_name ?? "Machine"} · {ADAPTER_LABEL[session.adapter] ?? session.adapter}
+              {session.agent_name ?? "Machine"} · {ORIGIN_LABEL[session.origin] ?? session.origin}
             </h2>
             <p className="truncate font-mono text-xs text-muted" title={session.working_directory}>
               {session.working_directory}
@@ -163,12 +163,6 @@ function Terminal({ events }: { events: RemoteEvent[] }) {
       } else if (e.type === "terminal.output") {
         if (e.data.command_id !== last) last = e.data.command_id;
         out += String(e.data.text ?? "");
-      } else if (e.type === "tool.started") {
-        const input = e.data.input as Record<string, unknown> | undefined;
-        const command = input && typeof input.command === "string" ? input.command : null;
-        out += `\n\u001b ${String(e.data.name)}${command ? `: ${command}` : ""}\n`;
-      } else if (e.type === "tool.completed" && typeof e.data.content === "string") {
-        out += `${e.data.content}\n`;
       }
     }
     return out.length > MAX_TERMINAL_CHARS ? `[…earlier output not shown]\n${out.slice(-MAX_TERMINAL_CHARS)}` : out;
@@ -210,18 +204,12 @@ const ACTIVITY: Record<string, (d: Record<string, unknown>) => string> = {
   "session.opened": () => "Session opened on the machine",
   "session.failed": (d) => `Couldn't open: ${String(d.reason ?? "")}`,
   "session.closed": () => "Session ended",
-  "session.started": (d) => `Claude Code session ${String(d.external_session_id ?? "")}`,
   "command.started": (d) => `Running ${String(d.tool ?? "a command")}`,
   "command.completed": (d) => {
     const result = d.result as { is_error?: boolean } | undefined;
     if (d.status !== "completed") return `Failed: ${String(d.error ?? d.status)}`;
     return result?.is_error ? "Finished with an error" : "Finished";
   },
-  "turn.started": () => "Turn started",
-  "turn.completed": (d) => (d.is_error ? `Turn failed: ${String(d.result ?? "")}` : "Turn finished"),
-  "tool.started": (d) => `${String(d.name)} started`,
-  "tool.completed": (d) => `${d.is_error ? "Failed" : "Done"}`,
-  "permission.request": (d) => `Asked to use ${String(d.tool)} — waiting for you`,
   "file.changed": (d) => `${String(d.action)} ${String(d.path)}`,
   warning: (d) => `Warning: ${String(d.message ?? "")}`,
   error: (d) => `Error: ${String(d.message ?? "")}`,
@@ -240,7 +228,7 @@ function Activity({ events }: { events: RemoteEvent[] }) {
           <span
             className={`min-w-0 flex-1 break-words ${
               e.type === "error" || e.type === "session.failed" ? "text-red-700 dark:text-red-300" : ""
-            } ${e.type === "permission.request" ? "text-amber-700 dark:text-amber-300" : ""}`}
+            }`}
           >
             {ACTIVITY[e.type](e.data)}
           </span>

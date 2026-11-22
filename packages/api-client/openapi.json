@@ -2100,6 +2100,502 @@
         "title": "DenyToolCall",
         "type": "object"
       },
+      "DeviceApproval": {
+        "properties": {
+          "args_hash": {
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Args Hash",
+            "type": "string"
+          },
+          "remember": {
+            "default": false,
+            "title": "Remember",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "args_hash"
+        ],
+        "title": "DeviceApproval",
+        "type": "object"
+      },
+      "DeviceChatCreate": {
+        "properties": {
+          "model": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "working_directory": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Working Directory",
+            "type": "string"
+          }
+        },
+        "required": [
+          "working_directory"
+        ],
+        "title": "DeviceChatCreate",
+        "type": "object"
+      },
+      "DeviceChatList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DeviceChatOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "DeviceChatList",
+        "type": "object"
+      },
+      "DeviceChatOut": {
+        "properties": {
+          "conversation_id": {
+            "format": "uuid",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "origin": {
+            "title": "Origin",
+            "type": "string"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          },
+          "working_directory": {
+            "title": "Working Directory",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversation_id",
+          "session_id",
+          "title",
+          "working_directory",
+          "status",
+          "origin",
+          "updated_at",
+          "url"
+        ],
+        "title": "DeviceChatOut",
+        "type": "object"
+      },
+      "DeviceDecision": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "user_code": {
+            "maxLength": 20,
+            "minLength": 4,
+            "title": "User Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_code"
+        ],
+        "title": "DeviceDecision",
+        "type": "object"
+      },
+      "DeviceDenial": {
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "title": "DeviceDenial",
+        "type": "object"
+      },
+      "DeviceLoginPoll": {
+        "properties": {
+          "device_code": {
+            "maxLength": 200,
+            "minLength": 10,
+            "title": "Device Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "device_code"
+        ],
+        "title": "DeviceLoginPoll",
+        "type": "object"
+      },
+      "DeviceLoginRequest": {
+        "description": "`celius login`: optionally name the Celius user who will accept it.",
+        "properties": {
+          "agent_version": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Version"
+          },
+          "arch": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arch"
+          },
+          "hostname": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hostname"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "os": {
+            "anyOf": [
+              {
+                "enum": [
+                  "windows",
+                  "linux",
+                  "macos"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Os"
+          },
+          "os_version": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Os Version"
+          },
+          "protocol_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protocol Version"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          }
+        },
+        "title": "DeviceLoginRequest",
+        "type": "object"
+      },
+      "DeviceLoginResult": {
+        "properties": {
+          "agent_id": {
+            "format": "uuid",
+            "title": "Agent Id",
+            "type": "string"
+          },
+          "credential": {
+            "title": "Credential",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "agent_id",
+          "credential",
+          "name",
+          "username"
+        ],
+        "title": "DeviceLoginResult",
+        "type": "object"
+      },
+      "DeviceLoginStart": {
+        "properties": {
+          "device_code": {
+            "title": "Device Code",
+            "type": "string"
+          },
+          "expires_in": {
+            "title": "Expires In",
+            "type": "integer"
+          },
+          "interval": {
+            "title": "Interval",
+            "type": "integer"
+          },
+          "user_code": {
+            "title": "User Code",
+            "type": "string"
+          },
+          "verification_url": {
+            "title": "Verification Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "device_code",
+          "user_code",
+          "verification_url",
+          "expires_in",
+          "interval"
+        ],
+        "title": "DeviceLoginStart",
+        "type": "object"
+      },
+      "DeviceMessage": {
+        "properties": {
+          "client_message_id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Client Message Id",
+            "type": "string"
+          },
+          "content": {
+            "maxLength": 200000,
+            "minLength": 1,
+            "title": "Content",
+            "type": "string"
+          }
+        },
+        "required": [
+          "client_message_id",
+          "content"
+        ],
+        "title": "DeviceMessage",
+        "type": "object"
+      },
+      "DeviceRequestList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DeviceRequestOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "login_command": {
+            "title": "Login Command",
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "login_command"
+        ],
+        "title": "DeviceRequestList",
+        "type": "object"
+      },
+      "DeviceRequestOut": {
+        "description": "A device that ran `celius login` naming you, waiting to be accepted.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "hostname": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hostname"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "ip_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip Address"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "os": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Os"
+          },
+          "os_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Os Version"
+          },
+          "user_code": {
+            "title": "User Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "user_code",
+          "name",
+          "hostname",
+          "os",
+          "os_version",
+          "ip_address",
+          "created_at",
+          "expires_at"
+        ],
+        "title": "DeviceRequestOut",
+        "type": "object"
+      },
       "EmailCompose": {
         "properties": {
           "account_id": {
@@ -2272,167 +2768,6 @@
           "unread"
         ],
         "title": "EmailSummaryOut",
-        "type": "object"
-      },
-      "EnrollRequest": {
-        "properties": {
-          "agent_version": {
-            "anyOf": [
-              {
-                "maxLength": 32,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Agent Version"
-          },
-          "arch": {
-            "anyOf": [
-              {
-                "maxLength": 32,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Arch"
-          },
-          "code": {
-            "maxLength": 40,
-            "minLength": 4,
-            "title": "Code",
-            "type": "string"
-          },
-          "hostname": {
-            "anyOf": [
-              {
-                "maxLength": 255,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Hostname"
-          },
-          "os": {
-            "anyOf": [
-              {
-                "enum": [
-                  "windows",
-                  "linux",
-                  "macos"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Os"
-          },
-          "os_version": {
-            "anyOf": [
-              {
-                "maxLength": 200,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Os Version"
-          },
-          "protocol_version": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Protocol Version"
-          }
-        },
-        "required": [
-          "code"
-        ],
-        "title": "EnrollRequest",
-        "type": "object"
-      },
-      "EnrollResponse": {
-        "properties": {
-          "agent_id": {
-            "format": "uuid",
-            "title": "Agent Id",
-            "type": "string"
-          },
-          "credential": {
-            "title": "Credential",
-            "type": "string"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "status": {
-            "title": "Status",
-            "type": "string"
-          }
-        },
-        "required": [
-          "agent_id",
-          "credential",
-          "status",
-          "name"
-        ],
-        "title": "EnrollResponse",
-        "type": "object"
-      },
-      "EnrollmentCreate": {
-        "properties": {
-          "name": {
-            "anyOf": [
-              {
-                "maxLength": 100,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name"
-          }
-        },
-        "title": "EnrollmentCreate",
-        "type": "object"
-      },
-      "EnrollmentOut": {
-        "properties": {
-          "code": {
-            "title": "Code",
-            "type": "string"
-          },
-          "command": {
-            "title": "Command",
-            "type": "string"
-          },
-          "expires_at": {
-            "format": "date-time",
-            "title": "Expires At",
-            "type": "string"
-          }
-        },
-        "required": [
-          "code",
-          "expires_at",
-          "command"
-        ],
-        "title": "EnrollmentOut",
         "type": "object"
       },
       "EntityBrief": {
@@ -5892,17 +6227,6 @@
       },
       "RemoteAgentConfig": {
         "properties": {
-          "adapters": {
-            "items": {
-              "enum": [
-                "celius",
-                "claude_code"
-              ],
-              "type": "string"
-            },
-            "title": "Adapters",
-            "type": "array"
-          },
           "allow_shell": {
             "default": true,
             "title": "Allow Shell",
@@ -6145,7 +6469,6 @@
           },
           "state": {
             "enum": [
-              "awaiting_authorization",
               "revoked",
               "needs_attention",
               "busy",
@@ -6301,10 +6624,6 @@
       },
       "RemoteSessionBrief": {
         "properties": {
-          "adapter": {
-            "title": "Adapter",
-            "type": "string"
-          },
           "conversation_id": {
             "format": "uuid",
             "title": "Conversation Id",
@@ -6343,8 +6662,8 @@
             "title": "Id",
             "type": "string"
           },
-          "mode": {
-            "title": "Mode",
+          "origin": {
+            "title": "Origin",
             "type": "string"
           },
           "status": {
@@ -6370,8 +6689,7 @@
         "required": [
           "id",
           "conversation_id",
-          "mode",
-          "adapter",
+          "origin",
           "working_directory",
           "status",
           "status_detail",
@@ -6383,15 +6701,6 @@
       },
       "RemoteSessionCreate": {
         "properties": {
-          "adapter": {
-            "default": "celius",
-            "enum": [
-              "celius",
-              "claude_code"
-            ],
-            "title": "Adapter",
-            "type": "string"
-          },
           "agent_id": {
             "format": "uuid",
             "title": "Agent Id",
@@ -6468,10 +6777,6 @@
       },
       "RemoteSessionOut": {
         "properties": {
-          "adapter": {
-            "title": "Adapter",
-            "type": "string"
-          },
           "agent_id": {
             "anyOf": [
               {
@@ -6514,7 +6819,6 @@
             "anyOf": [
               {
                 "enum": [
-                  "awaiting_authorization",
                   "revoked",
                   "needs_attention",
                   "busy",
@@ -6580,17 +6884,6 @@
             ],
             "title": "Ended At"
           },
-          "external_session_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "External Session Id"
-          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -6599,10 +6892,6 @@
           "last_seq": {
             "title": "Last Seq",
             "type": "integer"
-          },
-          "mode": {
-            "title": "Mode",
-            "type": "string"
           },
           "opened_at": {
             "anyOf": [
@@ -6615,6 +6904,10 @@
               }
             ],
             "title": "Opened At"
+          },
+          "origin": {
+            "title": "Origin",
+            "type": "string"
           },
           "permissions": {
             "additionalProperties": true,
@@ -6644,8 +6937,7 @@
         "required": [
           "id",
           "conversation_id",
-          "mode",
-          "adapter",
+          "origin",
           "working_directory",
           "status",
           "status_detail",
@@ -6658,7 +6950,6 @@
           "agent_online",
           "permissions",
           "effective_permissions",
-          "external_session_id",
           "current_run_id",
           "last_seq",
           "opened_at"
@@ -6669,10 +6960,6 @@
       "RemoteSessionSummary": {
         "description": "Shown with a conversation: where it runs.",
         "properties": {
-          "adapter": {
-            "title": "Adapter",
-            "type": "string"
-          },
           "agent_id": {
             "anyOf": [
               {
@@ -6716,8 +7003,8 @@
             "title": "Id",
             "type": "string"
           },
-          "mode": {
-            "title": "Mode",
+          "origin": {
+            "title": "Origin",
             "type": "string"
           },
           "status": {
@@ -6746,8 +7033,7 @@
           "agent_name",
           "agent_os",
           "agent_online",
-          "mode",
-          "adapter",
+          "origin",
           "working_directory",
           "status",
           "status_detail"
@@ -14590,50 +14876,6 @@
         ]
       }
     },
-    "/api/v1/remote/agents/{agent_id}/authorize": {
-      "post": {
-        "description": "Explicit authorisation: a newly registered machine gets no work until this.",
-        "operationId": "authorize_agent_api_v1_remote_agents__agent_id__authorize_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "agent_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Agent Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RemoteAgentOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Authorize Agent",
-        "tags": [
-          "remote"
-        ]
-      }
-    },
     "/api/v1/remote/agents/{agent_id}/disconnect": {
       "post": {
         "description": "Ask the agent to close its connection and reconnect (sessions keep running).",
@@ -14802,26 +15044,30 @@
         ]
       }
     },
-    "/api/v1/remote/enroll": {
-      "post": {
-        "description": "Called by `celius-agent register` with a pairing code.",
-        "operationId": "enroll_api_v1_remote_enroll_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/EnrollRequest"
-              }
+    "/api/v1/remote/device/chats": {
+      "get": {
+        "description": "Recent chats that run on this machine (started here or in Celius).",
+        "operationId": "device_chats_api_v1_remote_device_chats_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
             }
-          },
-          "required": true
-        },
+          }
+        ],
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EnrollResponse"
+                  "$ref": "#/components/schemas/DeviceChatList"
                 }
               }
             },
@@ -14838,21 +15084,155 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Enroll",
+        "summary": "Device Chats",
+        "tags": [
+          "remote"
+        ]
+      },
+      "post": {
+        "description": "A new conversation running on this machine, in `working_directory`.",
+        "operationId": "device_chat_create_api_v1_remote_device_chats_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceChatCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceChatOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Device Chat Create",
         "tags": [
           "remote"
         ]
       }
     },
-    "/api/v1/remote/enrollments": {
+    "/api/v1/remote/device/chats/{conversation_id}": {
+      "get": {
+        "description": "The conversation, as clients see it (messages, tool calls, active run).",
+        "operationId": "device_chat_api_v1_remote_device_chats__conversation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Device Chat",
+        "tags": [
+          "remote"
+        ]
+      }
+    },
+    "/api/v1/remote/device/chats/{conversation_id}/messages": {
       "post": {
-        "description": "A one-time pairing code (valid a few minutes) to register a machine.",
-        "operationId": "create_enrollment_api_v1_remote_enrollments_post",
+        "description": "Send a message; the reply runs as any other, its tools on this machine.",
+        "operationId": "device_chat_message_api_v1_remote_device_chats__conversation_id__messages_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/EnrollmentCreate"
+                "$ref": "#/components/schemas/DeviceMessage"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Device Chat Message",
+        "tags": [
+          "remote"
+        ]
+      }
+    },
+    "/api/v1/remote/device/login": {
+      "post": {
+        "description": "`celius login` on a device: start a sign-in that someone accepts in Celius.",
+        "operationId": "device_login_api_v1_remote_device_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceLoginRequest"
               }
             }
           },
@@ -14863,7 +15243,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EnrollmentOut"
+                  "$ref": "#/components/schemas/DeviceLoginStart"
                 }
               }
             },
@@ -14880,7 +15260,355 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Create Enrollment",
+        "summary": "Device Login",
+        "tags": [
+          "remote"
+        ]
+      }
+    },
+    "/api/v1/remote/device/login/poll": {
+      "post": {
+        "description": "Has the sign-in been accepted? 428 `authorization_pending` until it is.",
+        "operationId": "device_login_poll_api_v1_remote_device_login_poll_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceLoginPoll"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceLoginResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Device Login Poll",
+        "tags": [
+          "remote"
+        ]
+      }
+    },
+    "/api/v1/remote/device/logout": {
+      "post": {
+        "description": "`celius logout`: the machine revokes itself (its sessions end).",
+        "operationId": "device_logout_api_v1_remote_device_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Device Logout",
+        "tags": [
+          "remote"
+        ]
+      }
+    },
+    "/api/v1/remote/device/runs/{run_id}/cancel": {
+      "post": {
+        "operationId": "device_run_cancel_api_v1_remote_device_runs__run_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Device Run Cancel",
+        "tags": [
+          "remote"
+        ]
+      }
+    },
+    "/api/v1/remote/device/runs/{run_id}/events": {
+      "get": {
+        "description": "The reply's live events (the same stream the apps follow).",
+        "operationId": "device_run_events_api_v1_remote_device_runs__run_id__events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Device Run Events",
+        "tags": [
+          "remote"
+        ]
+      }
+    },
+    "/api/v1/remote/device/tool-calls/{call_id}/approve": {
+      "post": {
+        "description": "Approve a request in a chat on this machine (from its own terminal).",
+        "operationId": "device_approve_api_v1_remote_device_tool_calls__call_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "call_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Call Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceApproval"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Device Approve",
+        "tags": [
+          "remote"
+        ]
+      }
+    },
+    "/api/v1/remote/device/tool-calls/{call_id}/deny": {
+      "post": {
+        "operationId": "device_deny_api_v1_remote_device_tool_calls__call_id__deny_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "call_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Call Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceDenial"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Device Deny",
+        "tags": [
+          "remote"
+        ]
+      }
+    },
+    "/api/v1/remote/devices": {
+      "get": {
+        "description": "Devices that ran `celius login --user <you>` and wait for you to accept them.",
+        "operationId": "device_requests_api_v1_remote_devices_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRequestList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Device Requests",
+        "tags": [
+          "remote"
+        ]
+      }
+    },
+    "/api/v1/remote/devices/accept": {
+      "post": {
+        "description": "Accept a device by the code it shows: it becomes one of your machines.",
+        "operationId": "accept_device_api_v1_remote_devices_accept_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceDecision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteAgentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Accept Device",
+        "tags": [
+          "remote"
+        ]
+      }
+    },
+    "/api/v1/remote/devices/refuse": {
+      "post": {
+        "operationId": "refuse_device_api_v1_remote_devices_refuse_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceDecision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Refuse Device",
         "tags": [
           "remote"
         ]

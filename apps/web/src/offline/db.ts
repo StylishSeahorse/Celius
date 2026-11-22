@@ -25,7 +25,7 @@ export interface OutboxItem {
     tool_profile?: string | null;
     memory_enabled?: boolean;
     /** Run it on a registered machine (Celius Remote) instead of the sandbox. */
-    remote?: { agent_id: string; adapter: "celius" | "claude_code"; working_directory: string } | null;
+    remote?: { agent_id: string; working_directory: string } | null;
   };
   status: "queued" | "failed";
   error?: string;

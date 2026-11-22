@@ -74,4 +74,5 @@ export type RemoteSessionSummary = Schemas["RemoteSessionSummary"];
 export type RemoteSessionBrief = Schemas["RemoteSessionBrief"];
 export type RemoteEvent = Schemas["RemoteEventOut"];
 export type RemoteEventPage = Schemas["RemoteEventPage"];
-export type Enrollment = Schemas["EnrollmentOut"];
+export type DeviceRequest = Schemas["DeviceRequestOut"];
+export type DeviceRequestList = Schemas["DeviceRequestList"];

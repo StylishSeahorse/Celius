@@ -64,7 +64,8 @@ export type {
   RemoteSessionBrief,
   RemoteEvent,
   RemoteEventPage,
-  Enrollment,
+  DeviceRequest,
+  DeviceRequestList,
 } from "@celius/api-client";
 
 export type MessageRole = "system" | "user" | "assistant" | "tool";

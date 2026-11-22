@@ -128,7 +128,7 @@ describe("Outbox", () => {
     const { client } = fakeClient(() => "ok");
     client.createConversation.mockImplementation(async () => (order.push("conversation"), {}) as never);
     client.sendMessage.mockImplementation(async () => (order.push("message"), { run: { id: "r" } }) as never);
-    const remote = { agent_id: "m1", adapter: "celius" as const, working_directory: "/srv/app" };
+    const remote = { agent_id: "m1", working_directory: "/srv/app" };
     let sessionCalls = 0;
     const withSession = {
       ...client,

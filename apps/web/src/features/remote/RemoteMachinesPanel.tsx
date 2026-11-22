@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { ApiError, api } from "../../lib/api";
-import type { Enrollment, RemoteAgent, RemoteAgentConfig, RemoteSession } from "../../lib/types";
+import type { DeviceRequest, RemoteAgent, RemoteAgentConfig, RemoteSession } from "../../lib/types";
 import {
-  ADAPTER_LABEL,
+  ORIGIN_LABEL,
   OS_LABEL,
   SESSION_LABEL,
   STATE_DOT,
@@ -28,14 +28,19 @@ export function RemoteMachinesPanel({
   onClose,
   onOpenConversation,
   onChanged,
+  initialCode,
 }: {
   onClose: () => void;
   onOpenConversation: (id: string) => void;
   onChanged: () => void;
+  /** From a device's sign-in link (#/devices?code=…). */
+  initialCode?: string | null;
 }) {
   const [agents, setAgents] = useState<RemoteAgent[] | null>(null);
+  const [waiting, setWaiting] = useState<DeviceRequest[]>([]);
+  const [loginCommand, setLoginCommand] = useState("celius login --server …");
   const [openId, setOpenId] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState(Boolean(initialCode));
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
@@ -45,6 +50,13 @@ export function RemoteMachinesPanel({
         setError(null);
       },
       (err) => setError(message(err)),
+    );
+    api.deviceRequests().then(
+      (page) => {
+        setWaiting(page.items);
+        setLoginCommand(page.login_command);
+      },
+      () => undefined,
     );
   }, []);
   useEffect(() => {
@@ -89,11 +101,11 @@ export function RemoteMachinesPanel({
             </button>
           )}
           <h2 id="remote-title" className="flex-1 font-semibold">
-            {open ? open.name : adding ? "Add a machine" : "Remote machines"}
+            {open ? open.name : adding ? "Add a device" : "Remote machines"}
           </h2>
           {!open && !adding && (
             <button className={primary} onClick={() => setAdding(true)}>
-              Add a machine
+              Add a device
             </button>
           )}
           <button onClick={onClose} className={button} aria-label="Close">
@@ -107,7 +119,11 @@ export function RemoteMachinesPanel({
             </p>
           )}
           {adding ? (
-            <AddMachine onDone={() => (setAdding(false), changed())} />
+            <AddDevice
+              command={loginCommand}
+              initialCode={initialCode ?? ""}
+              onAccepted={() => (setAdding(false), changed())}
+            />
           ) : open ? (
             <MachineDetail
               agent={open}
@@ -117,16 +133,26 @@ export function RemoteMachinesPanel({
             />
           ) : agents === null ? (
             <p className="text-muted">Loading…</p>
-          ) : agents.length === 0 ? (
+          ) : agents.length === 0 && waiting.length === 0 ? (
             <Intro onAdd={() => setAdding(true)} />
           ) : (
-            <ul className="space-y-2">
+            <>
+              {waiting.length > 0 && (
+                <section className="mb-4 space-y-2" aria-label="Devices waiting for you">
+                  <h3 className="text-sm font-medium">Waiting for you to accept</h3>
+                  {waiting.map((request) => (
+                    <WaitingDevice key={request.id} request={request} onDecided={changed} />
+                  ))}
+                </section>
+              )}
+              <ul className="space-y-2">
               {agents.map((agent) => (
                 <li key={agent.id}>
                   <MachineRow agent={agent} onOpen={() => setOpenId(agent.id)} />
                 </li>
               ))}
-            </ul>
+              </ul>
+            </>
           )}
         </div>
       </div>
@@ -137,14 +163,15 @@ export function RemoteMachinesPanel({
 function Intro({ onAdd }: { onAdd: () => void }) {
   return (
     <div className="mx-auto max-w-md space-y-3 py-8 text-center text-sm text-muted">
-      <p className="text-base text-ink">Run Celius on your own computers and servers.</p>
+      <p className="text-base text-ink">Use Celius on your own computers and servers.</p>
       <p>
-        Install the Celius agent on a Windows PC or a Linux machine. It connects out to this server
-        (nothing on the machine is opened to the network), and chats you start there show here like
-        any other conversation, on every device.
+        Install Celius on a Windows PC or a Linux machine and sign it in from there with{" "}
+        <code>celius login</code>; you accept it here. Then chat with it from any device, or run{" "}
+        <code>celius</code> in a terminal on the machine itself. It connects out to this server:
+        nothing on the machine is opened to the network.
       </p>
       <button className={primary} onClick={onAdd}>
-        Add a machine
+        Add a device
       </button>
     </div>
   );
@@ -193,17 +220,70 @@ function MachineRow({ agent, onOpen }: { agent: RemoteAgent; onOpen: () => void 
 
 // ---------------------------------------------------------------------- adding
 
-function AddMachine({ onDone }: { onDone: () => void }) {
-  const [name, setName] = useState("");
-  const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
-  const [error, setError] = useState<string | null>(null);
+function WaitingDevice({ request, onDecided }: { request: DeviceRequest; onDecided: () => void }) {
   const [busy, setBusy] = useState(false);
-
-  async function create() {
+  const [error, setError] = useState<string | null>(null);
+  async function decide(accept: boolean) {
     setBusy(true);
     setError(null);
     try {
-      setEnrollment(await api.createEnrollment(name.trim() || undefined));
+      if (accept) await api.acceptDevice(request.user_code);
+      else await api.refuseDevice(request.user_code);
+      onDecided();
+    } catch (err) {
+      setError(message(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-300 bg-amber-50/60 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/20">
+      <span className="text-xl" aria-hidden="true">
+        {osIcon(request.os)}
+      </span>
+      <span className="min-w-0 flex-1 text-sm">
+        <span className="block font-medium">{request.name || request.hostname || "A device"}</span>
+        <span className="text-xs text-muted">
+          {OS_LABEL[request.os ?? ""] ?? request.os ?? ""}
+          {request.ip_address ? ` · from ${request.ip_address}` : ""} · {ago(request.created_at)}
+        </span>
+      </span>
+      <span className="text-sm">
+        Code <code className="rounded bg-canvas px-1.5 py-0.5 font-mono tracking-wider">{request.user_code}</code>
+      </span>
+      <button className={primary} disabled={busy} onClick={() => void decide(true)}>
+        Accept
+      </button>
+      <button className={button} disabled={busy} onClick={() => void decide(false)}>
+        Refuse
+      </button>
+      {error && <p className="w-full text-xs text-red-600 dark:text-red-400">{error}</p>}
+      <p className="w-full text-xs text-muted">Accept only if this code is the one shown on your device right now.</p>
+    </div>
+  );
+}
+
+function AddDevice({
+  command,
+  initialCode,
+  onAccepted,
+}: {
+  command: string;
+  initialCode: string;
+  onAccepted: () => void;
+}) {
+  const [code, setCode] = useState(initialCode);
+  const [name, setName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const server = command.match(/--server (\S+)/)?.[1] ?? "https://…";
+
+  async function accept() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.acceptDevice(code.trim(), name.trim() || undefined);
+      onAccepted();
     } catch (err) {
       setError(message(err));
     } finally {
@@ -211,63 +291,58 @@ function AddMachine({ onDone }: { onDone: () => void }) {
     }
   }
 
-  if (!enrollment) {
-    return (
-      <div className="max-w-lg space-y-4 text-sm">
-        <p>
-          You'll get a one-time pairing code to enter on the machine. After it registers, you approve
-          it here before it can be used.
-        </p>
-        <label className="block space-y-1">
-          <span className="text-muted">Name (optional)</span>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Windows workstation"
-            maxLength={100}
-            className="w-full rounded-md border border-line bg-canvas px-2 py-1.5 outline-none focus:border-accent"
-          />
-        </label>
-        {error && <p className="text-red-600 dark:text-red-400">{error}</p>}
-        <button className={primary} disabled={busy} onClick={() => void create()}>
-          Create pairing code
-        </button>
-      </div>
-    );
-  }
-  const expires = new Date(enrollment.expires_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   return (
-    <div className="space-y-4 text-sm">
-      <p>
-        Pairing code (valid until {expires}, usable once):{" "}
-        <code className="rounded bg-panel px-2 py-1 font-mono text-base tracking-wider">{enrollment.code}</code>
-      </p>
-      <Steps title="Windows 10/11 (PowerShell)">
-        <Command text={`.\\install-windows.ps1 -Server ${serverOf(enrollment.command)} -Code ${enrollment.code}`} />
+    <div className="space-y-5 text-sm">
+      <Steps title="1. Install Celius on the device">
+        <p className="text-muted">From the repository's services/remote-agent folder (the installer signs it in too):</p>
+        <Command text={`.\\install\\install-windows.ps1 -Server ${server}`} />
+        <Command text={`sudo ./install/install-linux.sh --server ${server}`} />
+      </Steps>
+      <Steps title="2. Or, if Celius is already installed there, sign it in">
+        <Command text={command} />
         <p className="text-muted">
-          From the agent package (services/remote-agent/install). It installs the agent for your user
-          and starts it at sign-in.
+          It shows a code. With <code>--user</code> the device then waits for you in this list; otherwise type its
+          code below.
         </p>
       </Steps>
-      <Steps title="Linux (systemd)">
-        <Command text={`sudo ./install-linux.sh --server ${serverOf(enrollment.command)} --code ${enrollment.code}`} />
-      </Steps>
-      <Steps title="Already installed">
-        <Command text={enrollment.command} />
+      <Steps title="3. Accept it here">
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="space-y-1">
+            <span className="block text-muted">Code shown on the device</span>
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              placeholder="BCDF-GHJK"
+              maxLength={20}
+              className="w-36 rounded-md border border-line bg-canvas px-2 py-1.5 font-mono tracking-wider outline-none focus:border-accent"
+            />
+          </label>
+          <label className="min-w-0 flex-1 space-y-1">
+            <span className="block text-muted">Name (optional)</span>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Windows workstation"
+              maxLength={100}
+              className="w-full rounded-md border border-line bg-canvas px-2 py-1.5 outline-none focus:border-accent"
+            />
+          </label>
+          <button
+            className={primary}
+            disabled={busy || code.replace(/[^A-Za-z0-9]/g, "").length < 8}
+            onClick={() => void accept()}
+          >
+            Accept device
+          </button>
+        </div>
+        {error && <p className="text-red-600 dark:text-red-400">{error}</p>}
       </Steps>
       <p className="text-muted">
-        Then list the folders Celius may use in the agent's <code>policy.json</code> (nothing is allowed
-        until you do), and approve the machine in this list.
+        Then run <code>celius</code> in a folder on the device (it asks you once before working there), or list
+        folders in its <code>policy.json</code> to use it from here.
       </p>
-      <button className={primary} onClick={onDone}>
-        Done
-      </button>
     </div>
   );
-}
-
-function serverOf(command: string): string {
-  return command.match(/--server (\S+)/)?.[1] ?? "";
 }
 
 function Steps({ title, children }: { title: string; children: React.ReactNode }) {
@@ -323,7 +398,6 @@ function MachineDetail({
     roots?: { path: string; write: boolean }[];
     allow_shell?: boolean;
     allow_write?: boolean;
-    adapters?: string[];
   };
   const r = resourcesOf(agent.resources);
 
@@ -361,18 +435,6 @@ function MachineDetail({
           {agent.online ? `Connected since ${ago(agent.connected_at)}` : `Last seen ${ago(agent.last_seen_at)}`}
         </span>
       </section>
-
-      {agent.status === "pending" && (
-        <section className="space-y-2 rounded-xl border border-amber-300 bg-amber-50/60 p-4 dark:border-amber-800 dark:bg-amber-950/20">
-          <p>
-            <strong>{agent.hostname ?? agent.name}</strong> registered with a pairing code and is waiting for you.
-            Approve it only if you just set it up.
-          </p>
-          <button className={primary} disabled={busy} onClick={() => void act(() => api.authorizeRemoteAgent(agent.id))}>
-            Authorise this machine
-          </button>
-        </section>
-      )}
 
       {agent.online && r && (
         <section aria-label="Resources" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -414,7 +476,7 @@ function MachineDetail({
                   className="flex w-full flex-wrap items-center gap-x-3 px-3 py-2 text-left hover:bg-panel"
                 >
                   <span className="min-w-0 flex-1 truncate">{s.conversation_title || "Untitled"}</span>
-                  <span className="text-xs text-muted">{ADAPTER_LABEL[s.adapter] ?? s.adapter}</span>
+                  <span className="text-xs text-muted">{ORIGIN_LABEL[s.origin] ?? s.origin}</span>
                   <span className="text-xs text-muted">{SESSION_LABEL[s.status] ?? s.status}</span>
                   <span className="w-full truncate font-mono text-xs text-muted">{s.working_directory}</span>
                 </button>
@@ -445,7 +507,6 @@ function MachineDetail({
           </li>
           <li>Commands (shell, Python, git): {local.allow_shell ? "allowed" : "not allowed"}</li>
           <li>Writing files: {local.allow_write ? "allowed" : "not allowed"}</li>
-          <li>Agent types: {(local.adapters ?? ["celius"]).map((a) => ADAPTER_LABEL[a] ?? a).join(", ")}</li>
         </ul>
       </section>
 
@@ -508,20 +569,6 @@ function MachineDetail({
               disabled={busy}
             />
             Allow writing files
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={(config.adapters ?? []).includes("claude_code")}
-              onChange={(e) =>
-                void saveConfig({
-                  adapters: e.target.checked ? ["celius", "claude_code"] : ["celius"],
-                })
-              }
-              disabled={busy}
-            />
-            Allow Claude Code sessions
-            {!agent.capabilities?.claude_code && <span className="text-muted">(not installed there)</span>}
           </label>
         </section>
       )}

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { api, type RemoteTarget } from "../../lib/api";
 import type { RemoteAgent } from "../../lib/types";
-import { ADAPTER_LABEL, STATE_DOT, STATE_LABEL, osIcon } from "./status";
+import { STATE_DOT, STATE_LABEL, osIcon } from "./status";
 
 const button = "rounded-md border border-line px-2.5 py-1 text-sm hover:bg-panel disabled:opacity-40";
 const primary = "rounded-md bg-accent px-3 py-1 text-sm text-white hover:bg-accent-strong disabled:opacity-40";
@@ -42,7 +42,7 @@ export function TargetPicker({
     <>
       <select
         aria-label="Where this chat runs"
-        title={value ? `${value.working_directory} (${ADAPTER_LABEL[value.adapter]})` : "Celius sandbox"}
+        title={value ? value.working_directory : "Celius sandbox"}
         disabled={disabled}
         value={value?.agent_id ?? ""}
         onChange={(e) => {
@@ -95,9 +95,6 @@ function ChooseFolder({
     (r) => r.path,
   );
   const [directory, setDirectory] = useState(initial?.working_directory ?? roots[0] ?? "");
-  const adapters = (agent.permissions as { adapters?: string[] }).adapters ?? ["celius"];
-  const claudeAvailable = adapters.includes("claude_code") && Boolean(agent.capabilities?.claude_code);
-  const [adapter, setAdapter] = useState<RemoteTarget["adapter"]>(initial?.adapter ?? "celius");
   const windows = agent.os === "windows";
   const absolute = windows ? /^[A-Za-z]:[\\/]|^\\\\/.test(directory) : directory.startsWith("/");
 
@@ -141,32 +138,10 @@ function ChooseFolder({
             <span className="block text-xs text-muted">Inside: {roots.join(", ")}</span>
           </label>
         )}
-        <fieldset className="space-y-1.5">
-          <legend className="mb-1 text-muted">Agent</legend>
-          <label className="flex items-start gap-2">
-            <input type="radio" checked={adapter === "celius"} onChange={() => setAdapter("celius")} className="mt-1" />
-            <span>
-              Celius <span className="text-muted">— this chat's model, memory and tools, acting on the machine</span>
-            </span>
-          </label>
-          <label className={`flex items-start gap-2 ${claudeAvailable ? "" : "opacity-50"}`}>
-            <input
-              type="radio"
-              checked={adapter === "claude_code"}
-              onChange={() => setAdapter("claude_code")}
-              disabled={!claudeAvailable}
-              className="mt-1"
-            />
-            <span>
-              Claude Code{" "}
-              <span className="text-muted">
-                {claudeAvailable
-                  ? "— runs there; its permission requests come to you here"
-                  : "— not installed or not allowed on this machine"}
-              </span>
-            </span>
-          </label>
-        </fieldset>
+        <p className="text-xs text-muted">
+          This chat's model, memory and tools, acting on the machine. Changes and commands ask
+          you first unless you set the machine otherwise.
+        </p>
         <div className="flex justify-end gap-2">
           <button className={button} onClick={onCancel}>
             Cancel
@@ -174,7 +149,7 @@ function ChooseFolder({
           <button
             className={primary}
             disabled={!absolute || roots.length === 0}
-            onClick={() => onChoose({ agent_id: agent.id, adapter, working_directory: directory.trim() })}
+            onClick={() => onChoose({ agent_id: agent.id, working_directory: directory.trim() })}
           >
             Use this machine
           </button>

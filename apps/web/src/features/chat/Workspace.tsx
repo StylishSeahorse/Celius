@@ -31,6 +31,10 @@ function byUpdated(a: ConversationSummary, b: ConversationSummary) {
 }
 
 /** "#/today", also with a query (e.g. coming back from signing in with Google). */
+function codeFromHash(hash: string): string | null {
+  return hash.startsWith("#/devices") ? new URLSearchParams(hash.split("?")[1] ?? "").get("code") : null;
+}
+
 function isTodayHash(hash: string) {
   return hash === "#/today" || hash.startsWith("#/today?");
 }
@@ -48,7 +52,9 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const [draftToolProfile, setDraftToolProfile] = useState<string | null>(null);
   const [draftMemory, setDraftMemory] = useState(true);
   const [draftRemote, setDraftRemote] = useState<RemoteTarget | null>(null);
-  const [remoteOpen, setRemoteOpen] = useState(false);
+  // "#/devices?code=…": the link a device shows when it signs in.
+  const [remoteOpen, setRemoteOpen] = useState(() => window.location.hash.startsWith("#/devices"));
+  const [deviceCode, setDeviceCode] = useState<string | null>(() => codeFromHash(window.location.hash));
   const [remoteAttention, setRemoteAttention] = useState(0);
   const [memoryOpen, setMemoryOpen] = useState(false);
   const [skillsOpen, setSkillsOpen] = useState(false);
@@ -121,11 +127,10 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
 
   // Machines waiting to be authorised or needing attention (Celius Remote).
   const refreshRemote = useCallback(() => {
-    api
-      .remoteAgents()
-      .then((page) =>
+    Promise.all([api.remoteAgents(), api.deviceRequests()])
+      .then(([machines, devices]) =>
         setRemoteAttention(
-          page.items.filter((a) => a.state === "awaiting_authorization" || a.state === "needs_attention").length,
+          devices.items.length + machines.items.filter((a) => a.state === "needs_attention").length,
         ),
       )
       .catch(() => undefined);
@@ -192,6 +197,10 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
   useEffect(() => {
     const onHash = () => {
       if (isTodayHash(window.location.hash)) setTodayOpen(true);
+      else if (window.location.hash.startsWith("#/devices")) {
+        setDeviceCode(codeFromHash(window.location.hash));
+        setRemoteOpen(true);
+      }
       else setSelectedId(idFromHash());
     };
     window.addEventListener("hashchange", onHash);
@@ -456,6 +465,7 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
       )}
       {remoteOpen && (
         <RemoteMachinesPanel
+          initialCode={deviceCode}
           onChanged={() => {
             refreshRemote();
             void refreshList();
@@ -466,6 +476,8 @@ export function Workspace({ me, onLogout }: { me: Me; onLogout: () => void }) {
           }}
           onClose={() => {
             setRemoteOpen(false);
+            setDeviceCode(null);
+            if (window.location.hash.startsWith("#/devices")) window.location.hash = "";
             refreshRemote();
           }}
         />

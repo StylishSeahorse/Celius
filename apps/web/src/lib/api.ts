@@ -47,7 +47,7 @@ import type {
   RemoteAgentConfig,
   RemoteSession,
   RemoteEventPage,
-  Enrollment,
+  DeviceRequestList,
 } from "./types";
 
 /** GET /insights: rates are null when there is nothing to divide by. */
@@ -143,7 +143,6 @@ export interface MessageBody {
 /** Where a new chat runs (Celius Remote, docs/remote/). */
 export interface RemoteTarget {
   agent_id: string;
-  adapter: "celius" | "claude_code";
   working_directory: string;
 }
 
@@ -221,11 +220,12 @@ export const api = {
   // Celius Remote: machines and sessions.
   remoteAgents: () => request<{ items: RemoteAgent[] }>("/remote/agents"),
   remoteAgent: (id: string) => request<RemoteAgent>(`/remote/agents/${id}`),
-  createEnrollment: (name?: string) =>
-    request<Enrollment>("/remote/enrollments", json("POST", { name: name || null })),
+  deviceRequests: () => request<DeviceRequestList>("/remote/devices"),
+  acceptDevice: (user_code: string, name?: string) =>
+    request<RemoteAgent>("/remote/devices/accept", json("POST", { user_code, name: name || null })),
+  refuseDevice: (user_code: string) => request<void>("/remote/devices/refuse", json("POST", { user_code })),
   updateRemoteAgent: (id: string, body: { name?: string; config?: RemoteAgentConfig }) =>
     request<RemoteAgent>(`/remote/agents/${id}`, json("PATCH", body)),
-  authorizeRemoteAgent: (id: string) => request<RemoteAgent>(`/remote/agents/${id}/authorize`, json("POST")),
   revokeRemoteAgent: (id: string) => request<RemoteAgent>(`/remote/agents/${id}/revoke`, json("POST")),
   disconnectRemoteAgent: (id: string) => request<void>(`/remote/agents/${id}/disconnect`, json("POST")),
   deleteRemoteAgent: (id: string) => request<void>(`/remote/agents/${id}`, json("DELETE")),

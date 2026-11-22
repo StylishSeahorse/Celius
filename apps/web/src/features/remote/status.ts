@@ -1,7 +1,6 @@
 // Shared wording and colours for Celius Remote (docs/remote/).
 
 export const STATE_LABEL: Record<string, string> = {
-  awaiting_authorization: "Awaiting your approval",
   revoked: "Revoked",
   needs_attention: "Needs attention",
   busy: "Busy",
@@ -11,7 +10,6 @@ export const STATE_LABEL: Record<string, string> = {
 };
 
 export const STATE_DOT: Record<string, string> = {
-  awaiting_authorization: "bg-amber-500",
   revoked: "bg-muted",
   needs_attention: "bg-amber-500",
   busy: "bg-sky-500",
@@ -29,9 +27,9 @@ export const SESSION_LABEL: Record<string, string> = {
   terminated: "Ended",
 };
 
-export const ADAPTER_LABEL: Record<string, string> = {
-  celius: "Celius",
-  claude_code: "Claude Code",
+export const ORIGIN_LABEL: Record<string, string> = {
+  portal: "Started in Celius",
+  device: "Started on the device",
 };
 
 export const OS_LABEL: Record<string, string> = { windows: "Windows", linux: "Linux", macos: "macOS" };

@@ -1733,26 +1733,6 @@ export interface paths {
         patch: operations["update_agent_api_v1_remote_agents__agent_id__patch"];
         trace?: never;
     };
-    "/api/v1/remote/agents/{agent_id}/authorize": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Authorize Agent
-         * @description Explicit authorisation: a newly registered machine gets no work until this.
-         */
-        post: operations["authorize_agent_api_v1_remote_agents__agent_id__authorize_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/remote/agents/{agent_id}/disconnect": {
         parameters: {
             query?: never;
@@ -1834,27 +1814,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/remote/enroll": {
+    "/api/v1/remote/device/chats": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Device Chats
+         * @description Recent chats that run on this machine (started here or in Celius).
+         */
+        get: operations["device_chats_api_v1_remote_device_chats_get"];
         put?: never;
         /**
-         * Enroll
-         * @description Called by `celius-agent register` with a pairing code.
+         * Device Chat Create
+         * @description A new conversation running on this machine, in `working_directory`.
          */
-        post: operations["enroll_api_v1_remote_enroll_post"];
+        post: operations["device_chat_create_api_v1_remote_device_chats_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/remote/enrollments": {
+    "/api/v1/remote/device/chats/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Device Chat
+         * @description The conversation, as clients see it (messages, tool calls, active run).
+         */
+        get: operations["device_chat_api_v1_remote_device_chats__conversation_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remote/device/chats/{conversation_id}/messages": {
         parameters: {
             query?: never;
             header?: never;
@@ -1864,10 +1868,201 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Create Enrollment
-         * @description A one-time pairing code (valid a few minutes) to register a machine.
+         * Device Chat Message
+         * @description Send a message; the reply runs as any other, its tools on this machine.
          */
-        post: operations["create_enrollment_api_v1_remote_enrollments_post"];
+        post: operations["device_chat_message_api_v1_remote_device_chats__conversation_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remote/device/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Device Login
+         * @description `celius login` on a device: start a sign-in that someone accepts in Celius.
+         */
+        post: operations["device_login_api_v1_remote_device_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remote/device/login/poll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Device Login Poll
+         * @description Has the sign-in been accepted? 428 `authorization_pending` until it is.
+         */
+        post: operations["device_login_poll_api_v1_remote_device_login_poll_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remote/device/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Device Logout
+         * @description `celius logout`: the machine revokes itself (its sessions end).
+         */
+        post: operations["device_logout_api_v1_remote_device_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remote/device/runs/{run_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Device Run Cancel */
+        post: operations["device_run_cancel_api_v1_remote_device_runs__run_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remote/device/runs/{run_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Device Run Events
+         * @description The reply's live events (the same stream the apps follow).
+         */
+        get: operations["device_run_events_api_v1_remote_device_runs__run_id__events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remote/device/tool-calls/{call_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Device Approve
+         * @description Approve a request in a chat on this machine (from its own terminal).
+         */
+        post: operations["device_approve_api_v1_remote_device_tool_calls__call_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remote/device/tool-calls/{call_id}/deny": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Device Deny */
+        post: operations["device_deny_api_v1_remote_device_tool_calls__call_id__deny_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remote/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Device Requests
+         * @description Devices that ran `celius login --user <you>` and wait for you to accept them.
+         */
+        get: operations["device_requests_api_v1_remote_devices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remote/devices/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Device
+         * @description Accept a device by the code it shows: it becomes one of your machines.
+         */
+        post: operations["accept_device_api_v1_remote_devices_accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/remote/devices/refuse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refuse Device */
+        post: operations["refuse_device_api_v1_remote_devices_refuse_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3374,6 +3569,171 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
+        /** DeviceApproval */
+        DeviceApproval: {
+            /** Args Hash */
+            args_hash: string;
+            /**
+             * Remember
+             * @default false
+             */
+            remember: boolean;
+        };
+        /** DeviceChatCreate */
+        DeviceChatCreate: {
+            /** Model */
+            model?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Working Directory */
+            working_directory: string;
+        };
+        /** DeviceChatList */
+        DeviceChatList: {
+            /** Items */
+            items: components["schemas"]["DeviceChatOut"][];
+        };
+        /** DeviceChatOut */
+        DeviceChatOut: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Origin */
+            origin: string;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /** Status */
+            status: string;
+            /** Title */
+            title: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Url */
+            url: string;
+            /** Working Directory */
+            working_directory: string;
+        };
+        /** DeviceDecision */
+        DeviceDecision: {
+            /** Name */
+            name?: string | null;
+            /** User Code */
+            user_code: string;
+        };
+        /** DeviceDenial */
+        DeviceDenial: {
+            /** Reason */
+            reason?: string | null;
+        };
+        /** DeviceLoginPoll */
+        DeviceLoginPoll: {
+            /** Device Code */
+            device_code: string;
+        };
+        /**
+         * DeviceLoginRequest
+         * @description `celius login`: optionally name the Celius user who will accept it.
+         */
+        DeviceLoginRequest: {
+            /** Agent Version */
+            agent_version?: string | null;
+            /** Arch */
+            arch?: string | null;
+            /** Hostname */
+            hostname?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Os */
+            os?: ("windows" | "linux" | "macos") | null;
+            /** Os Version */
+            os_version?: string | null;
+            /** Protocol Version */
+            protocol_version?: number | null;
+            /** Username */
+            username?: string | null;
+        };
+        /** DeviceLoginResult */
+        DeviceLoginResult: {
+            /**
+             * Agent Id
+             * Format: uuid
+             */
+            agent_id: string;
+            /** Credential */
+            credential: string;
+            /** Name */
+            name: string;
+            /** Username */
+            username: string;
+        };
+        /** DeviceLoginStart */
+        DeviceLoginStart: {
+            /** Device Code */
+            device_code: string;
+            /** Expires In */
+            expires_in: number;
+            /** Interval */
+            interval: number;
+            /** User Code */
+            user_code: string;
+            /** Verification Url */
+            verification_url: string;
+        };
+        /** DeviceMessage */
+        DeviceMessage: {
+            /** Client Message Id */
+            client_message_id: string;
+            /** Content */
+            content: string;
+        };
+        /** DeviceRequestList */
+        DeviceRequestList: {
+            /** Items */
+            items: components["schemas"]["DeviceRequestOut"][];
+            /** Login Command */
+            login_command: string;
+        };
+        /**
+         * DeviceRequestOut
+         * @description A device that ran `celius login` naming you, waiting to be accepted.
+         */
+        DeviceRequestOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Hostname */
+            hostname: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Ip Address */
+            ip_address: string | null;
+            /** Name */
+            name: string | null;
+            /** Os */
+            os: string | null;
+            /** Os Version */
+            os_version: string | null;
+            /** User Code */
+            user_code: string;
+        };
         /** EmailCompose */
         EmailCompose: {
             /**
@@ -3434,54 +3794,6 @@ export interface components {
             to: string;
             /** Unread */
             unread: boolean;
-        };
-        /** EnrollRequest */
-        EnrollRequest: {
-            /** Agent Version */
-            agent_version?: string | null;
-            /** Arch */
-            arch?: string | null;
-            /** Code */
-            code: string;
-            /** Hostname */
-            hostname?: string | null;
-            /** Os */
-            os?: ("windows" | "linux" | "macos") | null;
-            /** Os Version */
-            os_version?: string | null;
-            /** Protocol Version */
-            protocol_version?: number | null;
-        };
-        /** EnrollResponse */
-        EnrollResponse: {
-            /**
-             * Agent Id
-             * Format: uuid
-             */
-            agent_id: string;
-            /** Credential */
-            credential: string;
-            /** Name */
-            name: string;
-            /** Status */
-            status: string;
-        };
-        /** EnrollmentCreate */
-        EnrollmentCreate: {
-            /** Name */
-            name?: string | null;
-        };
-        /** EnrollmentOut */
-        EnrollmentOut: {
-            /** Code */
-            code: string;
-            /** Command */
-            command: string;
-            /**
-             * Expires At
-             * Format: date-time
-             */
-            expires_at: string;
         };
         /** EntityBrief */
         EntityBrief: {
@@ -4669,8 +4981,6 @@ export interface components {
         };
         /** RemoteAgentConfig */
         RemoteAgentConfig: {
-            /** Adapters */
-            adapters?: ("celius" | "claude_code")[];
             /**
              * Allow Shell
              * @default true
@@ -4768,7 +5078,7 @@ export interface components {
              * State
              * @enum {string}
              */
-            state: "awaiting_authorization" | "revoked" | "needs_attention" | "busy" | "idle" | "disconnected" | "offline";
+            state: "revoked" | "needs_attention" | "busy" | "idle" | "disconnected" | "offline";
             /** Status */
             status: string;
         };
@@ -4809,8 +5119,6 @@ export interface components {
         };
         /** RemoteSessionBrief */
         RemoteSessionBrief: {
-            /** Adapter */
-            adapter: string;
             /**
              * Conversation Id
              * Format: uuid
@@ -4830,8 +5138,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            /** Mode */
-            mode: string;
+            /** Origin */
+            origin: string;
             /** Status */
             status: string;
             /** Status Detail */
@@ -4841,12 +5149,6 @@ export interface components {
         };
         /** RemoteSessionCreate */
         RemoteSessionCreate: {
-            /**
-             * Adapter
-             * @default celius
-             * @enum {string}
-             */
-            adapter: "celius" | "claude_code";
             /**
              * Agent Id
              * Format: uuid
@@ -4869,8 +5171,6 @@ export interface components {
         };
         /** RemoteSessionOut */
         RemoteSessionOut: {
-            /** Adapter */
-            adapter: string;
             /** Agent Id */
             agent_id: string | null;
             /** Agent Name */
@@ -4880,7 +5180,7 @@ export interface components {
             /** Agent Os */
             agent_os: string | null;
             /** Agent State */
-            agent_state: ("awaiting_authorization" | "revoked" | "needs_attention" | "busy" | "idle" | "disconnected" | "offline") | null;
+            agent_state: ("revoked" | "needs_attention" | "busy" | "idle" | "disconnected" | "offline") | null;
             /**
              * Conversation Id
              * Format: uuid
@@ -4901,8 +5201,6 @@ export interface components {
             };
             /** Ended At */
             ended_at: string | null;
-            /** External Session Id */
-            external_session_id: string | null;
             /**
              * Id
              * Format: uuid
@@ -4910,10 +5208,10 @@ export interface components {
             id: string;
             /** Last Seq */
             last_seq: number;
-            /** Mode */
-            mode: string;
             /** Opened At */
             opened_at: string | null;
+            /** Origin */
+            origin: string;
             /** Permissions */
             permissions: {
                 [key: string]: unknown;
@@ -4930,8 +5228,6 @@ export interface components {
          * @description Shown with a conversation: where it runs.
          */
         RemoteSessionSummary: {
-            /** Adapter */
-            adapter: string;
             /** Agent Id */
             agent_id: string | null;
             /** Agent Name */
@@ -4945,8 +5241,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            /** Mode */
-            mode: string;
+            /** Origin */
+            origin: string;
             /** Status */
             status: string;
             /** Status Detail */
@@ -9477,37 +9773,6 @@ export interface operations {
             };
         };
     };
-    authorize_agent_api_v1_remote_agents__agent_id__authorize_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                agent_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RemoteAgentOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     disconnect_agent_api_v1_remote_agents__agent_id__disconnect_post: {
         parameters: {
             query?: never;
@@ -9625,26 +9890,24 @@ export interface operations {
             };
         };
     };
-    enroll_api_v1_remote_enroll_post: {
+    device_chats_api_v1_remote_device_chats_get: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EnrollRequest"];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["EnrollResponse"];
+                    "application/json": components["schemas"]["DeviceChatList"];
                 };
             };
             /** @description Validation Error */
@@ -9658,7 +9921,7 @@ export interface operations {
             };
         };
     };
-    create_enrollment_api_v1_remote_enrollments_post: {
+    device_chat_create_api_v1_remote_device_chats_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -9667,7 +9930,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["EnrollmentCreate"];
+                "application/json": components["schemas"]["DeviceChatCreate"];
             };
         };
         responses: {
@@ -9677,8 +9940,372 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["EnrollmentOut"];
+                    "application/json": components["schemas"]["DeviceChatOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    device_chat_api_v1_remote_device_chats__conversation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    device_chat_message_api_v1_remote_device_chats__conversation_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceMessage"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    device_login_api_v1_remote_device_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceLoginStart"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    device_login_poll_api_v1_remote_device_login_poll_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceLoginPoll"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceLoginResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    device_logout_api_v1_remote_device_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    device_run_cancel_api_v1_remote_device_runs__run_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    device_run_events_api_v1_remote_device_runs__run_id__events_get: {
+        parameters: {
+            query?: {
+                after?: number | null;
+            };
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    device_approve_api_v1_remote_device_tool_calls__call_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                call_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceApproval"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    device_deny_api_v1_remote_device_tool_calls__call_id__deny_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                call_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceDenial"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    device_requests_api_v1_remote_devices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceRequestList"];
+                };
+            };
+        };
+    };
+    accept_device_api_v1_remote_devices_accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceDecision"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoteAgentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refuse_device_api_v1_remote_devices_refuse_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceDecision"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
