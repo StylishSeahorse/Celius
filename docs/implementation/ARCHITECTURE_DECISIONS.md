@@ -619,7 +619,8 @@ model's output.
 
 ## C-16: Celius Remote — execution on registered machines through Central
 
-Status: accepted · 2026-11-12
+Status: accepted · 2026-11-12 · amended by C-17 (no Claude Code; devices sign in from their
+command line)
 
 **Context.** Celius should run agent work on the user's own Windows and Linux machines and
 show it as ordinary conversations, including external coding agents (Claude Code). Central
@@ -649,3 +650,51 @@ the source of truth); SSH or exposed ports; terminal-text scraping of Claude Cod
 Agent SDK gives structured messages and a permission callback; a second approval system;
 a message broker or new microservice; automatic failover to another machine (risks running
 a task twice).
+
+## C-17: Devices sign in from their command line; `celius` on the device; no Claude Code
+
+Status: accepted · 2026-11-22 · amends C-16
+
+**Context.** Two requirements after C-16 shipped: Claude Code must not be part of Celius at
+all, and adding a device must start **on the device** — install Celius, sign in from its
+command line, accept it in Celius — instead of creating a pairing code in Celius and
+authorising the machine afterwards. Once accepted, the device is used either from Celius
+(any client) or with a `celius` command on the device itself, like a terminal coding agent;
+both act locally on the device.
+
+**Decision.**
+- Removed: the Claude Code adapter, its event projection, `runs.execution = external`,
+  `remote_sessions.mode/adapter/external_session_id`, the `adapters` policy key, and the
+  installers' Claude options. Migration 0017 ends any external sessions and cancels their
+  unfinished runs before dropping the columns.
+- Sign-in is the device authorization grant (RFC 8628) turned around:
+  `celius login --server … [--user name]` creates a `remote_device_requests` row (hash of a
+  secret device code, an 8-character user code, facts, address, 15-minute expiry) and polls.
+  The named user sees it under *Waiting for you to accept*; anyone signed in can also type
+  the code. Accepting creates an **active** machine owned by the acceptor; the device's next
+  poll receives its credential once. Refusal and expiry are reported to the device. Pairing
+  codes (`remote_enrollments`) and the separate authorise step are gone: accepting *is*
+  the explicit authorisation.
+- Safeguards: the user code alone obtains nothing (the poll needs the secret device code);
+  unknown user names are accepted silently (no enumeration); 10 sign-ins per address per
+  hour, 10 waiting per user; the UI asks to accept only a code shown on one's own device.
+- `celius` on the device is a client of Central, not a second agent loop: a device API
+  (`/remote/device/chats|runs|tool-calls`, authenticated as the machine, acting for its
+  owner, limited to conversations whose session runs on that machine) creates the chat
+  (`remote_sessions.origin = device`), sends messages, follows the run's existing SSE and
+  answers approvals with the same rules. Tools run through the background agent if it is
+  running, otherwise through one `celius` runs in-process while it is open. The chat is an
+  ordinary conversation in Celius.
+- The device's policy file is re-read on every `session.open` and reported to Central
+  (`policy` frame), so `celius` can add a folder to `roots` when the user allows it and the
+  change applies without restarting the agent.
+- One program, `celius` (`celius-agent` kept as an alias): `login`, `logout`, `agent`
+  (the service/task), chat (default), `status`, `policy`, `rotate-credential`. Installers
+  sign the device in interactively and put `celius` on PATH.
+
+**Rejected.** Keeping Claude Code behind a switch (the requirement is that it is not
+involved at all); signing in by pasting a user password or token into the device (exposes
+the user's account credential on a machine that only needs its own); a code created in
+Celius and typed on the device (the earlier design: the wrong way round for "install,
+then sign in"); a separate local agent loop in `celius` (two sources of truth for prompts,
+memory and approvals).

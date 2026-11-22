@@ -4,6 +4,11 @@ Date: 2026-11-12. Every statement below was checked against the code on branch
 `ccr-f650cd7b-39q5nz` (commit `ba2dce0`), not only against the README. File references are
 relative to the repository root.
 
+> Later change (ADR C-17): the Claude Code adapter and pairing codes described as plans
+> below were replaced by device sign-in from the device's command line and the `celius`
+> command on the device. Rows L5/L6 and the Claude Code assumption are kept as written at
+> the time.
+
 ## 1. What exists today
 
 ```

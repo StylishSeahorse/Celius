@@ -1,29 +1,37 @@
-# Celius Remote Agent
+# Celius on a device
 
-Runs Celius work on this machine — Celius's own agent's tools, or a Claude Code session —
-for conversations you start in Celius on any device. It connects **out** to your Celius
-server (HTTPS + one WebSocket); it opens no port and needs no SSH.
+The `celius` command and agent for your own computers (Windows, Linux). Sign the device in
+from here and accept it in Celius; then either chat on the device with `celius`, or let
+Celius use it from anywhere through the background agent. It connects **out** to your
+Celius server (HTTPS + one WebSocket); it opens no port and needs no SSH.
 
 - Install: [docs/remote/INSTALL.md](../../docs/remote/INSTALL.md)
   (`install/install-windows.ps1`, `install/install-linux.sh`)
 - How it works: [docs/remote/ARCHITECTURE.md](../../docs/remote/ARCHITECTURE.md)
-- Protocol: [docs/remote/API.md](../../docs/remote/API.md)
+- Protocol and API: [docs/remote/API.md](../../docs/remote/API.md)
 
 ```
-celius-agent register --server https://celius.example --code ABCD-EFGH-JKLM
-celius-agent run          # foreground (the service runs this)
-celius-agent status       # configuration, policy, and whether Celius accepts it
-celius-agent policy       # what this machine allows
-celius-agent rotate-credential
+celius login --server https://celius.example --user alice   # shows a code; accept it in Celius
+celius                    # chat in this folder (-p "…" for one message, -c to continue)
+celius agent              # the background agent: Celius can use this device (the service runs this)
+celius status             # sign-in, policy, and whether Celius accepts this device
+celius policy             # what this device allows
+celius rotate-credential
+celius logout             # sign out and remove the device from Celius
 ```
 
-Python ≥ 3.10; one dependency (`websockets`). Extras: `monitor` (psutil), `claude`
-(the Claude Agent SDK, which includes the Claude Code CLI).
+`celius-agent` is the same program under its earlier name; `celius run` is `celius agent`.
+
+Python ≥ 3.10; one dependency (`websockets`). Extra: `monitor` (psutil, for CPU/memory/disk
+figures).
 
 | Module | Role |
 |---|---|
-| `cli.py` | Commands, logging, single-instance lock |
-| `config.py` | Agent home, config and the machine's policy file |
+| `cli.py` | Commands, logging, single-instance lock, the in-process agent for `celius` |
+| `login.py` | Device sign-in: shows the code, waits for you to accept it in Celius |
+| `client.py` | The device API (`/api/v1/remote/device/…`) with the device's own token |
+| `chat.py` | `celius` in the terminal: the chat, approvals, folder trust |
+| `config.py` | Device home, config and the device's policy file |
 | `credentials.py` | Credential storage (DPAPI on Windows, 0600 elsewhere) |
 | `connection.py` | Token exchange, WebSocket session, heartbeats, outbox sending, reconnect with backoff |
 | `runtime.py` | Commands (journalled, never run twice), sessions, tool execution |
@@ -31,7 +39,6 @@ Python ≥ 3.10; one dependency (`websockets`). Extras: `monitor` (psutil), `cla
 | `tools.py` | Native tools, confined to the session folder |
 | `paths.py` | Path checks (roots, symlinks, traversal) |
 | `process.py` | Processes: streaming output, timeouts, process-tree kill |
-| `monitor.py` | Machine facts and resource snapshots |
-| `adapters/claude_code.py` | Claude Code via the Agent SDK; SDK messages → canonical events |
+| `monitor.py` | Device facts and resource snapshots |
 
 Development: `uv sync && uv run pytest -q && uv run ruff check . && uv run ruff format --check .`

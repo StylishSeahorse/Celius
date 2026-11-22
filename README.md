@@ -243,19 +243,21 @@ The model can call tools in the conversation's private workspace:
   for every API route automatically
 
 ### Remote machines (Celius Remote)
-- Run a chat on one of your own computers — a Windows PC, a Linux workstation, server or
-  VM — and follow it from any device: the conversation, a live terminal, changed files
-  with diffs and downloads, and the machine's CPU, memory, disk and GPU
-- Two kinds of agent: Celius's own (this chat's model, memory and tools, acting on the
-  machine) or **Claude Code** running there, whose permission requests come to you as
-  ordinary approvals
-- The machine connects out to the server; no open ports or SSH. Pairing codes, explicit
-  authorisation, per-machine credentials, revocation
+- Install Celius on one of your own computers — a Windows PC, a Linux workstation, server
+  or VM — sign in there with `celius login`, and accept the device in Celius
+- Then use it from anywhere: start a chat in Celius that runs on the device, and follow
+  it from any client — the conversation, a live terminal, changed files with diffs and
+  downloads, and the machine's CPU, memory, disk and GPU
+- Or on the device itself: run `celius` in a project folder for a terminal chat, with
+  approvals answered right there; the chat is in Celius too
+- Celius's own agent (your model, memory and tools) does the work in both cases
+- The device connects out to the server; no open ports or SSH. Sign-in accepted by you,
+  per-device credentials, revocation, `celius logout`
 - Nothing runs outside the folders the machine's owner allows in its policy file; commands
   are off by default and ask before running unless you choose otherwise
 - Work continues when every client is closed or the network drops; nothing is lost or
   run twice when it comes back
-- [Install the agent](docs/remote/INSTALL.md) · [how it works](docs/remote/ARCHITECTURE.md)
+- [Install Celius on a device](docs/remote/INSTALL.md) · [how it works](docs/remote/ARCHITECTURE.md)
 
 ### Running it
 - Encrypted backups (database, files, workspaces, settings) with an off-site copy,
@@ -480,7 +482,7 @@ docs/                 Backlog, ADRs, deployment, operations, acceptance tests, s
   - [0009: Memory and recall](docs/adr/0009-memory-and-recall.md)
 - Assistant roadmap: [roadmap and status](docs/implementation/CELIUS_ROADMAP.md) ·
   [audit](docs/implementation/AUDIT.md) ·
-  [decisions C-01…C-16](docs/implementation/ARCHITECTURE_DECISIONS.md) ·
+  [decisions C-01…C-17](docs/implementation/ARCHITECTURE_DECISIONS.md) ·
   [implementation log](docs/implementation/IMPLEMENTATION_LOG.md)
 
 ## Not yet verified

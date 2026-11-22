@@ -7,15 +7,16 @@ the remote tool calls by the existing `worker`. No new container, port, volume o
 
 | Item | What to do |
 |---|---|
-| Migration | `0016` (new tables, two nullable/defaulted columns on `runs`). Applied by the `migrate` step of `make up` / `make upgrade` as usual. Reversible: `alembic downgrade 0015`. |
+| Migration | `0016` (new tables, two nullable/defaulted columns on `runs`) and `0017` (device sign-in: `remote_device_requests` replaces `remote_enrollments`; sessions get `origin`). Applied by the `migrate` step of `make up` / `make upgrade` as usual. `0017` ends any Claude Code sessions left from an earlier build. Reversible: `alembic downgrade 0015`. |
 | Settings | `.env.example` → *Celius Remote*. All have safe defaults; `REMOTE_AGENTS_ENABLED=false` turns the feature off (404). |
+| Public address | `APP_PUBLIC_URL` is used in the link `celius login` prints (`…/#/devices?code=…`) and in the commands *Add a device* shows; set it to the address people open. |
 | Network | Machines need outbound HTTPS to your public Celius address. Nothing connects to them. |
 | Reverse proxy | Pass WebSocket upgrades on `/api/v1/remote/agent/connect`, no buffering on `/api/v1/remote/sessions/*/stream`: [reverse-proxy.md](../deployment/reverse-proxy.md). Caddy needs nothing extra. |
-| TLS | Agents refuse plain `http://` (except `localhost`) unless registered with `--allow-insecure-http`. A private CA: `--ca-file`. |
+| TLS | Devices refuse plain `http://` (except `localhost`) unless signed in with `celius login --allow-insecure-http`. A private CA: `--ca-file`. |
 | Storage | All remote state is in PostgreSQL (`remote_*` tables). Downloads are passed through, not stored. |
 | Backups | Covered by the existing `make backup` (database dump). Agents keep their own credential and outbox on the machine; nothing there needs backing up: after a restore, agents reconnect and resend anything Central doesn't have. |
-| Retention | The worker's maintenance pass deletes terminal output older than `REMOTE_OUTPUT_RETENTION_DAYS` (30), finished commands older than 30 days, and stale pairing codes. Other session events go when their conversation is deleted. |
-| Audit | `audit_events` actions `remote_enrollment.created`, `remote_agent.enrolled/authorized/updated/revoked/deleted/connected/disconnected/credential_rotated/disconnect_requested`, `remote_session.opened/interrupted/terminated`, `remote_permission.decided`, plus the existing `tool_call.*` for every approval. |
+| Retention | The worker's maintenance pass deletes terminal output older than `REMOTE_OUTPUT_RETENTION_DAYS` (30), finished commands older than 30 days, and device sign-in requests a day after they expire. Other session events go when their conversation is deleted. |
+| Audit | `audit_events` actions `remote_device.login_requested/refused`, `remote_agent.accepted/signed_in/updated/revoked/deleted/connected/disconnected/credential_rotated/disconnect_requested`, `remote_session.opened/interrupted/terminated`, plus the existing `tool_call.*` for every approval. |
 
 ### Upgrade and rollback
 
@@ -48,10 +49,10 @@ are comfortably within a small Proxmox VM; for hundreds, raise the poll interval
 
 | Task | How |
 |---|---|
-| Add | *Remote machines → Add a machine*, then the installer (INSTALL.md), then *Authorise*. |
-| Restrict | The machine's `policy.json` (what it allows at all) and the machine's settings in Celius (narrower). |
-| Rotate its credential | On the machine: `celius-agent rotate-credential`, then restart the agent. The old credential stops working once the new one is used, or after `REMOTE_CREDENTIAL_GRACE_MINUTES`. |
-| Revoke | *Revoke*: its credential and tokens stop working at once, its connection closes, its sessions end and queued commands are cancelled. Register it again to reuse it. |
-| Remove | *Remove*: revoke and forget; its conversations stay. |
+| Add | Install on the device (INSTALL.md) or run `celius login --server … --user you` there; accept it under *Remote machines → Waiting for you to accept* (or *Add a device* and type its code). |
+| Restrict | The machine's `policy.json` (what it allows at all; re-read when a session opens) and the machine's settings in Celius (narrower). |
+| Rotate its credential | On the machine: `celius rotate-credential`, then restart the background agent. The old credential stops working once the new one is used, or after `REMOTE_CREDENTIAL_GRACE_MINUTES`. |
+| Revoke | *Revoke*: its credential and tokens stop working at once, its connection closes, its sessions end and queued commands are cancelled. Sign it in again (`celius login --force`) to reuse it. |
+| Remove | *Remove* in Celius, or `celius logout` on the machine: revoke and forget; its conversations stay. |
 | Reconnect | *Reconnect agent*: the agent closes its connection and reconnects (work continues). |
 | Lost or stolen machine | *Revoke* it in Celius. Nothing on Central depends on the machine. |

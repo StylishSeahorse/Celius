@@ -1,7 +1,8 @@
-"""Celius Remote (ADR C-16, docs/remote/ARCHITECTURE.md §7).
+"""Celius Remote (ADR C-16, C-17; docs/remote/ARCHITECTURE.md §7, docs/remote/API.md).
 
-User routes use the normal session auth. Agent routes accept only a pairing code, a
-machine credential or a machine access token, and only act on that machine.
+User routes use the normal session auth. Device routes accept only a device code (sign-in),
+a machine credential or a machine access token, and only act on that machine and the
+conversations that run on it.
 """
 
 import asyncio

@@ -6,12 +6,13 @@
 # Agent (any OS with Python ≥ 3.10; CI: Ubuntu + Windows × 3.10 + 3.12)
 cd services/remote-agent && uv sync && uv run pytest -q
 
-# API unit/integration tests on SQLite (protocol at the WebSocket level, Claude Code
-# projection, isolation, retention)
-cd services/api && uv run pytest -q tests/test_remote_agents.py tests/test_remote_external.py
+# API unit/integration tests on SQLite (device sign-in, protocol at the WebSocket level,
+# isolation, retention)
+cd services/api && uv run pytest -q tests/test_remote_agents.py
 
 # Everything on PostgreSQL, including the end-to-end tests: the real API under uvicorn,
-# the real worker loop and the real agent over a WebSocket on localhost
+# the real worker loop and the real agent over a WebSocket on localhost, signed in with
+# the real `celius login` code path, and `celius` chats driven through its terminal UI
 make dev-deps   # or any PostgreSQL 16 with pgvector
 cd services/api && TEST_POSTGRES_URL=postgresql+asyncpg://celius:celius@localhost:5432/celius \
   TEST_DATABASE_URL=postgresql+asyncpg://celius:celius@localhost:5432/celius_test \
@@ -29,15 +30,19 @@ PostgreSQL step.
 pnpm build
 DATABASE_URL=postgresql+asyncpg://… (cd services/api && uv run alembic upgrade head)
 DATABASE_URL=postgresql+asyncpg://… infra/scripts/e2e-stack.sh      # API + worker + fake model
-# Sign in as e2e / e2e-password-123 at http://127.0.0.1:18000
-# Remote machines → Add a machine → copy the code, then on the same computer:
+# Sign in as e2e / e2e-password-123 at http://127.0.0.1:18000. Then, on the same computer:
 cd services/remote-agent
-uv run celius-agent register --server http://127.0.0.1:18000 --code XXXX-XXXX-XXXX
-#   edit the printed policy.json: "roots": [{"path": "/some/folder", "write": true}],
-#   "allow_shell": true
-uv run celius-agent run
-# Authorise the machine; New chat → "Where this chat runs" → the machine → a folder.
-# With the fake model, "[tool:python] …" runs Python there, "[tool:write] …" writes hello.txt.
+uv run celius login --server http://127.0.0.1:18000 --user e2e --name "Dev laptop"
+# Celius: the Remote machines badge → Waiting for you to accept → check the code → Accept.
+
+# 1. On the device: chat in a folder (answers the folder/commands questions once).
+mkdir -p /tmp/project && cd /tmp/project
+uv run --project ~/Celius/services/remote-agent celius -p "[tool:python] print(6 * 7)"
+#   approve in the terminal; the chat also appears in Celius, "Started on the device".
+
+# 2. From Celius: run the background agent, then New chat → "Where this chat runs" → the
+#    machine → /tmp/project. "[tool:write] …" writes hello.txt there after approval.
+uv run celius agent
 ```
 
 ## Status
@@ -48,7 +53,9 @@ Legend: **I** implemented · **U** unit tested · **IT** integration/end-to-end 
 
 | Area | I | U | IT | M | Notes |
 |---|---|---|---|---|---|
-| Pairing, explicit authorisation, credentials (hashed), short-lived tokens | ✓ | ✓ | ✓ | ✓ | `test_remote_agents.py`; CLI register against a live stack |
+| Device sign-in (`celius login`, accept/refuse in Celius, expiry, rate limits, unknown users), credentials (hashed), short-lived tokens | ✓ | ✓ | ✓ | ✓ | `test_remote_agents.py`; e2e uses the real login code; real CLI + browser against a live stack |
+| `celius` on the device: folder trust, chat, approvals in the terminal or in Celius, in-process agent | ✓ | ✓ | ✓ | ✓ | `test_chat_trust.py`, e2e `test_celius_cli_*`; real binary in a pty against a live stack |
+| Policy file re-read when a session opens; Central told | ✓ | ✓ | — | — | |
 | Credential rotation with grace; revocation closes the socket, ends sessions | ✓ | ✓ | ✓ | — | |
 | Heartbeats, resources, online/offline/disconnected/needs attention | ✓ | ✓ | ✓ | ✓ | |
 | Duplicate connection protection (newest wins, 4409) | ✓ | ✓ | — | — | |
@@ -64,16 +71,14 @@ Legend: **I** implemented · **U** unit tested · **IT** integration/end-to-end 
 | Conversation integration (list badge, header bar, selector, outbox) | ✓ | ✓ | ✓ | ✓ | web unit test for the outbox step; Playwright walkthrough |
 | Session monitor: terminal, activity, files + diffs + download, resources | ✓ | — | — | ✓ | desktop and phone widths |
 | Approval from a phone-sized screen | ✓ | — | — | partly | the same approval card; viewed at 390 px, approved at desktop width |
-| Claude Code adapter (Agent SDK, `can_use_tool`, resume, restart) | ✓ | ✓ | — | — | against an SDK stand-in and the real SDK's message classes; **not run against real Claude Code** (needs an account) |
-| Claude Code projection into the conversation and approvals | ✓ | — | ✓ | — | protocol-level simulated machine |
 | Retention | ✓ | — | ✓ | — | |
 | Cross-user isolation of machines and sessions | ✓ | — | ✓ | — | `test_isolation.py` |
-| Linux installer + systemd unit | ✓ | — | — | ✓ | ShellCheck clean; installed in a container (`--no-service`), dedicated user, permissions, authorise → connect; systemd itself not available here |
+| Linux installer + systemd unit | ✓ | — | — | ✓ | ShellCheck clean; run in a container (`--no-service`): dedicated user, `celius` on PATH, sign-in code shown → accepted → `celius agent` online → `--uninstall`; systemd itself not available here |
 | Windows installer (scheduled task, DPAPI) | ✓ | — | — | — | parsed by PowerShell in CI; **not executed** (no Windows here) |
 | Agent on Windows | ✓ | CI | — | — | unit tests on `windows-latest` (3.10, 3.12) |
-| `celius-agent.exe` (PyInstaller) | ✓ | — | — | Linux build ✓ | Windows build in CI (`remote-agent-exe`) |
+| `celius.exe` (PyInstaller) | ✓ | — | — | Linux build ✓ | Windows build in CI (`remote-agent-exe`) |
 | Celius in Docker with remote agents | ✓ | — | — | — | the image builds and passes the release gate in CI; agents not connected to the container |
-| Migration 0016 up/down/`alembic check` | ✓ | — | ✓ | ✓ | |
+| Migrations 0016, 0017 up/down/`alembic check` | ✓ | — | ✓ | ✓ | |
 
 Known pre-existing failure, unrelated to this work: `tests/test_continuous_improvement.py`
 (two memory benchmark tests) needs `services/api/devtools/data/memory_eval.json`, which was

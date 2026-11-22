@@ -2,11 +2,35 @@
 
 Newest first. Each entry: what changed, how it was verified, what is left.
 
+## 2026-11-22: devices sign in from their command line; `celius` on the device (ADR C-17)
+
+Install Celius on a device, sign in there, accept it in Celius; then use it from Celius or
+with `celius` in a folder on the device. Claude Code removed entirely.
+
+- Central: migration 0017 (`remote_device_requests` replaces `remote_enrollments`;
+  `remote_sessions.origin`; external-session columns dropped); device login/poll,
+  accept/refuse and the device API; policy frames; the external mode, projection and
+  pairing/authorise routes removed.
+- `services/remote-agent`: `celius login/logout/agent/status/policy`, the terminal chat
+  with folder trust and approvals, an in-process agent when no service runs, the policy
+  re-read on session open; the Claude adapter removed; installers sign in and put `celius`
+  on PATH.
+- Web app: *Waiting for you to accept* with Accept/Refuse, *Add a device* with the
+  commands and a code box, `#/devices?code=` links, sessions marked *Started in Celius* /
+  *Started on the device*; Claude Code UI removed.
+- Verified: API suites on SQLite and PostgreSQL; end-to-end tests with the real login code
+  and `celius` chats; agent tests; web typecheck, tests and build; the real `celius` binary
+  in a pty against a live stack with Playwright accepting the device; the Linux installer
+  in a container (`--no-service`) through sign-in, connection and uninstall.
+- Left: Windows installer on real Windows; systemd itself; devices against the Docker
+  deployment.
+
 ## 2026-11-12: Celius Remote (ADR C-16)
 
 Run conversations on registered Windows and Linux machines, from any client.
 Details: [docs/remote/](../remote/), status in [PROGRESS.md](../remote/PROGRESS.md).
 
+- (Superseded in part by the 2026-11-22 entry: pairing codes and Claude Code removed.)
 - Central: migration 0016 (`remote_agents`, credentials, enrollments, sessions, commands,
   session events; `runs.execution`, `runs.remote_session_id`); pairing codes, explicit
   authorisation, hashed credentials with rotation, HMAC access tokens, revocation; the
