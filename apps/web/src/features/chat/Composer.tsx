@@ -94,7 +94,10 @@ export function Composer(props: Props) {
 
   const busyUploading = attachments.some((a) => a.state === "uploading" || a.state === "processing");
   const sendable = attachments.filter((a) => a.file && (a.state === "ready" || a.state === "unreadable"));
-  const canSend = (text.trim().length > 0 || sendable.length > 0) && !busyUploading;
+  // While a reply is written, a message goes to it (steering): text only.
+  const canSend = canStop
+    ? text.trim().length > 0 && attachments.length === 0
+    : (text.trim().length > 0 || sendable.length > 0) && !busyUploading;
 
   async function submit() {
     const content = text.trim();
@@ -198,7 +201,7 @@ export function Composer(props: Props) {
         onChange={(e) => setText(e.target.value)}
         onKeyDown={onKeyDown}
         onPaste={onPaste}
-        placeholder="Message Celius…"
+        placeholder={canStop ? "Add to what Celius is doing…" : "Message Celius…"}
         aria-label="Message"
         className="block max-h-60 w-full resize-none bg-transparent px-2 py-1.5 leading-relaxed outline-none"
       />
@@ -228,7 +231,7 @@ export function Composer(props: Props) {
         />
         <button
           onClick={() => fileInput.current?.click()}
-          disabled={!online}
+          disabled={!online || canStop}
           title={online ? "Attach files" : "Attaching needs a connection"}
           className="rounded-lg px-2 py-1 text-sm text-muted hover:bg-panel hover:text-ink disabled:opacity-40"
         >
@@ -236,7 +239,7 @@ export function Composer(props: Props) {
         </button>
         <button
           onClick={() => folderInput.current?.click()}
-          disabled={!online}
+          disabled={!online || canStop}
           title="Attach a folder"
           className="hidden rounded-lg px-2 py-1 text-sm text-muted hover:bg-panel hover:text-ink disabled:opacity-40 sm:inline"
         >
@@ -264,12 +267,14 @@ export function Composer(props: Props) {
           Thinking: {REASONING_LABEL[reasoningKey]}
         </button>
         <span className="flex-1" />
-        {canStop ? (
+        {canStop && (
           <button onClick={onStop} className="rounded-lg border border-line px-3 py-1.5 text-sm hover:bg-panel">
             Stop
           </button>
-        ) : (
+        )}
+        {(!canStop || text.trim().length > 0) && (
           <button
+            title={canStop ? "Celius reads it before its next step, without stopping" : undefined}
             onClick={() => void submit()}
             disabled={!canSend}
             className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-strong disabled:opacity-40"

@@ -2,10 +2,12 @@ import asyncio
 import time
 import uuid
 from collections.abc import AsyncIterator
-from typing import Annotated
+from datetime import datetime
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Header, Query, Request
+from fastapi import APIRouter, Depends, Header, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +17,7 @@ from app.db import SessionFactory, get_db, get_session_factory
 from app.models import TERMINAL_RUN_STATUSES, Run, RunEvent
 from app.schemas.conversations import RunOut
 from app.schemas.events import RunEventEnvelope
+from app.services import steering
 from app.services.conversations import run_out
 from app.services.runs import get_owned_run, request_cancel
 
@@ -35,6 +38,66 @@ async def cancel_run(run_id: uuid.UUID, auth: CurrentAuth, db: DB) -> RunOut:
     await request_cancel(db, run)
     await db.commit()
     return run_out(run)
+
+
+class SteerIn(BaseModel):
+    content: str = Field(min_length=1, max_length=steering.MAX_CHARS)
+    client_id: str = Field(min_length=8, max_length=64)
+
+
+class SteerOut(BaseModel):
+    id: uuid.UUID
+    content: str
+    status: Literal["pending", "delivered", "withdrawn"]
+    step: int | None
+    created_at: datetime
+    delivered_at: datetime | None
+    # The reply waits for an approval: the message is read once that is answered.
+    waits_for_approval: bool = False
+
+
+def _steer_out(steer, run: Run | None = None) -> SteerOut:
+    return SteerOut(
+        id=steer.id,
+        content=steer.content,
+        status=steer.status,
+        step=steer.step,
+        created_at=steer.created_at,
+        delivered_at=steer.delivered_at,
+        waits_for_approval=bool(
+            run is not None and steer.status == "pending" and steering.waits_for_approval(run)
+        ),
+    )
+
+
+@router.post("/{run_id}/steer", response_model=SteerOut, status_code=status.HTTP_201_CREATED)
+async def steer_run(
+    run_id: uuid.UUID, body: SteerIn, response: Response, auth: CurrentAuth, db: DB
+) -> SteerOut:
+    """Add a message for the reply being written: it is read before its next model turn.
+    409 run_finished when the reply ended first (send it as a normal message then)."""
+    steer, new = await steering.add(db, auth.user.id, run_id, body.content, body.client_id)
+    run = await db.get(Run, run_id)
+    await db.commit()
+    if not new:
+        response.status_code = status.HTTP_200_OK
+    return _steer_out(steer, run)
+
+
+@router.get("/{run_id}/steers", response_model=list[SteerOut])
+async def run_steers(run_id: uuid.UUID, auth: CurrentAuth, db: DB) -> list[SteerOut]:
+    run = await get_owned_run(db, auth.user.id, run_id)
+    return [_steer_out(s, run) for s in await steering.of_run(db, auth.user.id, run_id)]
+
+
+@router.delete("/{run_id}/steers/{steer_id}", response_model=SteerOut)
+async def withdraw_steer(
+    run_id: uuid.UUID, steer_id: uuid.UUID, auth: CurrentAuth, db: DB
+) -> SteerOut:
+    """Take back a message the reply hasn't read yet."""
+    steer = await steering.withdraw(db, auth.user.id, run_id, steer_id)
+    await db.commit()
+    return _steer_out(steer)
 
 
 def _format_sse(event: RunEvent) -> str:

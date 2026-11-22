@@ -41,6 +41,7 @@ from app.models.generation import (
     Run,
     RunEvent,
     RunStatus,
+    RunSteer,
 )
 from app.models.identity import (
     AuditEvent,
@@ -160,6 +161,7 @@ __all__ = [
     "Run",
     "RunEvent",
     "RunStatus",
+    "RunSteer",
     "Session",
     "SyncEvent",
     "User",

@@ -22,6 +22,9 @@ class FakeLlama:
         self.reasoning_sent = 0
         # Thinking streamed before the calls of a scripted tool turn.
         self.tool_reasoning: str | None = None
+        # Awaited once, just before the next answer text streams (e.g. to send a message
+        # to the run meanwhile).
+        self.before_text = None
         self.context_tokens: int | None = None
         self.vision = False
         self.chat_template: str | None = None
@@ -174,6 +177,9 @@ class FakeLlama:
                 yield _sse(
                     {"choices": [{"delta": {"reasoning_content": self.reasoning[i : i + 200]}}]}
                 )
+        if self.before_text is not None:
+            hook, self.before_text = self.before_text, None
+            await hook()
         for piece in re.findall(r"\S+\s*", reply):
             if self.fail_after_chunks is not None and self.chunks_sent >= self.fail_after_chunks:
                 yield _sse({"error": {"message": "slot crashed"}})

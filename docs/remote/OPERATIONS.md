@@ -7,7 +7,7 @@ the remote tool calls by the existing `worker`. No new container, port, volume o
 
 | Item | What to do |
 |---|---|
-| Migration | `0016` (new tables, two nullable/defaulted columns on `runs`) and `0017` (device sign-in: `remote_device_requests` replaces `remote_enrollments`; sessions get `origin`). Applied by the `migrate` step of `make up` / `make upgrade` as usual. `0017` ends any Claude Code sessions left from an earlier build. Reversible: `alembic downgrade 0015`. |
+| Migration | `0016` (new tables, two nullable/defaulted columns on `runs`) and `0017` (device sign-in: `remote_device_requests` replaces `remote_enrollments`; sessions get `origin`). Applied by the `migrate` step of `make up` / `make upgrade` as usual. `0017` ends any Claude Code sessions left from an earlier build. Reversible: `alembic downgrade 0015` (this also removes the later `0018`, steering). |
 | Settings | `.env.example` → *Celius Remote*. All have safe defaults; `REMOTE_AGENTS_ENABLED=false` turns the feature off (404). |
 | Public address | `APP_PUBLIC_URL` is used in the link `celius login` prints (`…/#/devices?code=…`) and in the commands *Add a device* shows; set it to the address people open. |
 | Network | Machines need outbound HTTPS to your public Celius address. Nothing connects to them. |
@@ -24,7 +24,7 @@ the remote tool calls by the existing `worker`. No new container, port, volume o
   are disconnected by the API restart and reconnect within a minute (backoff with jitter);
   running commands continue on the machines and their events arrive after reconnecting.
 - Rollback to a version before Celius Remote: `make rollback` restores the pre-upgrade
-  backup. If you only roll the code back, first `alembic downgrade 0015` (drops the remote
+  backup. If you only roll the code back, first `alembic downgrade 0015` (also drops steering's `run_steers`, 0018; drops the remote
   tables and the two `runs` columns). Stop agents first, or they will retry quietly until
   the server has the feature again.
 - Server and agent versions are independent; the protocol is versioned (`protocol: 1`).

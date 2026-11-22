@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { cancelActiveRun, login, newChat, send } from "./helpers";
+import { cancelActiveRun, chat, lastReply, login, newChat, send } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   await login(page);
@@ -56,4 +56,26 @@ test("a model error is shown and the next message still works", async ({ page })
   await expect(page.getByRole("alert")).toContainText("fake failure requested");
   await send(page, "this one works");
   await expect(page.locator(".markdown").last()).toContainText("this one works");
+});
+
+test("steering: a message sent while the reply streams is read and the reply goes on", async ({ page }) => {
+  await send(page, "[slow] tell me about the solar system in many many words please");
+  const composer = page.getByLabel("Message");
+  const stop = page.getByRole("button", { name: "Stop", exact: true }).last();
+  await expect(stop).toBeVisible();
+  // Mid-answer: the reply has started streaming.
+  await expect(lastReply(page)).toContainText("You said", { timeout: 15_000 });
+  await composer.fill("Keep it short");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(page.getByTestId("queued-steer")).toContainText("Keep it short");
+
+  const steer = chat(page).getByTestId("steer");
+  await expect(steer).toContainText("Keep it short", { timeout: 30_000 });
+  await expect(page.getByTestId("queued-steer")).toHaveCount(0);
+  // The reply continues after it, answering the new message.
+  // The first answer stays above it, and the reply continues below it.
+  await expect(chat(page).getByText("tell me about the solar system").last()).toBeVisible();
+  await expect(lastReply(page)).toContainText("Keep it short", { timeout: 30_000 });
+  await expect(lastReply(page)).toContainText("This is turn", { timeout: 30_000 });
+  await expect(stop).toHaveCount(0, { timeout: 30_000 });
 });

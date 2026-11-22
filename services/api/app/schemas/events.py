@@ -17,6 +17,7 @@ class RunEventType(StrEnum):
     tool_call_started = "tool_call.started"
     tool_call_completed = "tool_call.completed"
     run_progress = "run.progress"
+    run_steered = "run.steered"
     run_completed = "run.completed"
     run_failed = "run.failed"
     run_cancelled = "run.cancelled"
