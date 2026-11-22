@@ -50,11 +50,6 @@ $TaskName = "Celius Agent"
 $Base = Join-Path $env:LOCALAPPDATA "CeliusAgent"
 $Venv = Join-Path $Base "venv"
 $Scripts = Join-Path $Venv "Scripts"
-if (-not $Package) {
-  # Run from the repository: install the package next to this script.
-  if (-not $PSScriptRoot) { throw "Run this from services\remote-agent, or: irm https://<celius>/install.ps1 | iex" }
-  $Package = "$(Split-Path -Parent $PSScriptRoot)[monitor]"
-}
 
 function Set-UserPath([bool]$Present) {
   $current = [Environment]::GetEnvironmentVariable("Path", "User")
@@ -71,6 +66,12 @@ if ($Uninstall) {
   Write-Host "Removed. The device's data (sign-in, policy, state) is still in $Base;"
   Write-Host "remove the device in Celius and delete that folder to remove everything."
   return  # not exit: this may run inside the user's own PowerShell (irm | iex)
+}
+
+if (-not $Package) {
+  # Run from the repository: install the package next to this script.
+  if (-not $PSScriptRoot) { throw "Run this from services\remote-agent, or: irm https://<celius>/install.ps1 | iex" }
+  $Package = "$(Split-Path -Parent $PSScriptRoot)[monitor]"
 }
 
 function Find-Python {
