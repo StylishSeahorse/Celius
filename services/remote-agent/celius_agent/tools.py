@@ -1,4 +1,4 @@
-"""Native tools: what Celius's own agent can do on this machine (mode 1).
+"""Native tools: what the Celius agent can do on this machine.
 
 Names and arguments match Celius's built-in tools (list_files, read_file, write_file,
 run_shell, run_python, git), so the model, prompts and approvals stay the same. Every path

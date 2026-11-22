@@ -118,12 +118,7 @@ async def claim_next_run(
     async with factory() as db:
         candidate = await db.scalar(
             select(Run.id)
-            .where(
-                Run.status == RunStatus.queued,
-                Run.cancel_requested.is_(False),
-                # Driven by an external agent on a machine, not by this worker (ADR C-16).
-                Run.execution != "external",
-            )
+            .where(Run.status == RunStatus.queued, Run.cancel_requested.is_(False))
             .order_by(Run.created_at)
             .limit(1)
             .with_for_update(skip_locked=True)

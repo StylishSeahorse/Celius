@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import shutil
-from typing import Any
+from collections.abc import Callable
 
 from celius_agent.config import Policy
 from celius_agent.paths import PathRefused, check_working_directory
@@ -24,33 +24,48 @@ MAX_RESULT_CHARS = 200_000
 
 
 class Runtime:
-    def __init__(self, store: StateStore, policy: Policy):
+    def __init__(
+        self,
+        store: StateStore,
+        policy: Policy,
+        policy_loader: Callable[[], Policy] | None = None,
+    ):
         self.store = store
         self.policy = policy
+        # Re-reads the machine's policy file (e.g. after `celius` allowed a new folder).
+        self.policy_loader = policy_loader
+        self.policy_changed = False  # tell Celius at the next chance
         self.sessions: dict[str, SessionState] = store.load_sessions()
         self.running: dict[str, ToolEnv] = {}  # command id -> env (for cancel)
         self.tasks: set[asyncio.Task] = set()
         self.semaphore = asyncio.Semaphore(policy.max_concurrent_commands)
         self.wakeup = asyncio.Event()  # set when there is something new to send
-        self.adapters: dict[str, Any] = {}  # session id -> external adapter
         self.python = find_python()
         self.disconnect_requested = False
-        self._claude = None  # cached capability probe
 
     # ------------------------------------------------------------------ facts
 
     def capabilities(self) -> dict:
-        from celius_agent.adapters import claude_code
-
-        if self._claude is None:
-            self._claude = claude_code.probe()
         return {
             "shell": shell_name(),
             "python": self.python is not None,
             "git": shutil.which("git") is not None,
-            "claude_code": self._claude,
             "tools": sorted(TOOLS),
         }
+
+    def reload_policy(self) -> None:
+        if self.policy_loader is None:
+            return
+        try:
+            fresh = self.policy_loader()
+        except (OSError, ValueError) as exc:
+            log.error("Can't read the policy file, keeping the previous one: %s", exc)
+            return
+        if fresh.report() != self.policy.report():
+            log.info("Policy changed: %s", fresh.report())
+            self.policy = fresh
+            self.policy_changed = True
+            self.wakeup.set()
 
     def open_sessions(self) -> int:
         return sum(1 for s in self.sessions.values() if s.status != "closed")
@@ -99,11 +114,9 @@ class Runtime:
     def _session_from_payload(self, session_id: str, payload: dict) -> SessionState | None:
         session = SessionState(
             id=session_id,
-            mode=payload.get("mode") or "native",
-            adapter=payload.get("adapter") or "celius",
+            origin=payload.get("origin") or "portal",
             working_directory=payload.get("working_directory") or "",
             permissions=payload.get("permissions") or {},
-            external_session_id=payload.get("external_session_id"),
             next_seq=max(1, int(payload.get("next_seq") or 1)),
             acked=max(0, int(payload.get("next_seq") or 1) - 1),
             status="opening",
@@ -191,16 +204,6 @@ class Runtime:
                     env.cancel.set()
             elif kind == "interrupt":
                 await self._interrupt(session_id)
-            elif kind in ("session.message", "permission.decision"):
-                adapter = await self._adapter_for(
-                    session_id, run_id if kind == "session.message" else None
-                )
-                if adapter is None:
-                    log.warning("%s for session %s without an adapter", kind, session_id)
-                elif kind == "session.message":
-                    await adapter.send(payload, run_id)
-                else:
-                    await adapter.decide(payload)
             else:
                 log.warning("Unknown command kind %r", kind)
         except Exception:
@@ -233,16 +236,10 @@ class Runtime:
                 acked=max(0, int(payload.get("next_seq") or 1) - 1),
             )
             self.sessions[session_id] = session
-        session.mode = payload.get("mode") or "native"
-        session.adapter = payload.get("adapter") or "celius"
+        session.origin = payload.get("origin") or "portal"
         session.permissions = payload.get("permissions") or {}
-        session.external_session_id = payload.get("external_session_id")
+        self.reload_policy()
         try:
-            if session.adapter not in self.policy.adapters:
-                raise PathRefused(
-                    f"This machine's policy doesn't allow {session.adapter} sessions "
-                    "(policy file: adapters)"
-                )
             directory, writable = check_working_directory(
                 str(payload.get("working_directory") or ""), self.policy.roots
             )
@@ -254,22 +251,6 @@ class Runtime:
             )
             return
         session.working_directory, session.writable = directory, writable
-        if session.adapter == "claude_code":
-            from celius_agent.adapters.claude_code import ClaudeCodeAdapter
-
-            try:
-                adapter = ClaudeCodeAdapter(self, session)
-                await adapter.start()
-            except Exception as exc:  # SDK missing, CLI missing, not signed in...
-                session.status = "closed"
-                self.store.save_session(session)
-                await self.emit(
-                    session_id,
-                    "session.failed",
-                    {"command_id": command_id, "reason": f"Claude Code could not start: {exc}"},
-                )
-                return
-            self.adapters[session_id] = adapter
         session.status = "open"
         self.store.save_session(session)
         await self.emit(
@@ -283,37 +264,6 @@ class Runtime:
             },
         )
 
-    async def _adapter_for(self, session_id: str | None, run_id: str | None):
-        """The session's external agent, started again (resuming its own session id) if
-        this agent restarted since. If it can't start, the turn fails visibly."""
-        adapter = self.adapters.get(session_id or "")
-        session = self.sessions.get(session_id or "")
-        if adapter is not None or session is None or session.status != "open":
-            return adapter
-        if session.adapter != "claude_code":
-            return None
-        from celius_agent.adapters.claude_code import ClaudeCodeAdapter
-
-        try:
-            adapter = ClaudeCodeAdapter(self, session)
-            await adapter.start()
-        except Exception as exc:
-            log.exception("Claude Code could not restart for session %s", session.id)
-            if run_id:
-                await self.emit(
-                    session.id,
-                    "turn.completed",
-                    {
-                        "is_error": True,
-                        "subtype": "adapter_error",
-                        "result": f"Claude Code could not start: {exc}",
-                    },
-                    run_id,
-                )
-            return None
-        self.adapters[session.id] = adapter
-        return adapter
-
     def _stop_session_work(self, session_id: str) -> None:
         for env in self.running.values():
             if env.session_id == session_id:
@@ -324,9 +274,6 @@ class Runtime:
         if session is None or session.status == "closed":
             return
         self._stop_session_work(session.id)
-        adapter = self.adapters.pop(session.id, None)
-        if adapter is not None:
-            await adapter.stop()
         session.status = "closed"
         self.store.save_session(session)
         await self.emit(session.id, "session.closed", {"reason": payload.get("reason") or "closed"})
@@ -335,9 +282,6 @@ class Runtime:
         if not session_id:
             return
         self._stop_session_work(session_id)
-        adapter = self.adapters.get(session_id)
-        if adapter is not None:
-            await adapter.interrupt()
 
     # ------------------------------------------------------------------ tools
 
@@ -400,10 +344,5 @@ class Runtime:
     async def shutdown(self) -> None:
         for env in self.running.values():
             env.cancel.set()
-        for adapter in list(self.adapters.values()):
-            try:
-                await adapter.stop()
-            except Exception:
-                log.exception("Stopping an adapter failed")
         if self.tasks:
             await asyncio.wait(self.tasks, timeout=10)

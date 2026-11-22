@@ -220,9 +220,7 @@ async def _enqueue_reply(
     db.add_all([MessageRevision(message_id=assistant.id, revision=1, reason=reason), run])
     await db.flush()
     # A conversation running on a machine sends its runs there (ADR C-16).
-    await remote_sessions.attach_run(
-        db, conversation.id, run, await _parts_of(db, trigger), reason=reason
-    )
+    await remote_sessions.attach_run(db, conversation.id, run)
     branch.head_message_id = assistant.id
     record_sync(
         db, user.id, "message", assistant.id, payload={"conversation_id": str(conversation.id)}

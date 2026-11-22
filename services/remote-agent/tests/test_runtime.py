@@ -40,8 +40,7 @@ async def open_session(runtime, workdir, session_id="s1", directory=None):
             "kind": "session.open",
             "session_id": session_id,
             "payload": {
-                "mode": "native",
-                "adapter": "celius",
+                "origin": "portal",
                 "working_directory": str(directory or workdir / "proj"),
                 "permissions": {"allow_shell": True, "allow_write": True},
                 "next_seq": 1,
@@ -121,22 +120,28 @@ async def test_command_running_at_restart_is_reported_not_rerun(tmp_path, workdi
     assert not (workdir / "proj" / "ran").exists()
 
 
-async def test_session_outside_roots_or_adapter_not_allowed_fails(tmp_path, workdir):
+async def test_session_outside_roots_fails(tmp_path, workdir):
     runtime = make_runtime(tmp_path, workdir)
     await open_session(runtime, workdir, "s2", directory=tmp_path)
-    assert events(runtime, "s2")[0]["type"] == "session.failed"
-    await runtime.handle_command(
-        {
-            "id": "open-s3",
-            "kind": "session.open",
-            "session_id": "s3",
-            "payload": {"adapter": "claude_code", "working_directory": str(workdir / "proj")},
-        }
-    )
-    await settle(runtime)
-    failed = events(runtime, "s3")[0]
+    failed = events(runtime, "s2")[0]
     assert failed["type"] == "session.failed"
-    assert "adapters" in failed["data"]["reason"]
+    assert "roots" in failed["data"]["reason"]
+
+
+async def test_policy_is_reloaded_when_a_session_opens(tmp_path, workdir):
+    """`celius` may allow a new folder while the agent service runs."""
+    other = tmp_path / "other"
+    other.mkdir()
+    current = {"roots": [{"path": str(workdir), "write": True}], "allow_shell": True}
+    runtime = Runtime(
+        StateStore(tmp_path / "state"),
+        Policy.from_dict(current),
+        policy_loader=lambda: Policy.from_dict(current),
+    )
+    current = {**current, "roots": current["roots"] + [{"path": str(other), "write": True}]}
+    await open_session(runtime, workdir, "s3", directory=other)
+    assert events(runtime, "s3")[0]["type"] == "session.opened"
+    assert runtime.policy_changed  # Celius is told at the next chance
 
 
 async def test_cancel_and_close(tmp_path, workdir):
@@ -175,8 +180,7 @@ async def test_welcome_restores_a_lost_session(tmp_path, workdir):
             "s7": {
                 "status": "idle",
                 "last_seq": 12,
-                "mode": "native",
-                "adapter": "celius",
+                "origin": "portal",
                 "working_directory": str(workdir / "proj"),
                 "permissions": {"allow_shell": True},
                 "next_seq": 13,

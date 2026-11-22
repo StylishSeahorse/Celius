@@ -73,14 +73,9 @@ def test_policy_defaults_are_restrictive():
     policy = Policy.from_dict({})
     assert policy.roots == []
     assert policy.allow_shell is False
-    assert policy.adapters == ["celius"]
-    report = Policy.from_dict(
-        {"roots": ["relative", "/tmp"], "adapters": ["claude_code", "evil"]}
-    ).report()
-    assert [r["path"] for r in report["roots"]] == [
-        os.path.realpath("/tmp")
-    ] or sys.platform == "win32"
-    assert report["adapters"] == ["claude_code"]
+    report = Policy.from_dict({"roots": ["relative", "/tmp"]}).report()
+    if sys.platform != "win32":
+        assert [r["path"] for r in report["roots"]] == [os.path.realpath("/tmp")]
 
 
 def test_server_url_requires_https_except_localhost():

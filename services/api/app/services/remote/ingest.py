@@ -3,7 +3,7 @@
 Each session's events carry a sequence number assigned by the agent. A batch is processed
 in order under a lock on the session row; an event at or below the stored `last_seq` is a
 resend and is dropped; a gap stops the batch (the agent resends from the ack). Projections
-(command results, session state, the external agent's conversation) run only for events
+(command results, session state) run only for events
 stored by this call, in the same transaction, so nothing is applied twice.
 """
 
@@ -18,8 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.base import utcnow
 from app.models import RemoteAgent, RemoteCommand, RemoteSession, RemoteSessionEvent
-from app.models.remote import ENDED_SESSION_STATUSES, FINAL_COMMAND_STATUSES
-from app.services.remote import external
+from app.models.remote import FINAL_COMMAND_STATUSES
 from app.services.sync import record_sync
 
 log = logging.getLogger(__name__)
@@ -133,8 +132,6 @@ async def _project(
     if event.type in ("command.started", "command.completed"):
         await _command_update(db, agent, session, event)
         return
-    if session.mode == "external" and session.status not in ENDED_SESSION_STATUSES:
-        await external.project(db, session, event)
 
 
 async def _command_update(

@@ -59,8 +59,6 @@ DEFAULT_POLICY: dict = {
     # Run shell commands, Python and git (Celius still asks before each one by default).
     "allow_shell": False,
     "allow_write": True,
-    # Agent types: "celius" (Celius's own agent) and "claude_code" (needs Claude Code).
-    "adapters": ["celius"],
     "max_concurrent_commands": 2,
     "max_command_seconds": 3600,
     "max_output_chars": 1_000_000,
@@ -76,7 +74,6 @@ class Policy:
     roots: list[dict] = field(default_factory=list)
     allow_shell: bool = False
     allow_write: bool = True
-    adapters: list[str] = field(default_factory=lambda: ["celius"])
     max_concurrent_commands: int = 2
     max_command_seconds: int = 3600
     max_output_chars: int = 1_000_000
@@ -95,12 +92,10 @@ class Policy:
                     roots.append(
                         {"path": os.path.realpath(path), "write": bool(root.get("write", True))}
                     )
-        adapters = [a for a in raw.get("adapters") or ["celius"] if a in ("celius", "claude_code")]
         return cls(
             roots=roots,
             allow_shell=bool(raw.get("allow_shell", False)),
             allow_write=bool(raw.get("allow_write", True)),
-            adapters=adapters or ["celius"],
             max_concurrent_commands=max(1, int(raw.get("max_concurrent_commands") or 2)),
             max_command_seconds=max(1, int(raw.get("max_command_seconds") or 3600)),
             max_output_chars=max(10_000, int(raw.get("max_output_chars") or 1_000_000)),
@@ -114,7 +109,6 @@ class Policy:
             "roots": self.roots,
             "allow_shell": self.allow_shell,
             "allow_write": self.allow_write,
-            "adapters": self.adapters,
             "max_concurrent_commands": self.max_concurrent_commands,
         }
 

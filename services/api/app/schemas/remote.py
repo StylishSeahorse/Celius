@@ -1,4 +1,4 @@
-"""Celius Remote API shapes (ADR C-16)."""
+"""Celius Remote API shapes (ADR C-16, C-17)."""
 
 import uuid
 from datetime import datetime
@@ -7,7 +7,6 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 AgentState = Literal[
-    "awaiting_authorization",
     "revoked",
     "needs_attention",
     "busy",
@@ -20,14 +19,29 @@ AgentState = Literal[
 # ---------------------------------------------------------------------- user side
 
 
-class EnrollmentCreate(BaseModel):
-    name: str | None = Field(default=None, max_length=100)
+class DeviceRequestOut(BaseModel):
+    """A device that ran `celius login` naming you, waiting to be accepted."""
 
-
-class EnrollmentOut(BaseModel):
-    code: str  # shown once
+    id: uuid.UUID
+    user_code: str  # as shown on the device: compare before accepting
+    name: str | None
+    hostname: str | None
+    os: str | None
+    os_version: str | None
+    ip_address: str | None
+    created_at: datetime
     expires_at: datetime
-    command: str  # what to run on the machine
+
+
+class DeviceRequestList(BaseModel):
+    items: list[DeviceRequestOut]
+    # What to run on a device to sign it in.
+    login_command: str
+
+
+class DeviceDecision(BaseModel):
+    user_code: str = Field(min_length=4, max_length=20)
+    name: str | None = Field(default=None, max_length=100)
 
 
 class RemoteAgentConfig(BaseModel):
@@ -36,9 +50,6 @@ class RemoteAgentConfig(BaseModel):
     # always: every write/command on the machine asks first; profile: the chat's tool
     # profile decides, as for the sandbox.
     approval: Literal["always", "profile"] = "always"
-    adapters: list[Literal["celius", "claude_code"]] = Field(
-        default_factory=lambda: ["celius", "claude_code"]
-    )
     max_sessions: int = Field(default=4, ge=1, le=32)
     network: Literal["unrestricted", "restricted"] = "unrestricted"
 
@@ -56,8 +67,7 @@ class RemoteSessionSummary(BaseModel):
     agent_name: str | None
     agent_os: str | None
     agent_online: bool
-    mode: str
-    adapter: str
+    origin: str  # portal | device (started with `celius` on the machine)
     working_directory: str
     status: str
     status_detail: str | None
@@ -67,8 +77,7 @@ class RemoteSessionBrief(BaseModel):
     id: uuid.UUID
     conversation_id: uuid.UUID
     conversation_title: str | None = None
-    mode: str
-    adapter: str
+    origin: str
     working_directory: str
     status: str
     status_detail: str | None
@@ -119,7 +128,6 @@ class RemoteSessionCreate(BaseModel):
     conversation_id: uuid.UUID | None = None
     title: str | None = Field(default=None, max_length=300)
     project_id: uuid.UUID | None = None
-    adapter: Literal["celius", "claude_code"] = "celius"
     working_directory: str = Field(min_length=1, max_length=1000)
     permissions: SessionPermissions = Field(default_factory=SessionPermissions)
 
@@ -132,7 +140,6 @@ class RemoteSessionOut(RemoteSessionBrief):
     agent_online: bool
     permissions: dict[str, Any]
     effective_permissions: dict[str, Any]
-    external_session_id: str | None
     current_run_id: uuid.UUID | None
     last_seq: int
     opened_at: datetime | None
@@ -169,15 +176,65 @@ class MachineFacts(BaseModel):
     protocol_version: int | None = None
 
 
-class EnrollRequest(MachineFacts):
-    code: str = Field(min_length=4, max_length=40)
+class DeviceLoginRequest(MachineFacts):
+    """`celius login`: optionally name the Celius user who will accept it."""
+
+    username: str | None = Field(default=None, max_length=64)
+    name: str | None = Field(default=None, max_length=100)
 
 
-class EnrollResponse(BaseModel):
+class DeviceLoginStart(BaseModel):
+    device_code: str  # secret: only the device knows it
+    user_code: str  # shown to the person, e.g. BCDF-GHJK
+    verification_url: str  # where to accept it (the code filled in)
+    expires_in: int  # seconds
+    interval: int  # seconds between polls
+
+
+class DeviceLoginPoll(BaseModel):
+    device_code: str = Field(min_length=10, max_length=200)
+
+
+class DeviceLoginResult(BaseModel):
     agent_id: uuid.UUID
     credential: str  # shown once; store it securely
-    status: str
     name: str
+    username: str  # whose machine this now is
+
+
+class DeviceChatCreate(BaseModel):
+    working_directory: str = Field(min_length=1, max_length=1000)
+    title: str | None = Field(default=None, max_length=300)
+    model: str | None = Field(default=None, max_length=255)
+
+
+class DeviceChatOut(BaseModel):
+    conversation_id: uuid.UUID
+    session_id: uuid.UUID
+    title: str | None
+    working_directory: str
+    status: str
+    origin: str
+    updated_at: datetime
+    url: str  # the conversation in Celius
+
+
+class DeviceChatList(BaseModel):
+    items: list[DeviceChatOut]
+
+
+class DeviceMessage(BaseModel):
+    client_message_id: str = Field(min_length=1, max_length=64)
+    content: str = Field(min_length=1, max_length=200_000)
+
+
+class DeviceApproval(BaseModel):
+    args_hash: str = Field(min_length=64, max_length=64)
+    remember: bool = False
+
+
+class DeviceDenial(BaseModel):
+    reason: str | None = Field(default=None, max_length=500)
 
 
 class TokenRequest(BaseModel):

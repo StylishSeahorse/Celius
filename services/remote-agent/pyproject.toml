@@ -1,7 +1,7 @@
 [project]
 name = "celius-agent"
-version = "0.1.0"
-description = "Celius Remote Agent: runs Celius sessions on this machine"
+version = "0.2.0"
+description = "Celius on this device: sign in, chat here, and let Celius work on it"
 requires-python = ">=3.10"
 dependencies = [
     "websockets>=13",
@@ -10,11 +10,10 @@ dependencies = [
 [project.optional-dependencies]
 # Faster, more complete resource figures (CPU, memory) than the built-in fallbacks.
 monitor = ["psutil>=5.9"]
-# Claude Code sessions (mode 2). The SDK bundles the Claude Code CLI.
-claude = ["claude-agent-sdk>=0.1"]
 
 [project.scripts]
-celius-agent = "celius_agent.cli:main"
+celius = "celius_agent.cli:main"
+celius-agent = "celius_agent.cli:main"  # earlier name
 
 [dependency-groups]
 dev = [

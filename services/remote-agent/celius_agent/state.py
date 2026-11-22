@@ -47,12 +47,10 @@ def now_iso() -> str:
 @dataclass
 class SessionState:
     id: str
-    mode: str = "native"
-    adapter: str = "celius"
+    origin: str = "portal"  # portal | device (started with `celius` here)
     working_directory: str = ""
     writable: bool = False
     permissions: dict = field(default_factory=dict)
-    external_session_id: str | None = None
     status: str = "opening"  # opening | open | closed
     next_seq: int = 1
     acked: int = 0

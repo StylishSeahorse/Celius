@@ -265,7 +265,8 @@ class Settings(BaseSettings):
     # Celius Remote (ADR C-16, docs/remote/). Machines connect out to this server over a
     # WebSocket; nothing is reachable on them. Off: the remote endpoints answer 404.
     remote_agents_enabled: bool = True
-    remote_enrollment_ttl_minutes: int = Field(default=15, ge=1, le=1440)
+    # How long a `celius login` waits for someone to accept the device in Celius.
+    remote_device_login_ttl_minutes: int = Field(default=15, ge=1, le=1440)
     # Short-lived access tokens agents exchange their credential for.
     remote_token_ttl_seconds: int = Field(default=900, ge=60, le=86400)
     # After a credential rotation, the old credential works this long (or until the new

@@ -142,7 +142,6 @@ class AgentProcess:
                     "roots": [{"path": str(r), "write": True} for r in roots],
                     "allow_shell": allow_shell,
                     "allow_write": True,
-                    "adapters": ["celius"],
                 }
             )
         )
@@ -151,15 +150,33 @@ class AgentProcess:
         self.runtime: Runtime | None = None
 
     async def register(self, http: httpx.AsyncClient, name: str) -> str:
-        code = (await http.post("/api/v1/remote/enrollments", json={"name": name})).json()["code"]
-        enrolled = (
-            await http.post("/api/v1/remote/enroll", json={"code": code, "os": "linux"})
-        ).json()
-        save_config(self.paths, AgentConfig(server_url=self.server, agent_id=enrolled["agent_id"]))
-        save_credential(self.paths.credential, enrolled["credential"])
-        response = await http.post(f"/api/v1/remote/agents/{enrolled['agent_id']}/authorize")
-        assert response.status_code == 200
-        return enrolled["agent_id"]
+        """`celius login`, run for real, and accepted in Celius by the test user."""
+        from celius_agent.login import device_login
+
+        config = AgentConfig(server_url=self.server)
+        accepted: list[str] = []
+
+        def say(line: str) -> None:
+            if "Sign-in code:" in line:
+                accepted.append(line.split(":", 1)[1].strip())
+
+        async def accept() -> None:
+            while not accepted:
+                await asyncio.sleep(0.05)
+            response = await http.post(
+                "/api/v1/remote/devices/accept", json={"user_code": accepted[0], "name": name}
+            )
+            assert response.status_code == 201, response.text
+
+        acceptor = asyncio.create_task(accept())
+        result = await asyncio.to_thread(
+            device_login, config, name=name, say=say, sleep=lambda _: time.sleep(0.1)
+        )
+        await acceptor
+        config.agent_id, config.name = result["agent_id"], result["name"]
+        save_config(self.paths, config)
+        save_credential(self.paths.credential, result["credential"])
+        return result["agent_id"]
 
     def start(self) -> None:
         from celius_agent.config import load_config
@@ -167,7 +184,9 @@ class AgentProcess:
 
         config = load_config(self.paths)
         policy = load_policy(self.paths)
-        self.runtime = Runtime(StateStore(self.paths.state), policy)
+        self.runtime = Runtime(
+            StateStore(self.paths.state), policy, policy_loader=lambda: load_policy(self.paths)
+        )
         connection = Connection(
             config, self.runtime, load_credential(self.paths.credential), Monitor()
         )
@@ -486,6 +505,123 @@ async def test_two_machines_run_sessions_at_the_same_time(
     finally:
         for agent, _ in agents:
             await agent.shutdown()
+
+
+class ScriptedUI:
+    """The `celius` chat's terminal, answered by the test."""
+
+    def __init__(self, approve: str | None = "once"):
+        self.text: list[str] = []
+        self.tools: list[str] = []
+        self.outputs: list[str] = []
+        self.notes: list[str] = []
+        self.answer = approve
+        self.asked: list[dict] = []
+
+    def write(self, text):
+        self.text.append(text)
+
+    def note(self, text):
+        self.notes.append(text)
+
+    def tool(self, text):
+        self.tools.append(text)
+
+    def output(self, text):
+        self.outputs.append(text)
+
+    def error(self, text):
+        self.notes.append(f"error: {text}")
+
+    def confirm(self, question):
+        return True
+
+    def approve(self, call):
+        self.asked.append(call)
+        return self.answer
+
+
+async def test_celius_cli_chat_runs_here_and_shows_in_celius(
+    http, server, worker, fake, sessionmaker, tmp_path
+):
+    """`celius` started in a folder on the device: Celius's model and approvals, tools
+    run in that folder, approved from the terminal; the chat is an ordinary conversation."""
+    from celius_agent.chat import Chat, ensure_folder_allowed
+    from celius_agent.client import DeviceClient
+    from celius_agent.config import load_config
+    from celius_agent.credentials import load_credential
+
+    project = tmp_path / "project"
+    project.mkdir()
+    agent = AgentProcess(tmp_path / "agent-home", server, [], allow_shell=False)
+    agent_id = await agent.register(http, "Dev laptop")
+    ui = ScriptedUI()
+    # First start in this folder: the person at the keyboard allows it.
+    assert ensure_folder_allowed(agent.paths, str(project), ui)
+    agent.start()  # the agent the chat starts when no service runs
+    await until(lambda: _online(http, agent_id), what="online")
+
+    client = DeviceClient(load_config(agent.paths), load_credential(agent.paths.credential))
+    chat = Chat(client, ui)
+    await asyncio.to_thread(chat.start, str(project))
+    fake.turns = [
+        [{"name": "run_shell", "arguments": {"command": "echo from-the-cli > made.txt"}}],
+    ]
+    fake.reply = "Created made.txt."
+    status = await asyncio.to_thread(chat.send, "Make a file here")
+    assert status == "completed", ui.notes
+    assert (project / "made.txt").read_text().strip() == "from-the-cli"
+    assert [c["tool_name"] for c in ui.asked] == ["run_shell"]  # asked in the terminal
+    assert ui.tools and ui.tools[0].startswith("run_shell")
+    assert "Created made.txt." in "".join(ui.text)
+
+    # The same conversation in Celius, marked as started on the device.
+    conversations = (await http.get("/api/v1/conversations")).json()["items"]
+    mine = next(c for c in conversations if c["id"] == chat.conversation_id)
+    assert mine["remote"]["origin"] == "device"
+    assert mine["remote"]["agent_name"] == "Dev laptop"
+    detail = (await http.get(f"/api/v1/conversations/{chat.conversation_id}")).json()
+    call = detail["messages"][-1]["tool_calls"][0]
+    assert call["status"] == "completed" and call["decision_source"] == "user"
+    # Another machine can't reach this chat.
+    other = AgentProcess(tmp_path / "other-home", server, [])
+    await other.register(http, "Other")
+    stranger = DeviceClient(load_config(other.paths), load_credential(other.paths.credential))
+    with pytest.raises(Exception) as denied:
+        await asyncio.to_thread(
+            stranger.call, "GET", f"/api/v1/remote/device/chats/{chat.conversation_id}"
+        )
+    assert getattr(denied.value, "status", None) == 404
+    await agent.shutdown()
+
+
+async def test_cli_one_shot_waits_for_approval_in_celius(
+    http, server, worker, fake, sessionmaker, tmp_path
+):
+    """`celius -p …` without a terminal: the request is answered in Celius instead."""
+    from celius_agent.chat import Chat
+    from celius_agent.client import DeviceClient
+    from celius_agent.config import load_config
+    from celius_agent.credentials import load_credential
+
+    project = tmp_path / "project"
+    project.mkdir()
+    agent = AgentProcess(tmp_path / "agent-home", server, [project])
+    agent_id = await agent.register(http, "Server")
+    agent.start()
+    await until(lambda: _online(http, agent_id), what="online")
+    ui = ScriptedUI(approve=None)
+    chat = Chat(DeviceClient(load_config(agent.paths), load_credential(agent.paths.credential)), ui)
+    await asyncio.to_thread(chat.start, str(project))
+    fake.turns = [[{"name": "run_python", "arguments": {"code": "print(6 * 7)"}}]]
+    fake.reply = "42"
+    sending = asyncio.create_task(asyncio.to_thread(chat.send, "Compute"))
+    call = await pending_call(http, chat.conversation_id)
+    await approve(http, call)  # from the phone / web app
+    assert await asyncio.wait_for(sending, 60) == "completed"
+    assert any("Waiting for a decision in Celius" in n for n in ui.notes)
+    assert any("42" in o for o in ui.outputs)
+    await agent.shutdown()
 
 
 async def test_ended_session_is_not_moved_back_to_the_sandbox(http, server, tmp_path):

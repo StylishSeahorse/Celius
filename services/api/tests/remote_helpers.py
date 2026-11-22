@@ -1,5 +1,5 @@
-"""Helpers for Celius Remote tests: an in-process ASGI WebSocket client and shortcuts to
-register and authorise a machine."""
+"""Helpers for Celius Remote tests: an in-process ASGI WebSocket client and a shortcut to
+sign a machine in (device login accepted in Celius)."""
 
 import asyncio
 import json
@@ -87,37 +87,37 @@ class ASGIWebSocket:
 
 
 async def register_machine(
-    client, headers, *, authorize: bool = True, name: str = "Workstation", os: str = "linux"
+    client, headers, *, name: str = "Workstation", os: str = "linux", username: str | None = None
 ) -> dict:
-    """Pairing code → enroll → (authorise). Returns ids, credential and an access token."""
-    response = await client.post("/api/v1/remote/enrollments", json={"name": name}, headers=headers)
-    assert response.status_code == 201, response.text
-    code = response.json()["code"]
-    response = await client.post(
-        "/api/v1/remote/enroll",
+    """`celius login` on a device, accepted in Celius by the user of `headers`. Returns the
+    machine id, its credential and an access token."""
+    started = await client.post(
+        "/api/v1/remote/device/login",
         json={
-            "code": code,
-            "hostname": f"{name.lower()}-host",
+            "username": username,
+            "name": name,
+            "hostname": f"{name.lower().replace(' ', '-')}-host",
             "os": os,
             "os_version": "test",
             "arch": "x86_64",
-            "agent_version": "0.1.0",
+            "agent_version": "0.2.0",
             "protocol_version": 1,
         },
     )
-    assert response.status_code == 201, response.text
-    enrolled = response.json()
-    result = {"agent_id": enrolled["agent_id"], "credential": enrolled["credential"]}
-    if authorize:
-        response = await client.post(
-            f"/api/v1/remote/agents/{enrolled['agent_id']}/authorize", headers=headers
-        )
-        assert response.status_code == 200, response.text
-        response = await client.post(
-            "/api/v1/remote/token", json={"credential": enrolled["credential"]}
-        )
-        assert response.status_code == 200, response.text
-        result["token"] = response.json()["access_token"]
+    assert started.status_code == 201, started.text
+    login = started.json()
+    accepted = await client.post(
+        "/api/v1/remote/devices/accept", json={"user_code": login["user_code"]}, headers=headers
+    )
+    assert accepted.status_code == 201, accepted.text
+    polled = await client.post(
+        "/api/v1/remote/device/login/poll", json={"device_code": login["device_code"]}
+    )
+    assert polled.status_code == 200, polled.text
+    result = {"agent_id": polled.json()["agent_id"], "credential": polled.json()["credential"]}
+    response = await client.post("/api/v1/remote/token", json={"credential": result["credential"]})
+    assert response.status_code == 200, response.text
+    result["token"] = response.json()["access_token"]
     return result
 
 
@@ -133,7 +133,6 @@ def hello(**overrides) -> dict:
             "roots": [{"path": "/srv/work", "write": True}],
             "allow_shell": True,
             "allow_write": True,
-            "adapters": ["celius"],
         },
         "resources": {"cpu_percent": 5.0},
     }

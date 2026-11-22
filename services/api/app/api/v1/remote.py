@@ -32,14 +32,32 @@ from app.config import Settings, get_settings
 from app.db import SessionFactory, get_db, get_session_factory
 from app.db.base import utcnow
 from app.errors import AppError
-from app.models import Conversation, RemoteAgent, RemoteCommand, RemoteSession, RemoteSessionEvent
+from app.models import (
+    Conversation,
+    RemoteAgent,
+    RemoteCommand,
+    RemoteSession,
+    RemoteSessionEvent,
+    Run,
+    ToolCall,
+    User,
+)
 from app.models.remote import ENDED_SESSION_STATUSES, FINAL_COMMAND_STATUSES
 from app.schemas.conversations import ConversationCreate
 from app.schemas.remote import (
-    EnrollmentCreate,
-    EnrollmentOut,
-    EnrollRequest,
-    EnrollResponse,
+    DeviceApproval,
+    DeviceChatCreate,
+    DeviceChatList,
+    DeviceChatOut,
+    DeviceDecision,
+    DeviceDenial,
+    DeviceLoginPoll,
+    DeviceLoginRequest,
+    DeviceLoginResult,
+    DeviceLoginStart,
+    DeviceMessage,
+    DeviceRequestList,
+    DeviceRequestOut,
     RemoteAgentList,
     RemoteAgentOut,
     RemoteAgentUpdate,
@@ -86,8 +104,7 @@ def _brief(
         id=session.id,
         conversation_id=session.conversation_id,
         conversation_title=title,
-        mode=session.mode,
-        adapter=session.adapter,
+        origin=session.origin,
         working_directory=session.working_directory,
         status=status or session.status,
         status_detail=session.status_detail,
@@ -163,7 +180,6 @@ async def session_out(
         agent_online=svc.is_online(agent, settings) if agent else False,
         permissions=session.permissions or {},
         effective_permissions=svc.effective_permissions(agent, session) if agent else {},
-        external_session_id=session.external_session_id,
         current_run_id=session.current_run_id,
         last_seq=session.last_seq,
         opened_at=session.opened_at,
@@ -173,19 +189,51 @@ async def session_out(
 # ---------------------------------------------------------------------- machines
 
 
-@router.post("/enrollments", response_model=EnrollmentOut, status_code=status.HTTP_201_CREATED)
-async def create_enrollment(
-    body: EnrollmentCreate, auth: CurrentAuth, db: DB, settings: AppSettings
-) -> EnrollmentOut:
-    """A one-time pairing code (valid a few minutes) to register a machine."""
-    code, enrollment = await identity.create_enrollment(db, auth.user.id, body.name, settings)
-    await db.commit()
+def _login_command(settings: Settings, username: str | None = None) -> str:
     server = settings.app_public_url.rstrip("/")
-    return EnrollmentOut(
-        code=code,
-        expires_at=enrollment.expires_at,
-        command=f"celius-agent register --server {server} --code {code}",
+    return f"celius login --server {server}" + (f" --user {username}" if username else "")
+
+
+@router.get("/devices", response_model=DeviceRequestList)
+async def device_requests(auth: CurrentAuth, db: DB, settings: AppSettings) -> DeviceRequestList:
+    """Devices that ran `celius login --user <you>` and wait for you to accept them."""
+    rows = await identity.requests_for(db, auth.user)
+    return DeviceRequestList(
+        items=[
+            DeviceRequestOut(
+                id=r.id,
+                user_code=identity.format_user_code(r.user_code),
+                name=r.name,
+                hostname=(r.facts or {}).get("hostname"),
+                os=(r.facts or {}).get("os"),
+                os_version=(r.facts or {}).get("os_version"),
+                ip_address=r.ip_address,
+                created_at=r.created_at,
+                expires_at=r.expires_at,
+            )
+            for r in rows
+        ],
+        login_command=_login_command(settings, auth.user.username),
     )
+
+
+@router.post("/devices/accept", response_model=RemoteAgentOut, status_code=status.HTTP_201_CREATED)
+async def accept_device(
+    body: DeviceDecision, request: Request, auth: CurrentAuth, db: DB, settings: AppSettings
+) -> RemoteAgentOut:
+    """Accept a device by the code it shows: it becomes one of your machines."""
+    agent = await identity.approve_device(db, auth.user, body.user_code, body.name, _ip(request))
+    await db.commit()
+    return agent_out(agent, settings, [])
+
+
+@router.post("/devices/refuse", status_code=status.HTTP_204_NO_CONTENT)
+async def refuse_device(
+    body: DeviceDecision, request: Request, auth: CurrentAuth, db: DB
+) -> Response:
+    await identity.deny_device(db, auth.user, body.user_code, _ip(request))
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/agents", response_model=RemoteAgentList)
@@ -254,17 +302,6 @@ async def update_agent(
 
 async def _ended_with_agent(db: AsyncSession, agent: RemoteAgent, detail: str) -> None:
     await svc.end_agent_sessions(db, agent, detail)
-
-
-@router.post("/agents/{agent_id}/authorize", response_model=RemoteAgentOut)
-async def authorize_agent(
-    agent_id: uuid.UUID, request: Request, auth: CurrentAuth, db: DB, settings: AppSettings
-) -> RemoteAgentOut:
-    """Explicit authorisation: a newly registered machine gets no work until this."""
-    agent = await svc.owned_agent(db, auth.user.id, agent_id)
-    await identity.authorize(db, agent, auth.user.id, _ip(request))
-    await db.commit()
-    return await get_agent(agent_id, auth, db, settings)
 
 
 @router.post("/agents/{agent_id}/revoke", response_model=RemoteAgentOut)
@@ -363,7 +400,6 @@ async def create_session(
         owner_id=auth.user.id,
         agent=agent,
         conversation=conversation,
-        adapter=body.adapter,
         working_directory=body.working_directory.strip(),
         permissions=body.permissions.model_dump(exclude_none=True),
         ip_address=_ip(request),
@@ -602,15 +638,42 @@ async def fetch_file(
 # ---------------------------------------------------------------------- agent side
 
 
-@router.post("/enroll", response_model=EnrollResponse, status_code=status.HTTP_201_CREATED)
-async def enroll(body: EnrollRequest, request: Request, db: DB) -> EnrollResponse:
-    """Called by `celius-agent register` with a pairing code."""
-    agent, credential = await identity.enroll(
-        db, body.code, body.model_dump(exclude={"code"}), _ip(request)
+@router.post("/device/login", response_model=DeviceLoginStart, status_code=status.HTTP_201_CREATED)
+async def device_login(
+    body: DeviceLoginRequest, request: Request, db: DB, settings: AppSettings
+) -> DeviceLoginStart:
+    """`celius login` on a device: start a sign-in that someone accepts in Celius."""
+    device_code, sign_in = await identity.start_device_login(
+        db,
+        username=body.username,
+        name=body.name,
+        facts=body.model_dump(exclude={"username", "name"}),
+        ip_address=_ip(request),
+        settings=settings,
     )
     await db.commit()
-    return EnrollResponse(
-        agent_id=agent.id, credential=credential, status=agent.status, name=agent.name
+    code = identity.format_user_code(sign_in.user_code)
+    return DeviceLoginStart(
+        device_code=device_code,
+        user_code=code,
+        verification_url=f"{settings.app_public_url.rstrip('/')}/#/devices?code={code}",
+        expires_in=settings.remote_device_login_ttl_minutes * 60,
+        interval=identity.POLL_INTERVAL_SECONDS,
+    )
+
+
+@router.post("/device/login/poll", response_model=DeviceLoginResult)
+async def device_login_poll(body: DeviceLoginPoll, db: DB) -> DeviceLoginResult:
+    """Has the sign-in been accepted? 428 `authorization_pending` until it is."""
+    try:
+        agent, credential = await identity.poll_device_login(db, body.device_code)
+    except AppError:
+        await db.commit()  # an expired request is recorded as such
+        raise
+    owner = await db.get(User, agent.owner_id)
+    await db.commit()
+    return DeviceLoginResult(
+        agent_id=agent.id, credential=credential, name=agent.name, username=owner.username
     )
 
 
@@ -638,6 +701,255 @@ async def rotate(request: Request, db: DB, settings: AppSettings) -> RotateRespo
     credential = await identity.rotate_credential(db, agent, settings, _ip(request))
     await db.commit()
     return RotateResponse(credential=credential)
+
+
+# ---------------------------------------------------------------------- the device itself
+#
+# The `celius` command line on a signed-in device: a chat that runs on this machine, in
+# the folder it was started in. It authenticates as the machine (never as a user session)
+# and only reaches conversations that run on this machine.
+
+
+async def _device(request: Request, db: DB, settings: AppSettings) -> tuple[RemoteAgent, User]:
+    """The calling machine and its owner, from the machine's access token. A dependency, so
+    it is checked before anything else in the request."""
+    agent = await identity.agent_for_token(db, _bearer(request), settings)
+    owner = await db.get(User, agent.owner_id)
+    if owner is None or not owner.is_active:
+        raise AppError(403, "owner_inactive", "The account this machine belongs to is disabled")
+    return agent, owner
+
+
+Device = Annotated[tuple[RemoteAgent, User], Depends(_device)]
+
+
+async def _device_session(
+    db: AsyncSession, agent: RemoteAgent, conversation_id: uuid.UUID
+) -> RemoteSession:
+    session = await db.scalar(
+        select(RemoteSession)
+        .where(RemoteSession.conversation_id == conversation_id, RemoteSession.agent_id == agent.id)
+        .order_by(RemoteSession.created_at.desc())
+        .limit(1)
+    )
+    if session is None:
+        raise AppError(404, "not_found", "No chat on this machine with that id")
+    return session
+
+
+async def _device_run(db: AsyncSession, agent: RemoteAgent, run_id: uuid.UUID) -> Run:
+    run = await db.get(Run, run_id)
+    session = (
+        await db.get(RemoteSession, run.remote_session_id)
+        if run and run.remote_session_id
+        else None
+    )
+    if run is None or session is None or session.agent_id != agent.id:
+        raise AppError(404, "not_found", "Run not found")
+    return run
+
+
+def _device_chat(
+    session: RemoteSession, conversation: Conversation, status_: str, settings: Settings
+) -> DeviceChatOut:
+    return DeviceChatOut(
+        conversation_id=conversation.id,
+        session_id=session.id,
+        title=conversation.title,
+        working_directory=session.working_directory,
+        status=status_,
+        origin=session.origin,
+        updated_at=conversation.updated_at,
+        url=f"{settings.app_public_url.rstrip('/')}/#/c/{conversation.id}",
+    )
+
+
+@router.post("/device/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def device_logout(
+    request: Request, device: Device, db: DB, settings: AppSettings
+) -> Response:
+    """`celius logout`: the machine revokes itself (its sessions end)."""
+    agent, owner = device
+    await identity.revoke(db, agent, owner.id, _ip(request))
+    await svc.end_agent_sessions(db, agent, "The machine signed out")
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/device/chats", response_model=DeviceChatOut, status_code=status.HTTP_201_CREATED)
+async def device_chat_create(
+    body: DeviceChatCreate, request: Request, device: Device, db: DB, settings: AppSettings
+) -> DeviceChatOut:
+    """A new conversation running on this machine, in `working_directory`."""
+    agent, owner = device
+    conversation, _ = await conversation_svc.create_conversation(
+        db, owner.id, ConversationCreate(title=body.title, model_override=body.model)
+    )
+    session = await svc.open_session(
+        db,
+        owner_id=owner.id,
+        agent=agent,
+        conversation=conversation,
+        origin="device",
+        working_directory=body.working_directory.strip(),
+        permissions={},
+        ip_address=_ip(request),
+    )
+    await db.commit()
+    return _device_chat(session, conversation, session.status, settings)
+
+
+@router.get("/device/chats", response_model=DeviceChatList)
+async def device_chats(
+    request: Request,
+    device: Device,
+    db: DB,
+    settings: AppSettings,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> DeviceChatList:
+    """Recent chats that run on this machine (started here or in Celius)."""
+    agent, _ = device
+    rows = (
+        await db.execute(
+            select(RemoteSession, Conversation)
+            .join(Conversation, Conversation.id == RemoteSession.conversation_id)
+            .where(RemoteSession.agent_id == agent.id, Conversation.deleted_at.is_(None))
+            .order_by(Conversation.updated_at.desc())
+            .limit(limit * 3)
+        )
+    ).all()
+    seen: set[uuid.UUID] = set()
+    latest = []
+    for session, conversation in rows:
+        if conversation.id not in seen:
+            seen.add(conversation.id)
+            latest.append((session, conversation))
+    latest = latest[:limit]
+    live = await svc.live_statuses(db, [s for s, _ in latest])
+    return DeviceChatList(
+        items=[_device_chat(s, c, live.get(s.id, s.status), settings) for s, c in latest]
+    )
+
+
+@router.get("/device/chats/{conversation_id}")
+async def device_chat(
+    conversation_id: uuid.UUID, request: Request, device: Device, db: DB, settings: AppSettings
+):
+    """The conversation, as clients see it (messages, tool calls, active run)."""
+    from app.api.v1.conversations import conversation_detail
+
+    agent, owner = device
+    await _device_session(db, agent, conversation_id)
+    conversation = await conversation_svc.get_owned_conversation(db, owner.id, conversation_id)
+    return await conversation_detail(db, conversation)
+
+
+@router.post("/device/chats/{conversation_id}/messages", status_code=status.HTTP_201_CREATED)
+async def device_chat_message(
+    conversation_id: uuid.UUID,
+    body: DeviceMessage,
+    request: Request,
+    device: Device,
+    db: DB,
+    settings: AppSettings,
+):
+    """Send a message; the reply runs as any other, its tools on this machine."""
+    from app.schemas.conversations import MessageSubmit
+    from app.services.chat import submit_message
+
+    agent, owner = device
+    session = await _device_session(db, agent, conversation_id)
+    if session.status in ENDED_SESSION_STATUSES:
+        raise AppError(409, "remote_session_ended", "This chat's session on the machine has ended")
+    return await submit_message(
+        db,
+        owner,
+        conversation_id,
+        MessageSubmit(client_message_id=body.client_message_id, content=body.content),
+        settings,
+    )
+
+
+@router.get("/device/runs/{run_id}/events", response_class=StreamingResponse)
+async def device_run_events(
+    run_id: uuid.UUID,
+    request: Request,
+    device: Device,
+    db: DB,
+    factory: Factory,
+    settings: AppSettings,
+    after: Annotated[int | None, Query(ge=0)] = None,
+) -> StreamingResponse:
+    """The reply's live events (the same stream the apps follow)."""
+    from app.api.v1.runs import _event_stream
+
+    agent, _ = device
+    await _device_run(db, agent, run_id)
+    return StreamingResponse(
+        _event_stream(request, factory, settings, run_id, after or 0),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.post("/device/runs/{run_id}/cancel", status_code=status.HTTP_204_NO_CONTENT)
+async def device_run_cancel(
+    run_id: uuid.UUID, request: Request, device: Device, db: DB, settings: AppSettings
+) -> Response:
+    from app.services.runs import request_cancel
+
+    agent, _ = device
+    run = await _device_run(db, agent, run_id)
+    await request_cancel(db, run)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+async def _device_call(db: AsyncSession, agent: RemoteAgent, call_id: uuid.UUID) -> ToolCall:
+    call = await db.get(ToolCall, call_id)
+    if call is None:
+        raise AppError(404, "not_found", "Tool call not found")
+    await _device_run(db, agent, call.run_id)
+    return call
+
+
+@router.post("/device/tool-calls/{call_id}/approve")
+async def device_approve(
+    call_id: uuid.UUID,
+    body: DeviceApproval,
+    request: Request,
+    device: Device,
+    db: DB,
+    settings: AppSettings,
+):
+    """Approve a request in a chat on this machine (from its own terminal)."""
+    from app.services.tools.calls import approve, tool_call_out
+
+    agent, owner = device
+    await _device_call(db, agent, call_id)
+    call = await approve(
+        db, owner, call_id, body.args_hash, remember=body.remember, ip_address=_ip(request)
+    )
+    await db.commit()
+    return tool_call_out(call)
+
+
+@router.post("/device/tool-calls/{call_id}/deny")
+async def device_deny(
+    call_id: uuid.UUID,
+    body: DeviceDenial,
+    request: Request,
+    device: Device,
+    db: DB,
+    settings: AppSettings,
+):
+    from app.services.tools.calls import deny, tool_call_out
+
+    agent, owner = device
+    await _device_call(db, agent, call_id)
+    call = await deny(db, owner, call_id, body.reason, ip_address=_ip(request))
+    await db.commit()
+    return tool_call_out(call)
 
 
 @router.websocket("/agent/connect")

@@ -26,8 +26,9 @@ from app.db.base import Base, JSONType, Timestamps, UUIDPrimaryKey
 BigIntPK = BigInteger().with_variant(Integer, "sqlite")
 
 AGENT_STATUSES = ("pending", "active", "revoked")
-SESSION_MODES = ("native", "external")
-SESSION_ADAPTERS = ("celius", "claude_code")
+# portal: opened from a Celius client; device: started by `celius` on the machine itself.
+SESSION_ORIGINS = ("portal", "device")
+DEVICE_REQUEST_STATUSES = ("pending", "approved", "denied", "consumed", "expired")
 # opening: waiting for the agent to accept the working directory.
 SESSION_STATUSES = ("opening", "idle", "running", "awaiting_approval", "failed", "terminated")
 ENDED_SESSION_STATUSES = frozenset({"failed", "terminated"})
@@ -44,7 +45,7 @@ FINAL_COMMAND_STATUSES = frozenset({"completed", "failed", "cancelled", "expired
 
 
 class RemoteAgent(UUIDPrimaryKey, Timestamps, Base):
-    """A machine registered by a user. Not trusted until `authorized_at` is set."""
+    """A machine signed in with `celius login` and accepted by its owner in Celius."""
 
     __tablename__ = "remote_agents"
 
@@ -58,8 +59,8 @@ class RemoteAgent(UUIDPrimaryKey, Timestamps, Base):
     arch: Mapped[str | None] = mapped_column(String(32))
     agent_version: Mapped[str | None] = mapped_column(String(32))
     protocol_version: Mapped[int | None] = mapped_column(Integer)
-    # pending (awaiting the user's authorisation) | active | revoked
-    status: Mapped[str] = mapped_column(String(16), default="pending", nullable=False)
+    # active | revoked (a device is accepted in Celius before it exists here)
+    status: Mapped[str] = mapped_column(String(16), default="active", nullable=False)
     # What the machine reports: shells, python, adapters available, GPUs...
     capabilities: Mapped[dict] = mapped_column(JSONType, default=dict, nullable=False)
     # The machine's own policy file (roots, allow_shell, allow_write, adapters), reported in
@@ -95,22 +96,35 @@ class RemoteAgentCredential(UUIDPrimaryKey, Base):
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
-class RemoteEnrollment(UUIDPrimaryKey, Base):
-    """A one-time pairing code a user creates to register a machine."""
+class RemoteDeviceRequest(UUIDPrimaryKey, Base):
+    """A device asking to sign in (`celius login`), until someone accepts it in Celius.
 
-    __tablename__ = "remote_enrollments"
+    Like the OAuth device flow: the device holds a secret `device_code` (only its hash is
+    stored) and polls; the person sees a short `user_code` on the device and accepts the
+    request in Celius. Naming a user at login shows the request in that user's list;
+    otherwise the code must be typed in."""
 
-    owner_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    __tablename__ = "remote_device_requests"
+
+    device_code_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    user_code: Mapped[str] = mapped_column(String(16), index=True, nullable=False)
+    # The user named at login (`celius login --user`), if any.
+    target_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
-    code_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     name: Mapped[str | None] = mapped_column(String(100))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    facts: Mapped[dict] = mapped_column(JSONType, default=dict, nullable=False)
+    ip_address: Mapped[str | None] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(16), default="pending", nullable=False)
+    decided_by: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL")
+    )
     agent_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("remote_agents.id", ondelete="SET NULL")
     )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class RemoteSession(UUIDPrimaryKey, Timestamps, Base):
@@ -128,15 +142,15 @@ class RemoteSession(UUIDPrimaryKey, Timestamps, Base):
     agent_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("remote_agents.id", ondelete="SET NULL")
     )
-    mode: Mapped[str] = mapped_column(String(16), nullable=False)  # native | external
-    adapter: Mapped[str] = mapped_column(String(32), nullable=False)  # celius | claude_code
+    origin: Mapped[str] = mapped_column(
+        String(16), default="portal", server_default="portal", nullable=False
+    )
     working_directory: Mapped[str] = mapped_column(String(1000), nullable=False)
     status: Mapped[str] = mapped_column(String(24), default="opening", nullable=False)
     status_detail: Mapped[str | None] = mapped_column(String(500))
     # Session-level limits within the machine's: {"allow_shell", "allow_write",
     # "approval", "time_limit_seconds"}.
     permissions: Mapped[dict] = mapped_column(JSONType, default=dict, nullable=False)
-    external_session_id: Mapped[str | None] = mapped_column(String(128))
     current_run_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("runs.id", ondelete="SET NULL", use_alter=True)
     )

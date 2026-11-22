@@ -76,7 +76,7 @@ from app.models.remote import (
     RemoteAgent,
     RemoteAgentCredential,
     RemoteCommand,
-    RemoteEnrollment,
+    RemoteDeviceRequest,
     RemoteSession,
     RemoteSessionEvent,
 )
@@ -124,7 +124,7 @@ __all__ = [
     "RemoteAgent",
     "RemoteAgentCredential",
     "RemoteCommand",
-    "RemoteEnrollment",
+    "RemoteDeviceRequest",
     "RemoteSession",
     "RemoteSessionEvent",
     "Skill",

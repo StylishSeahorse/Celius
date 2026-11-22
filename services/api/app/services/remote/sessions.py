@@ -27,8 +27,6 @@ from app.models.remote import ENDED_SESSION_STATUSES
 from app.services.audit import audit
 from app.services.sync import record_sync
 
-ADAPTER_MODE = {"celius": "native", "claude_code": "external"}
-
 
 def _aware(moment: datetime | None) -> datetime | None:
     if moment is None or moment.tzinfo:
@@ -86,8 +84,6 @@ def effective_permissions(agent: RemoteAgent, session: RemoteSession | None = No
         allow_shell = allow_shell and bool(limits["allow_shell"])
     if "allow_write" in limits:
         allow_write = allow_write and bool(limits["allow_write"])
-    adapters = set(local.get("adapters") or []) | {"celius"}
-    adapters &= set(config.get("adapters") or ["celius"])
     approval = limits.get("approval") or config.get("approval") or "always"
     if config.get("approval", "always") == "always":
         approval = "always"  # a session can't loosen the machine's setting
@@ -95,7 +91,6 @@ def effective_permissions(agent: RemoteAgent, session: RemoteSession | None = No
         "allow_shell": allow_shell,
         "allow_write": allow_write,
         "approval": approval if approval in ("always", "profile") else "always",
-        "adapters": sorted(adapters),
         "roots": list(local.get("roots") or []),
         "time_limit_seconds": limits.get("time_limit_seconds"),
     }
@@ -185,11 +180,9 @@ def enqueue_command(
 
 def session_payload(session: RemoteSession, agent: RemoteAgent) -> dict:
     return {
-        "mode": session.mode,
-        "adapter": session.adapter,
+        "origin": session.origin,
         "working_directory": session.working_directory,
         "permissions": effective_permissions(agent, session),
-        "external_session_id": session.external_session_id,
         "next_seq": session.last_seq + 1,
     }
 
@@ -208,40 +201,17 @@ async def open_session(
     owner_id: uuid.UUID,
     agent: RemoteAgent,
     conversation: Conversation,
-    adapter: str,
+    origin: str = "portal",
     working_directory: str,
     permissions: dict | None,
     ip_address: str | None = None,
 ) -> RemoteSession:
     if agent.status != "active":
-        raise AppError(409, "agent_not_active", "Authorise this machine first")
-    mode = ADAPTER_MODE.get(adapter)
-    if mode is None:
-        raise AppError(422, "unknown_adapter", f"Unknown agent type {adapter!r}")
-    allowed = effective_permissions(agent)
-    if adapter not in allowed["adapters"]:
-        raise AppError(
-            409,
-            "adapter_not_allowed",
-            f"{adapter} is not enabled on this machine (its policy file and its settings "
-            "in Celius must both allow it)",
-        )
-    if adapter == "claude_code" and not (agent.capabilities or {}).get("claude_code"):
-        raise AppError(409, "adapter_unavailable", "Claude Code is not installed on this machine")
+        raise AppError(409, "agent_not_active", "This machine was revoked")
     if not _valid_directory(working_directory, agent.os):
         raise AppError(422, "invalid_directory", "Give an absolute folder path on the machine")
     if await open_session_for(db, conversation.id) is not None:
         raise AppError(409, "session_exists", "This conversation already runs on a machine")
-    if mode == "external":
-        has_messages = await db.scalar(
-            select(func.count()).select_from(Run).where(Run.conversation_id == conversation.id)
-        )
-        if has_messages:
-            raise AppError(
-                409,
-                "conversation_not_empty",
-                "An external agent session needs a new conversation",
-            )
     max_sessions = int((agent.config or {}).get("max_sessions") or 4)
     open_count = await db.scalar(
         select(func.count())
@@ -258,8 +228,7 @@ async def open_session(
         owner_id=owner_id,
         conversation_id=conversation.id,
         agent_id=agent.id,
-        mode=mode,
-        adapter=adapter,
+        origin=origin,
         working_directory=working_directory,
         status="opening",
         permissions=_clean_permissions(permissions or {}),
@@ -281,7 +250,7 @@ async def open_session(
         session.id,
         ip_address,
         agent_id=str(agent.id),
-        adapter=adapter,
+        origin=origin,
         working_directory=working_directory,
     )
     record_sync(db, owner_id, "conversation", conversation.id, payload={"remote": True})
@@ -357,9 +326,7 @@ async def latest_session_for(db: AsyncSession, conversation_id: uuid.UUID) -> Re
     )
 
 
-async def attach_run(
-    db: AsyncSession, conversation_id: uuid.UUID, run: Run, trigger_parts: list, *, reason: str
-) -> None:
+async def attach_run(db: AsyncSession, conversation_id: uuid.UUID, run: Run) -> None:
     """Route a new run of a remote conversation to its machine. A conversation whose
     session ended is not silently moved back to the sandbox (or anywhere else): the user
     opens a session again, on the same or another machine."""
@@ -373,32 +340,9 @@ async def attach_run(
             "This conversation's session on its machine has ended. Open a session again "
             "(on this or another machine) to continue.",
         )
-    if session.mode == "external" and reason != "created":
-        raise AppError(
-            409,
-            "not_supported_for_external_agent",
-            "An external agent's history can't be edited or regenerated; send a new message",
-        )
-    run.execution = "remote" if session.mode == "native" else "external"
+    run.execution = "remote"
     run.remote_session_id = session.id
     session.current_run_id = run.id
-    if session.mode == "external" and session.agent_id:
-        text = "\n\n".join(p.text for p in trigger_parts if p.type == "text" and p.text)
-        names = [p.data.get("filename") for p in trigger_parts if p.type == "file" and p.data]
-        if names:
-            text += (
-                "\n\n[Files attached in Celius are not on this machine: "
-                + ", ".join(str(n) for n in names)
-                + "]"
-            )
-        enqueue_command(
-            db,
-            session.agent_id,
-            "session.message",
-            session_id=session.id,
-            run_id=run.id,
-            payload={"text": text},
-        )
 
 
 def live_status(session: RemoteSession, run_status: str | None) -> str:
@@ -455,8 +399,7 @@ async def summaries_for(db: AsyncSession, settings: Settings, conversation_ids: 
             agent_name=agent.name if agent else None,
             agent_os=agent.os if agent else None,
             agent_online=is_online(agent, settings) if agent else False,
-            mode=session.mode,
-            adapter=session.adapter,
+            origin=session.origin,
             working_directory=session.working_directory,
             status=live.get(session.id, session.status),
             status_detail=session.status_detail,

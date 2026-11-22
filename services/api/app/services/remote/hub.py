@@ -64,12 +64,10 @@ def clean_local_policy(raw: Any) -> dict:
             roots.append({"path": root["path"][:1000], "write": bool(root.get("write", True))})
         elif isinstance(root, str):
             roots.append({"path": root[:1000], "write": True})
-    adapters = [a for a in raw.get("adapters") or [] if a in ("celius", "claude_code")]
     return {
         "roots": roots[:50],
         "allow_shell": bool(raw.get("allow_shell", False)),
         "allow_write": bool(raw.get("allow_write", False)),
-        "adapters": adapters,
         "max_concurrent_commands": raw.get("max_concurrent_commands"),
     }
 
@@ -252,6 +250,8 @@ class AgentConnection:
                 await self._heartbeat(frame)
             elif kind == "events":
                 await self._events(frame)
+            elif kind == "policy":
+                await self._policy(frame)
             elif kind == "bye":
                 self.clean = True
                 return
@@ -272,6 +272,19 @@ class AgentConnection:
                     RemoteAgent.connection_id == self.connection_id,
                 )
                 .values(**values)
+            )
+            await db.commit()
+
+    async def _policy(self, frame: dict) -> None:
+        """The machine's own policy file changed (e.g. `celius` allowed a folder)."""
+        async with self.factory() as db:
+            await db.execute(
+                update(RemoteAgent)
+                .where(
+                    RemoteAgent.id == self.agent_id,
+                    RemoteAgent.connection_id == self.connection_id,
+                )
+                .values(local_policy=clean_local_policy(frame.get("local_policy")))
             )
             await db.commit()
 

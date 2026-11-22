@@ -1,4 +1,4 @@
-"""Celius Remote Agent: runs Celius work on this machine (docs/remote/)."""
+"""Celius on this device: `celius` (chat here) and the agent Celius controls (docs/remote/)."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 PROTOCOL_VERSION = 1

@@ -263,6 +263,12 @@ class Connection:
     async def _sender(self, ws) -> None:
         while True:
             self.runtime.wakeup.clear()
+            if self.runtime.policy_changed:
+                # Celius offers tools by what this machine allows: keep it current.
+                self.runtime.policy_changed = False
+                await ws.send(
+                    json.dumps({"type": "policy", "local_policy": self.runtime.policy.report()})
+                )
             if await self._flush(ws):
                 continue
             # Within one connection every frame arrives and is acked; after a drop the

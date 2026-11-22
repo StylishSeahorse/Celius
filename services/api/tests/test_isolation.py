@@ -61,6 +61,13 @@ QUERIES = {
 }
 # Not about someone's data.
 SKIP = {
+    # A machine's own token, never a user session (machine isolation: test_remote_device.py).
+    "/api/v1/remote/device/chats/{conversation_id}",
+    "/api/v1/remote/device/chats/{conversation_id}/messages",
+    "/api/v1/remote/device/runs/{run_id}/events",
+    "/api/v1/remote/device/runs/{run_id}/cancel",
+    "/api/v1/remote/device/tool-calls/{call_id}/approve",
+    "/api/v1/remote/device/tool-calls/{call_id}/deny",
     "/api/v1/auth/invitations/{token}",  # public: checked by the invitation tests
     "/api/v1/models/{model_id}/verify-tools",
 }

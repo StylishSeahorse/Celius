@@ -15,7 +15,7 @@ from app.config import get_settings
 from app.db import get_session_factory
 from app.db.base import utcnow
 from app.main import create_app
-from app.models import RemoteCommand, RemoteEnrollment, RemoteSessionEvent, User
+from app.models import RemoteCommand, RemoteDeviceRequest, RemoteSessionEvent, User
 from app.services.model_gateway import get_model_gateway
 from app.services.remote import identity
 from tests.conftest import PASSWORD
@@ -88,46 +88,105 @@ async def wait_for(predicate, wait: float = 5):
 # ---------------------------------------------------------------------- registration
 
 
-async def test_register_requires_explicit_authorisation(http, headers):
-    machine = await register_machine(http, headers, authorize=False)
-    listed = (await http.get("/api/v1/remote/agents", headers=headers)).json()["items"]
-    assert [m["state"] for m in listed] == ["awaiting_authorization"]
-    assert listed[0]["hostname"] == "workstation-host"
+DEVICE = {"hostname": "build-box", "os": "linux", "agent_version": "0.2.0", "protocol_version": 1}
 
-    # A pending machine gets no token.
-    response = await http.post("/api/v1/remote/token", json={"credential": machine["credential"]})
-    assert response.status_code == 403
-    assert response.json()["error"]["code"] == "agent_not_authorized"
 
-    response = await http.post(
-        f"/api/v1/remote/agents/{machine['agent_id']}/authorize", headers=headers
+async def _start_login(http, **extra) -> dict:
+    response = await http.post("/api/v1/remote/device/login", json={**DEVICE, **extra})
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+async def _poll(http, login) -> httpx.Response:
+    return await http.post(
+        "/api/v1/remote/device/login/poll", json={"device_code": login["device_code"]}
     )
-    assert response.json()["status"] == "active"
-    assert response.json()["state"] == "offline"
-    response = await http.post("/api/v1/remote/token", json={"credential": machine["credential"]})
-    assert response.status_code == 200
-    assert response.json()["agent_id"] == machine["agent_id"]
 
 
-async def test_pairing_code_is_single_use_and_expires(http, headers, sessionmaker):
-    code = (await http.post("/api/v1/remote/enrollments", json={}, headers=headers)).json()["code"]
-    first = await http.post("/api/v1/remote/enroll", json={"code": code, "os": "linux"})
-    assert first.status_code == 201
-    again = await http.post("/api/v1/remote/enroll", json={"code": code, "os": "linux"})
-    assert again.status_code == 401
+async def test_device_signs_in_and_is_accepted_in_celius(http, headers):
+    login = await _start_login(http, username="owner", name="Build box")
+    assert len(login["user_code"]) == 9 and login["user_code"][4] == "-"
+    assert login["verification_url"].endswith(f"#/devices?code={login['user_code']}")
+    # Waiting: the device keeps polling.
+    assert (await _poll(http, login)).json()["error"]["code"] == "authorization_pending"
+    # Named at login, it waits in the owner's list with the same code.
+    waiting = (await http.get("/api/v1/remote/devices", headers=headers)).json()
+    assert [d["user_code"] for d in waiting["items"]] == [login["user_code"]]
+    assert waiting["items"][0]["hostname"] == "build-box"
+    assert waiting["login_command"].endswith("--user owner")
+    assert (await http.get("/api/v1/remote/agents", headers=headers)).json()["items"] == []
 
-    code = (await http.post("/api/v1/remote/enrollments", json={}, headers=headers)).json()["code"]
+    accepted = await http.post(
+        "/api/v1/remote/devices/accept",
+        json={"user_code": login["user_code"].lower().replace("-", "")},  # typed loosely
+        headers=headers,
+    )
+    assert accepted.status_code == 201, accepted.text
+    machine = accepted.json()
+    assert machine["name"] == "Build box"
+    assert machine["status"] == "active"
+    assert (await http.get("/api/v1/remote/devices", headers=headers)).json()["items"] == []
+
+    result = await _poll(http, login)
+    assert result.status_code == 200
+    assert result.json()["agent_id"] == machine["id"]
+    assert result.json()["username"] == "owner"
+    # The credential is handed out once.
+    assert (await _poll(http, login)).json()["error"]["code"] == "invalid_grant"
+    token = await http.post(
+        "/api/v1/remote/token", json={"credential": result.json()["credential"]}
+    )
+    assert token.status_code == 200
+
+
+async def test_refused_and_expired_sign_ins(http, headers, sessionmaker):
+    login = await _start_login(http)
+    refused = await http.post(
+        "/api/v1/remote/devices/refuse", json={"user_code": login["user_code"]}, headers=headers
+    )
+    assert refused.status_code == 204
+    assert (await _poll(http, login)).json()["error"]["code"] == "access_denied"
+
+    login = await _start_login(http)
     async with sessionmaker() as db:
-        for row in (await db.scalars(select(RemoteEnrollment))).all():
+        for row in (await db.scalars(select(RemoteDeviceRequest))).all():
             row.expires_at = utcnow()
         await db.commit()
-    expired = await http.post("/api/v1/remote/enroll", json={"code": code})
-    assert expired.status_code == 401
-    wrong = await http.post("/api/v1/remote/enroll", json={"code": "AAAA-BBBB-CCCC"})
-    assert wrong.status_code == 401
+    assert (await _poll(http, login)).json()["error"]["code"] == "expired_token"
+    late = await http.post(
+        "/api/v1/remote/devices/accept", json={"user_code": login["user_code"]}, headers=headers
+    )
+    assert late.status_code == 404
+    wrong = await http.post(
+        "/api/v1/remote/devices/accept", json={"user_code": "BCDF-GHJK"}, headers=headers
+    )
+    assert wrong.status_code == 404
 
 
-async def test_pairing_codes_and_machines_are_private(http, headers, sessionmaker):
+async def test_a_device_named_for_someone_else_is_theirs_alone(http, headers, sessionmaker):
+    other = await _other_user_headers(http, sessionmaker)
+    login = await _start_login(http, username="other")
+    # Not listed for the owner, and the owner can't accept it even with the code.
+    assert (await http.get("/api/v1/remote/devices", headers=headers)).json()["items"] == []
+    response = await http.post(
+        "/api/v1/remote/devices/accept", json={"user_code": login["user_code"]}, headers=headers
+    )
+    assert response.status_code == 404
+    listed = (await http.get("/api/v1/remote/devices", headers=other)).json()["items"]
+    assert [d["user_code"] for d in listed] == [login["user_code"]]
+    # An unknown name isn't revealed: the request starts normally and lists for nobody.
+    unknown = await http.post("/api/v1/remote/device/login", json={**DEVICE, "username": "nobody"})
+    assert unknown.status_code == 201
+
+
+async def test_sign_in_requests_are_rate_limited(http):
+    for _ in range(10):
+        await _start_login(http)
+    response = await http.post("/api/v1/remote/device/login", json=DEVICE)
+    assert response.status_code == 429
+
+
+async def test_machines_are_private(http, headers, sessionmaker):
     machine = await register_machine(http, headers)
     other = await _other_user_headers(http, sessionmaker)
     assert (await http.get("/api/v1/remote/agents", headers=other)).json()["items"] == []
@@ -138,8 +197,10 @@ async def test_pairing_codes_and_machines_are_private(http, headers, sessionmake
     ]:
         response = await http.request(method, path, headers=other)
         assert response.status_code == 404, (method, path)
-    # Agent endpoints never accept a user session.
+    # Machine endpoints never accept a user session.
     response = await http.post("/api/v1/remote/credentials/rotate", headers=headers)
+    assert response.status_code == 401
+    response = await http.get("/api/v1/remote/device/chats", headers=headers)
     assert response.status_code == 401
 
 
@@ -291,7 +352,7 @@ async def test_session_open_is_delivered_and_events_are_stored_once(
     machine = await register_machine(http, headers)
     session = await _open_session(http, headers, machine)
     assert session["status"] == "opening"
-    assert session["mode"] == "native"
+    assert session["origin"] == "portal"
     async with ws(app, machine["token"]) as sock:
         await sock.send_json(hello())
         await sock.receive_json()
@@ -383,10 +444,11 @@ async def test_agent_cannot_report_for_another_machines_session(app, http, heade
 
 
 async def test_session_needs_an_active_machine_and_absolute_directory(http, headers):
-    pending = await register_machine(http, headers, authorize=False)
+    revoked = await register_machine(http, headers, name="Old")
+    await http.post(f"/api/v1/remote/agents/{revoked['agent_id']}/revoke", headers=headers)
     response = await http.post(
         "/api/v1/remote/sessions",
-        json={"agent_id": pending["agent_id"], "working_directory": "/srv"},
+        json={"agent_id": revoked["agent_id"], "working_directory": "/srv"},
         headers=headers,
     )
     assert response.json()["error"]["code"] == "agent_not_active"
@@ -458,7 +520,7 @@ async def test_remote_can_be_turned_off(http, headers, remote_settings):
     assert response.json()["error"]["code"] == "remote_disabled"
 
 
-async def test_retention_prunes_old_output_commands_and_codes(
+async def test_retention_prunes_old_output_commands_and_sign_ins(
     app, http, headers, sessionmaker, remote_settings
 ):
     from datetime import timedelta
@@ -491,11 +553,11 @@ async def test_retention_prunes_old_output_commands_and_codes(
         for command in (await db.scalars(select(RemoteCommand))).all():
             command.status = "completed"
             command.updated_at = utcnow() - timedelta(days=31)
-        for code in (await db.scalars(select(RemoteEnrollment))).all():
-            code.expires_at = utcnow() - timedelta(days=2)
+        for request in (await db.scalars(select(RemoteDeviceRequest))).all():
+            request.expires_at = utcnow() - timedelta(days=2)
         await db.commit()
     removed = await maintenance.prune(sessionmaker, remote_settings)
-    assert removed == {"terminal_output": 1, "commands": 1, "pairing_codes": 1}
+    assert removed == {"terminal_output": 1, "commands": 1, "device_requests": 1}
     async with sessionmaker() as db:
         kept = [e.type for e in (await db.scalars(select(RemoteSessionEvent))).all()]
         assert sorted(kept) == ["file.changed", "session.opened"]

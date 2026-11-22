@@ -5,7 +5,7 @@
   when it is deleted.
 - Finished commands (including fetched file contents) are kept 30 days for the audit
   trail and then removed.
-- Unused pairing codes are removed a day after they expire.
+- Device sign-in requests are removed a day after they expire.
 """
 
 from datetime import timedelta
@@ -15,7 +15,7 @@ from sqlalchemy import delete
 from app.config import Settings
 from app.db import SessionFactory
 from app.db.base import utcnow
-from app.models import RemoteCommand, RemoteEnrollment, RemoteSessionEvent
+from app.models import RemoteCommand, RemoteDeviceRequest, RemoteSessionEvent
 from app.models.remote import FINAL_COMMAND_STATUSES
 
 COMMAND_RETENTION_DAYS = 30
@@ -38,11 +38,13 @@ async def prune(factory: SessionFactory, settings: Settings) -> dict[str, int]:
             )
         )
         codes = await db.execute(
-            delete(RemoteEnrollment).where(RemoteEnrollment.expires_at < now - timedelta(days=1))
+            delete(RemoteDeviceRequest).where(
+                RemoteDeviceRequest.expires_at < now - timedelta(days=1)
+            )
         )
         await db.commit()
     return {
         "terminal_output": output.rowcount or 0,
         "commands": commands.rowcount or 0,
-        "pairing_codes": codes.rowcount or 0,
+        "device_requests": codes.rowcount or 0,
     }
