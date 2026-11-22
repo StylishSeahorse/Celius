@@ -30,10 +30,12 @@ PostgreSQL step.
 pnpm build
 DATABASE_URL=postgresql+asyncpg://… (cd services/api && uv run alembic upgrade head)
 DATABASE_URL=postgresql+asyncpg://… infra/scripts/e2e-stack.sh      # API + worker + fake model
-# Sign in as e2e / e2e-password-123 at http://127.0.0.1:18000. Then, on the same computer:
-cd services/remote-agent
-uv run celius login --server http://127.0.0.1:18000 --user e2e --name "Dev laptop"
+make agent-wheel   # the package /install.sh serves
+# Sign in as e2e / e2e-password-123 at http://127.0.0.1:18000. Then, on the same computer
+# (as a normal user with sudo), the one-line install, exactly as on a real device:
+curl -fsSL "http://127.0.0.1:18000/install.sh?user=e2e" | sudo bash -s -- --no-service
 # Celius: the Remote machines badge → Waiting for you to accept → check the code → Accept.
+# (Or without installing: cd services/remote-agent && uv run celius login --server … --user e2e)
 
 # 1. On the device: chat in a folder (answers the folder/commands questions once).
 mkdir -p /tmp/project && cd /tmp/project
@@ -73,8 +75,9 @@ Legend: **I** implemented · **U** unit tested · **IT** integration/end-to-end 
 | Approval from a phone-sized screen | ✓ | — | — | partly | the same approval card; viewed at 390 px, approved at desktop width |
 | Retention | ✓ | — | ✓ | — | |
 | Cross-user isolation of machines and sessions | ✓ | — | ✓ | — | `test_isolation.py` |
+| One-command install served by Celius (`/install.sh`, `/install.ps1`, package) | ✓ | ✓ | — | Linux ✓ | `test_remote_install.py` (filled-in values, injection refused, ShellCheck on the served script); `curl … \| sudo bash` as a normal user against a live stack: install → code → accept → `celius` chat → `--upgrade` → `--uninstall`. Windows: CI parses the served form and runs it through `iex` (uninstall); not run as a real install |
 | Linux installer + systemd unit | ✓ | — | — | ✓ | ShellCheck clean; run in a container (`--no-service`): dedicated user, `celius` on PATH, sign-in code shown → accepted → `celius agent` online → `--uninstall`; systemd itself not available here |
-| Windows installer (scheduled task, DPAPI) | ✓ | — | — | — | parsed by PowerShell in CI; **not executed** (no Windows here) |
+| Windows installer (scheduled task, DPAPI, winget Python) | ✓ | — | — | — | parsed by PowerShell in CI; **not executed as an install** (no Windows here) |
 | Agent on Windows | ✓ | CI | — | — | unit tests on `windows-latest` (3.10, 3.12) |
 | `celius.exe` (PyInstaller) | ✓ | — | — | Linux build ✓ | Windows build in CI (`remote-agent-exe`) |
 | Celius in Docker with remote agents | ✓ | — | — | — | the image builds and passes the release gate in CI; agents not connected to the container |

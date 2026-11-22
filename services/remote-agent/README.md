@@ -5,7 +5,10 @@ from here and accept it in Celius; then either chat on the device with `celius`,
 Celius use it from anywhere through the background agent. It connects **out** to your
 Celius server (HTTPS + one WebSocket); it opens no port and needs no SSH.
 
-- Install: [docs/remote/INSTALL.md](../../docs/remote/INSTALL.md)
+- Install: one command on the device, served by your Celius server —
+  `irm https://celius.example/install.ps1 | iex` (Windows) or
+  `curl -fsSL https://celius.example/install.sh | sudo bash` (Linux);
+  details in [docs/remote/INSTALL.md](../../docs/remote/INSTALL.md)
   (`install/install-windows.ps1`, `install/install-linux.sh`)
 - How it works: [docs/remote/ARCHITECTURE.md](../../docs/remote/ARCHITECTURE.md)
 - Protocol and API: [docs/remote/API.md](../../docs/remote/API.md)

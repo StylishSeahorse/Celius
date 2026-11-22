@@ -248,7 +248,9 @@ The model can call tools in the conversation's private workspace:
 
 ### Remote machines (Celius Remote)
 - Install Celius on one of your own computers — a Windows PC, a Linux workstation, server
-  or VM — sign in there with `celius login`, and accept the device in Celius
+  or VM — with one command it downloads from your Celius server
+  (`irm https://…/install.ps1 | iex`, `curl -fsSL https://…/install.sh | sudo bash`), then
+  accept the device in Celius
 - Then use it from anywhere: start a chat in Celius that runs on the device, and follow
   it from any client — the conversation, a live terminal, changed files with diffs and
   downloads, and the machine's CPU, memory, disk and GPU

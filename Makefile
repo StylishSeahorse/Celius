@@ -3,7 +3,7 @@ COMPOSE_PROD := docker compose -f infra/compose.yaml --env-file .env
 COMPOSE_DEV := docker compose -f infra/compose.dev.yaml
 DEV_DB := postgresql+asyncpg://celius:celius@localhost:5432/celius
 
-.PHONY: gen-api desktop install dev-deps dev-api dev-worker dev-web fake-llama migrate migration test test-api-pg \
+.PHONY: gen-api agent-wheel desktop install dev-deps dev-api dev-worker dev-web fake-llama migrate migration test test-api-pg \
 	test-web test-sandbox lint format e2e up down logs \
 	backup restore restore-drill upgrade rollback status
 
@@ -54,6 +54,9 @@ e2e:                ## Browser tests against a full local stack (fake model serv
 
 gen-api:            ## Regenerate packages/api-client from the API's OpenAPI document
 	pnpm gen:api
+
+agent-wheel:        ## Build the celius package that /install.sh and /install.ps1 serve (dev; the image builds its own)
+	cd services/remote-agent && uv build --wheel --out-dir dist
 
 desktop:            ## Build the desktop app for this OS (Windows installers on Windows)
 	pnpm --filter @celius/desktop build

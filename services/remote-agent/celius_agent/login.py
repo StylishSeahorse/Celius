@@ -24,7 +24,7 @@ def device_login(
     *,
     username: str | None = None,
     name: str | None = None,
-    say: Callable[[str], None] = print,
+    say: Callable[[str], None] | None = None,
     sleep: Callable[[float], None] = time.sleep,
 ) -> dict:
     """Returns {agent_id, credential, name, username} once accepted."""
@@ -34,6 +34,11 @@ def device_login(
         {**machine_facts(), "username": username or None, "name": name or None},
     )
     interval = max(1, int(started.get("interval") or 3))
+    if say is None:
+        # Flushed: the code must show at once even when output is piped or logged.
+        def say(text: str) -> None:
+            print(text, flush=True)
+
     say("")
     say(f"  Sign-in code:  {started['user_code']}")
     say("")

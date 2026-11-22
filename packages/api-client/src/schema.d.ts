@@ -3754,6 +3754,10 @@ export interface components {
         };
         /** DeviceRequestList */
         DeviceRequestList: {
+            /** Install Linux */
+            install_linux: string;
+            /** Install Windows */
+            install_windows: string;
             /** Items */
             items: components["schemas"]["DeviceRequestOut"][];
             /** Login Command */

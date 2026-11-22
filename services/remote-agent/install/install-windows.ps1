@@ -13,6 +13,12 @@
 
   Then open a new terminal and run `celius` in a project folder to chat on this PC.
 
+  From your Celius server, with nothing else needed on the PC (PowerShell, not as admin):
+    irm https://celius.example/install.ps1 | iex
+    irm "https://celius.example/install.ps1?user=alice" | iex
+  (`?upgrade=1` upgrades, `?uninstall=1` removes.) If Python is missing it is installed
+  for your account with winget.
+
 .EXAMPLE
   .\install-windows.ps1 -Server https://celius.example -CeliusUser alice
 .EXAMPLE
@@ -34,14 +40,21 @@ param(
   [Parameter(ParameterSetName = "Upgrade", Mandatory = $true)][switch]$Upgrade,
   [Parameter(ParameterSetName = "Uninstall", Mandatory = $true)][switch]$Uninstall,
   # A Python 3.10+ to build the environment with (default: the py launcher, then python).
-  [string]$Python
+  [string]$Python,
+  # What to install (a pip requirement); the server's script passes its own package.
+  # Default: this copy of the repository.
+  [string]$Package
 )
 $ErrorActionPreference = "Stop"
 $TaskName = "Celius Agent"
 $Base = Join-Path $env:LOCALAPPDATA "CeliusAgent"
 $Venv = Join-Path $Base "venv"
 $Scripts = Join-Path $Venv "Scripts"
-$Src = Split-Path -Parent $PSScriptRoot
+if (-not $Package) {
+  # Run from the repository: install the package next to this script.
+  if (-not $PSScriptRoot) { throw "Run this from services\remote-agent, or: irm https://<celius>/install.ps1 | iex" }
+  $Package = "$(Split-Path -Parent $PSScriptRoot)[monitor]"
+}
 
 function Set-UserPath([bool]$Present) {
   $current = [Environment]::GetEnvironmentVariable("Path", "User")
@@ -57,18 +70,28 @@ if ($Uninstall) {
   if (Test-Path $Venv) { Remove-Item -Recurse -Force $Venv }
   Write-Host "Removed. The device's data (sign-in, policy, state) is still in $Base;"
   Write-Host "remove the device in Celius and delete that folder to remove everything."
-  exit 0
+  return  # not exit: this may run inside the user's own PowerShell (irm | iex)
 }
 
 function Find-Python {
-  if ($Python) { return @($Python) }
-  if (Get-Command py -ErrorAction SilentlyContinue) { return @("py", "-3") }
+  if ($Python) { return , @($Python) }
+  if (Get-Command py -ErrorAction SilentlyContinue) { return , @("py", "-3") }
   $found = Get-Command python -ErrorAction SilentlyContinue
-  if ($found -and $found.Source -notlike "*WindowsApps*") { return @($found.Source) }
-  throw "Python 3.10 or newer is needed: install it from python.org (tick 'Add to PATH')."
+  if ($found -and $found.Source -notlike "*WindowsApps*") { return , @($found.Source) }
+  $local = Get-ChildItem "$env:LOCALAPPDATA\Programs\Python\Python3*\python.exe" -ErrorAction SilentlyContinue |
+    Sort-Object FullName -Descending | Select-Object -First 1
+  if ($local) { return , @($local.FullName) }
+  return $null
 }
 
 $py = Find-Python
+if (-not $py -and (Get-Command winget -ErrorAction SilentlyContinue)) {
+  Write-Host "Installing Python 3.12 for your account (winget)..."
+  winget install --exact --id Python.Python.3.12 --scope user --silent `
+    --accept-package-agreements --accept-source-agreements | Out-Host
+  $py = Find-Python
+}
+if (-not $py) { throw "Python 3.10 or newer is needed: install it from python.org (tick 'Add to PATH'), then run this again." }
 $pyExe = $py[0]
 $pyArgs = if ($py.Length -gt 1) { $py[1..($py.Length - 1)] } else { @() }
 & $pyExe @pyArgs -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)"
@@ -80,9 +103,13 @@ if (-not (Test-Path (Join-Path $Scripts "python.exe"))) {
   & $pyExe @pyArgs -m venv $Venv
 }
 $VenvPython = Join-Path $Scripts "python.exe"
-& $VenvPython -m pip install --quiet --upgrade pip
-& $VenvPython -m pip install --quiet "$Src[monitor]"
+$pipArgs = @("-m", "pip", "install", "--quiet", "--disable-pip-version-check")
+if ($CaFile) { $pipArgs += @("--cert", $CaFile) }
+& $VenvPython @pipArgs --upgrade pip
+& $VenvPython @pipArgs --upgrade --force-reinstall --no-deps $Package
 if ($LASTEXITCODE -ne 0) { throw "Installing Celius failed." }
+& $VenvPython @pipArgs $Package
+if ($LASTEXITCODE -ne 0) { throw "Installing Celius's dependencies failed." }
 Set-UserPath $true
 $env:Path = "$env:Path;$Scripts"
 

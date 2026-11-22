@@ -11,8 +11,42 @@ Celius. Then you can use the device in two ways, both with local access to it:
   chat is also in Celius, where you can follow it, answer its approvals or continue it.
 
 The device connects **out** to your Celius server over HTTPS; nothing on it is opened to the
-network and no SSH is involved. Requirements: Python 3.10 or newer (or the portable
-`celius.exe` on Windows) and outbound HTTPS to your Celius address.
+network and no SSH is involved. It needs outbound HTTPS to your Celius address and to PyPI
+(for the installer's two small dependencies); the installers install Python 3.10+ if it is
+missing.
+
+## Quick install: one command on the device
+
+Your Celius server serves the installers itself; the device needs nothing else (no
+repository, no git). *Remote machines → Add a device* shows these with your address and
+user name filled in:
+
+**Windows** (PowerShell, as yourself, **not** as administrator):
+
+```powershell
+irm "https://celius.example.com/install.ps1?user=alice" | iex
+```
+
+**Linux:**
+
+```bash
+curl -fsSL "https://celius.example.com/install.sh?user=alice" | sudo bash
+```
+
+Each one installs Celius (and Python via winget or the package manager if there is none),
+puts `celius` on the PATH, shows a sign-in code and waits. Accept the device in Celius (see
+the next section); the installer then finishes and starts the background agent. `?user=`
+makes the device wait in that user's list; without it, type the code in Celius.
+
+| | Windows | Linux |
+|---|---|---|
+| Upgrade | `irm https://…/install.ps1?upgrade=1 \| iex` | `curl -fsSL https://…/install.sh \| sudo bash -s -- --upgrade` |
+| Remove | `irm https://…/install.ps1?uninstall=1 \| iex` | `curl -fsSL https://…/install.sh \| sudo bash -s -- --uninstall` |
+| Options | — | after `sudo bash -s --`: `--name`, `--run-as`, `--no-service`, `--ca-file` |
+
+The server fills in its own `APP_PUBLIC_URL` and serves the `celius` package it was built
+with (`/install/celius_agent-<version>-py3-none-any.whl`). The sections below describe what
+the installers do, and how to run them from a copy of the repository instead.
 
 ## Signing a device in
 
@@ -46,8 +80,9 @@ the device's screen and choose **Accept**. The device signs in at once.
 
 ## Windows 10/11
 
-From the `services/remote-agent` folder of the Celius repository (or a copy of it), in
-PowerShell **as yourself, not as administrator**:
+Quick install: `irm https://celius.example.com/install.ps1 | iex` (above). From the
+`services/remote-agent` folder of a copy of the repository instead, in PowerShell **as
+yourself, not as administrator**:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass   # this window only
@@ -87,6 +122,9 @@ with Python inside. Put it in a folder on your PATH and run `celius login --serv
 PC from Celius. `run_python` then uses a Python installed on the PC, if any.
 
 ## Linux (desktop, server, VM)
+
+Quick install: `curl -fsSL https://celius.example.com/install.sh | sudo bash` (above). From
+a copy of the repository instead:
 
 ```bash
 cd services/remote-agent
@@ -174,6 +212,7 @@ tool profile decides.
 ## Updating
 
 There is no self-updater: a program that replaces its own code from the network is a
-software-supply risk, so updates are explicit. Re-run the installer with `-Upgrade` /
-`--upgrade` from the new version. Celius shows each device's version; the protocol is
+software-supply risk, so updates are explicit. After upgrading the Celius server, run the
+upgrade command from the table above on each device (it installs the package the server
+now serves), or re-run a repository copy of the installer with `-Upgrade` / `--upgrade`. Celius shows each device's version; the protocol is
 versioned (`protocol: 1`) so older agents keep working with a newer server.

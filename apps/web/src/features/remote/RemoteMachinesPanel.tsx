@@ -38,7 +38,11 @@ export function RemoteMachinesPanel({
 }) {
   const [agents, setAgents] = useState<RemoteAgent[] | null>(null);
   const [waiting, setWaiting] = useState<DeviceRequest[]>([]);
-  const [loginCommand, setLoginCommand] = useState("celius login --server …");
+  const [commands, setCommands] = useState<DeviceCommands>({
+    login: "celius login --server …",
+    linux: "curl -fsSL …/install.sh | sudo bash",
+    windows: "irm …/install.ps1 | iex",
+  });
   const [openId, setOpenId] = useState<string | null>(null);
   const [adding, setAdding] = useState(Boolean(initialCode));
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +58,7 @@ export function RemoteMachinesPanel({
     api.deviceRequests().then(
       (page) => {
         setWaiting(page.items);
-        setLoginCommand(page.login_command);
+        setCommands({ login: page.login_command, linux: page.install_linux, windows: page.install_windows });
       },
       () => undefined,
     );
@@ -120,7 +124,7 @@ export function RemoteMachinesPanel({
           )}
           {adding ? (
             <AddDevice
-              command={loginCommand}
+              commands={commands}
               initialCode={initialCode ?? ""}
               onAccepted={() => (setAdding(false), changed())}
             />
@@ -263,12 +267,14 @@ function WaitingDevice({ request, onDecided }: { request: DeviceRequest; onDecid
   );
 }
 
+type DeviceCommands = { login: string; linux: string; windows: string };
+
 function AddDevice({
-  command,
+  commands,
   initialCode,
   onAccepted,
 }: {
-  command: string;
+  commands: DeviceCommands;
   initialCode: string;
   onAccepted: () => void;
 }) {
@@ -276,7 +282,6 @@ function AddDevice({
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const server = command.match(/--server (\S+)/)?.[1] ?? "https://…";
 
   async function accept() {
     setBusy(true);
@@ -294,12 +299,17 @@ function AddDevice({
   return (
     <div className="space-y-5 text-sm">
       <Steps title="1. Install Celius on the device">
-        <p className="text-muted">From the repository's services/remote-agent folder (the installer signs it in too):</p>
-        <Command text={`.\\install\\install-windows.ps1 -Server ${server}`} />
-        <Command text={`sudo ./install/install-linux.sh --server ${server}`} />
+        <p className="text-muted">
+          Run one command on the device. It installs Celius (and Python, if needed), then shows a code and
+          waits for you here.
+        </p>
+        <p className="text-xs text-muted">Windows — in PowerShell, not as administrator:</p>
+        <Command text={commands.windows} />
+        <p className="text-xs text-muted">Linux:</p>
+        <Command text={commands.linux} />
       </Steps>
       <Steps title="2. Or, if Celius is already installed there, sign it in">
-        <Command text={command} />
+        <Command text={commands.login} />
         <p className="text-muted">
           It shows a code. With <code>--user</code> the device then waits for you in this list; otherwise type its
           code below.

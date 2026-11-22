@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api.install import router as install_router
 from app.api.v1 import router as v1_router
 from app.auth.bootstrap import ensure_bootstrap_user
 from app.config import Settings, get_settings
@@ -37,6 +38,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     install_error_handlers(app)
     app.add_middleware(SecurityMiddleware, settings=settings)
     app.include_router(v1_router)
+    app.include_router(install_router)  # /install.sh, /install.ps1: device installers
     mount_web_app(app, settings.static_root)  # last: it catches every other path
     return app
 

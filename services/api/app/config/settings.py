@@ -296,6 +296,10 @@ class Settings(BaseSettings):
     remote_output_retention_days: int = Field(default=30, ge=1)
     # Downloads travel base64-encoded in one frame: 8 MB of file is about 11 MB.
     remote_file_fetch_max_bytes: int = Field(default=8 * 1024 * 1024, ge=1024, le=10 * 1024 * 1024)
+    # The device installers and the celius package served at /install.sh, /install.ps1 and
+    # /install/<wheel> (the image puts them here). Unset: the repository's
+    # services/remote-agent/install and services/remote-agent/dist (after `make agent-wheel`).
+    remote_agent_dist_dir: str | None = None
 
     @model_validator(mode="after")
     def _check_production_secrets(self) -> "Settings":

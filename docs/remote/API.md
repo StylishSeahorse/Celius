@@ -49,6 +49,19 @@ expired), `agent_not_active`, `invalid_directory`, `session_exists`, `too_many_s
 open one again; Celius never moves it back to the sandbox), `file_unavailable`,
 `machine_timeout`.
 
+## Installers (public, outside `/api`)
+
+| Method & path | Query | Result |
+|---|---|---|
+| `GET /install.sh` | `user?` | The Linux installer with this server's `APP_PUBLIC_URL`, its package and the user name filled in: `curl -fsSL …/install.sh \| sudo bash` |
+| `GET /install.ps1` | `user?`, `upgrade?`, `uninstall?` | The Windows installer wrapped to run with those values: `irm …/install.ps1 \| iex` |
+| `GET /install/{wheel}` | | The `celius` package (`celius_agent-<version>-py3-none-any.whl`) the installers download |
+
+`user` must look like a user name (400 `invalid_user` otherwise; it is placed in a script).
+503 `installer_unavailable` when the server has no package (see OPERATIONS.md); 404 when
+remote machines are off. `GET /remote/devices` also returns `install_linux` and
+`install_windows`: these commands for the signed-in user.
+
 ## Device sign-in (public)
 
 The device authorization grant of RFC 8628, adapted: the device starts the sign-in and a

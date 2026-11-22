@@ -53,6 +53,14 @@ call() {
   curl -fsS -X "$method" "$API$path" -H "Authorization: Bearer $token" "$@"
 }
 
+step "device installers are served"
+site="${API%/api/v1}"
+installer="$(curl -fsS "$site/install.sh?user=admin")" || fail "/install.sh is not served"
+wheel="$(printf '%s\n' "$installer" | sed -n "s|^SERVED_SERVER=.* SERVED_PACKAGE='celius-agent\[monitor\] @ [^ ]*/install/\([^']*\)'.*|\1|p")"
+[ -n "$wheel" ] || fail "/install.sh has no package"
+curl -fsS -o /dev/null "$site/install/$wheel" || fail "the celius package $wheel is not served"
+curl -fsS "$site/install.ps1" | grep -q "^} -Server " || fail "/install.ps1 is not served"
+
 step "create data"
 call POST /conversations -H 'Content-Type: application/json' -d '{"title": "Before the backup"}' >/dev/null
 head -c 150000 /dev/urandom | base64 >"$backups/upload.bin" # an accepted type (text) of random content

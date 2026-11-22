@@ -37,6 +37,9 @@ class DeviceRequestList(BaseModel):
     items: list[DeviceRequestOut]
     # What to run on a device to sign it in.
     login_command: str
+    # One command that installs Celius on a device and signs it in (served by this server).
+    install_linux: str
+    install_windows: str
 
 
 class DeviceDecision(BaseModel):

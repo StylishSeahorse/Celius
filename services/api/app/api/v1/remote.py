@@ -28,6 +28,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.install import install_commands
 from app.auth.dependencies import CurrentAuth
 from app.config import Settings, get_settings
 from app.db import SessionFactory, get_db, get_session_factory
@@ -199,6 +200,7 @@ def _login_command(settings: Settings, username: str | None = None) -> str:
 async def device_requests(auth: CurrentAuth, db: DB, settings: AppSettings) -> DeviceRequestList:
     """Devices that ran `celius login --user <you>` and wait for you to accept them."""
     rows = await identity.requests_for(db, auth.user)
+    install_cmds = install_commands(settings, auth.user.username)
     return DeviceRequestList(
         items=[
             DeviceRequestOut(
@@ -215,6 +217,8 @@ async def device_requests(auth: CurrentAuth, db: DB, settings: AppSettings) -> D
             for r in rows
         ],
         login_command=_login_command(settings, auth.user.username),
+        install_linux=install_cmds["linux"],
+        install_windows=install_cmds["windows"],
     )
 
 

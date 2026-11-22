@@ -95,6 +95,19 @@ jobs:
           $errors = $null
           [System.Management.Automation.Language.Parser]::ParseFile("$PWD/install/install-windows.ps1", [ref]$null, [ref]$errors) | Out-Null
           if ($errors) { $errors; exit 1 }
+      - name: The Windows installer runs as Celius serves it (irm | iex)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # Wrapped as GET /install.ps1 wraps it (services/api/app/api/install.py).
+          $body = Get-Content -Raw install/install-windows.ps1
+          $served = "& {`n$body`n} -Server 'https://celius.example' -Package 'celius-agent[monitor] @ https://celius.example/install/x.whl' -CeliusUser 'alice'"
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseInput($served, [ref]$null, [ref]$errors) | Out-Null
+          if ($errors) { $errors; exit 1 }
+          # Uninstall on a clean runner changes nothing; it must return, not close the shell.
+          Invoke-Expression "& {`n$body`n} -Uninstall"
+          Write-Host "still running after the served script"
       - name: Linux installer lints
         if: runner.os == 'Linux'
         run: shellcheck install/install-linux.sh
