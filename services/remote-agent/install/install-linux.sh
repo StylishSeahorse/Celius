@@ -16,7 +16,9 @@
 #   --name NAME            A name for this device in Celius (default: its hostname).
 #   --run-as USER          Linux user the agent runs as (default: the user who ran sudo, so
 #                          it can reach that user's code and `celius` shares its sign-in;
-#                          with no sudo user, a dedicated 'celius-agent' system user).
+#                          with no sudo user, a dedicated 'celius-agent' system user, which
+#                          root's `celius` then runs as). `--run-as root` gives Celius the
+#                          whole machine: for a container or VM that is only for this.
 #   --allow-insecure-http  Allow a plain http:// server (trusted networks only).
 #   --ca-file PATH         CA bundle for a server with a private certificate authority.
 #   --no-service           Install and sign in only (containers without systemd).
@@ -28,7 +30,7 @@ set -euo pipefail
 SERVED_SERVER="" SERVED_PACKAGE="" SERVED_USER=""
 
 SERVER="$SERVED_SERVER" CELIUS_USER="$SERVED_USER" NAME="" RUN_AS="${SUDO_USER:-}" INSECURE=""
-CA_FILE="" SERVICE=1 MODE=install PACKAGE="$SERVED_PACKAGE"
+CA_FILE="" SERVICE=1 MODE=install PACKAGE="$SERVED_PACKAGE" RUN_AS_CHOSEN=0
 case "$SERVER" in
   http://localhost* | http://127.0.0.1* | "") ;;
   http://*) INSECURE="--allow-insecure-http" ;; # the script itself came from this address
@@ -38,7 +40,7 @@ while [ $# -gt 0 ]; do
     --server) SERVER="$2"; shift 2 ;;
     --celius-user) CELIUS_USER="$2"; shift 2 ;;
     --name) NAME="$2"; shift 2 ;;
-    --run-as) RUN_AS="$2"; shift 2 ;;
+    --run-as) RUN_AS="$2"; RUN_AS_CHOSEN=1; shift 2 ;;
     --allow-insecure-http) INSECURE="--allow-insecure-http"; shift ;;
     --ca-file) CA_FILE="$2"; shift 2 ;;
     --no-service) SERVICE=0; shift ;;
@@ -58,14 +60,18 @@ if [ -z "$PACKAGE" ]; then
 fi
 PREFIX="${CELIUS_AGENT_PREFIX:-/opt/celius-agent}"
 UNIT=/etc/systemd/system/celius-agent.service
-LINK=/usr/local/bin/celius
+LINKS="/usr/local/bin/celius /usr/bin/celius" # /usr/bin too: root shells such as `pct enter` lack /usr/local/bin
+SYSTEM_CONF=/etc/celius-agent.json # which user and home root's `celius` uses
 have_systemd() { [ "$SERVICE" -eq 1 ] && command -v systemctl >/dev/null && [ -d /run/systemd/system ]; }
 
 if [ "$MODE" = uninstall ]; then
   if have_systemd; then systemctl disable --now celius-agent 2>/dev/null || true; fi
   rm -f "$UNIT"
   if have_systemd; then systemctl daemon-reload; fi
-  if [ -L "$LINK" ]; then rm -f "$LINK"; fi
+  for link in $LINKS; do
+    if [ -L "$link" ] && [ "$(readlink "$link")" = "$PREFIX/bin/celius" ]; then rm -f "$link"; fi
+  done
+  rm -f "$SYSTEM_CONF"
   rm -rf "$PREFIX"
   echo "Removed. The device's data (sign-in, policy, state) is kept in its home folder;"
   echo "remove the device in Celius and delete that folder to remove everything."
@@ -98,7 +104,7 @@ if ! python_ok; then
   python_ok || { echo "Python 3.10 or newer with venv is required ($PYTHON); install it and run this again." >&2; exit 1; }
 fi
 
-if [ -z "$RUN_AS" ] || [ "$RUN_AS" = root ]; then
+if [ -z "$RUN_AS" ] || { [ "$RUN_AS" = root ] && [ "$RUN_AS_CHOSEN" -eq 0 ]; }; then
   RUN_AS=celius-agent
   if ! id -u "$RUN_AS" >/dev/null 2>&1; then
     useradd --system --create-home --home-dir /var/lib/celius-agent --shell /usr/sbin/nologin "$RUN_AS"
@@ -108,6 +114,13 @@ id -u "$RUN_AS" >/dev/null 2>&1 || { echo "No such user: $RUN_AS" >&2; exit 1; }
 RUN_HOME="$(getent passwd "$RUN_AS" | cut -d: -f6)"
 AGENT_HOME="${CELIUS_AGENT_HOME:-$RUN_HOME/.config/celius-agent}"
 as_agent() { runuser -u "$RUN_AS" -- env CELIUS_AGENT_HOME="$AGENT_HOME" "$@"; }
+# Where an earlier install kept this device's sign-in (to keep it when --run-as changes).
+OLD_HOME=""
+if [ -f "$SYSTEM_CONF" ]; then
+  OLD_HOME="$(sed -n 's/.*"home": "\([^"]*\)".*/\1/p' "$SYSTEM_CONF")"
+elif [ -s /var/lib/celius-agent/.config/celius-agent/credential ]; then
+  OLD_HOME=/var/lib/celius-agent/.config/celius-agent
+fi
 
 echo "Installing Celius into $PREFIX"
 pip_args=(--quiet --disable-pip-version-check)
@@ -116,10 +129,28 @@ pip_args=(--quiet --disable-pip-version-check)
 "$PREFIX/bin/pip" install "${pip_args[@]}" --upgrade pip </dev/null
 "$PREFIX/bin/pip" install "${pip_args[@]}" --upgrade --force-reinstall --no-deps "$PACKAGE" </dev/null
 "$PREFIX/bin/pip" install "${pip_args[@]}" "$PACKAGE" </dev/null
-ln -sfn "$PREFIX/bin/celius" "$LINK"
+for link in $LINKS; do
+  # Never replace a celius that is not ours.
+  if [ ! -e "$link" ] || { [ -L "$link" ] && [ "$(readlink "$link")" = "$PREFIX/bin/celius" ]; }; then
+    ln -sfn "$PREFIX/bin/celius" "$link"
+  fi
+done
+printf '{"user": "%s", "home": "%s"}\n' "$RUN_AS" "$AGENT_HOME" >"$SYSTEM_CONF"
+chmod 644 "$SYSTEM_CONF"
+if [ "$RUN_AS" = root ]; then
+  echo "Note: the agent runs as root, so Celius can reach the whole machine (within the folders you allow)."
+fi
 
 if [ "$MODE" = install ]; then
   install -d -m 700 -o "$RUN_AS" "$AGENT_HOME"
+  if [ ! -s "$AGENT_HOME/credential" ] && [ -n "$OLD_HOME" ] && [ "$OLD_HOME" != "$AGENT_HOME" ] \
+    && [ -s "$OLD_HOME/credential" ]; then
+    echo "Moving this device's sign-in from $OLD_HOME to $AGENT_HOME"
+    if have_systemd; then systemctl stop celius-agent 2>/dev/null || true; fi
+    cp -a "$OLD_HOME/." "$AGENT_HOME/"
+    rm -f "$AGENT_HOME/agent.lock"
+    chown -R "$RUN_AS": "$AGENT_HOME"
+  fi
   if [ -s "$AGENT_HOME/credential" ]; then
     echo "This device is already signed in ($AGENT_HOME); keeping that sign-in."
   else
@@ -179,11 +210,11 @@ else
 fi
 if [ "$MODE" = install ]; then
   echo
-  if [ "$RUN_AS" = "${SUDO_USER:-}" ]; then
-    echo "Chat on this device: run 'celius' in a project folder (it asks before working there)."
-  else
-    echo "The agent runs as $RUN_AS; to chat here as that user:"
-    echo "  sudo -u $RUN_AS env CELIUS_AGENT_HOME=$AGENT_HOME celius"
+  echo "Chat on this device: run 'celius' in a project folder (it asks before working there)."
+  if [ "$RUN_AS" != root ] && [ "$RUN_AS" != "${SUDO_USER:-}" ]; then
+    echo "It runs as '$RUN_AS' (also when root types celius), so it can only work in folders"
+    echo "that user can read. For the whole machine (a container just for this), install again"
+    echo "with: ... | bash -s -- --run-as root"
   fi
   echo "To use this device from Celius, list its folders in $AGENT_HOME/policy.json (\"roots\")"
   echo "and set \"allow_shell\": true if it may run commands (applies to the next session)."

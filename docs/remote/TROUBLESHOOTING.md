@@ -14,6 +14,8 @@ Windows).
 | Accepting: *No device is waiting with this code* | Expired, already accepted, or mistyped. | Check the code on the device's screen; start again if it expired. |
 | `celius login`: *Refusing plain http://* | The server address is `http://` and not localhost. | Use the HTTPS address. On a trusted LAN only: `--allow-insecure-http`. |
 | `celius login`: certificate errors | Private CA or self-signed certificate. | `--ca-file /path/to/ca.pem`. |
+| `celius: command not found` after installing (as root, e.g. in `pct enter`) | Installed before `celius` was also linked into `/usr/bin`; that shell's PATH lacks `/usr/local/bin`. | `/usr/local/bin/celius`, or run the install command again with `--upgrade`. |
+| `celius`: *… can't be read by 'celius-agent'* | Installed as root, so the agent runs as the `celius-agent` user, which can't read e.g. `/root`. | Work in a folder it can read, or install again with `--run-as root` on a machine that is just for Celius (keeps the sign-in). |
 | `celius`: *This device isn't signed in* | No sign-in in this device home. On Linux the service's user may differ from yours. | `celius login …`, or run `celius` as the agent's user (the installer prints the command). |
 | `celius`: *Celius may not work in …* | You declined the folder, or it's outside `roots`. | Answer yes when asked, add it to `roots` in `policy.json`, or start `celius` in an allowed folder. |
 | `celius -p` waits after a tool call | No terminal to ask in, so the approval waits in Celius. | Answer it in Celius, or run without `-p`. |

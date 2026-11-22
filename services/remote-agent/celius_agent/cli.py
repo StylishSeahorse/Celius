@@ -248,6 +248,14 @@ def cmd_chat(args, paths: Paths) -> int:
         return 1
     ui = TerminalUI()
     directory = os.path.realpath(args.dir or os.getcwd())
+    if not os.access(directory, os.R_OK | os.X_OK):
+        print(
+            f"{directory} can't be read by '{_user_name()}', the user Celius runs as on this "
+            "machine. Work in a folder that user can read, or install Celius again with "
+            "--run-as root (Linux) for the whole machine.",
+            file=sys.stderr,
+        )
+        return 1
     if not ensure_folder_allowed(paths, directory, ui):
         print(
             f"Celius may not work in {directory}. Add it to roots in {paths.policy}, or start "
@@ -346,6 +354,38 @@ def cmd_policy(args, paths: Paths) -> int:
     return 0
 
 
+SYSTEM_CONF = Path("/etc/celius-agent.json")  # written by install-linux.sh
+
+
+def _user_name() -> str:
+    try:
+        import pwd
+
+        return pwd.getpwuid(os.geteuid()).pw_name
+    except (ImportError, KeyError):
+        return os.environ.get("USERNAME") or os.environ.get("USER") or "?"
+
+
+def _run_as_service_user(paths: Paths, argv: list[str]) -> None:
+    """root on a machine whose agent runs as another user: be that user, with its sign-in.
+
+    install-linux.sh records the agent's user and home; root's own home has no sign-in.
+    """
+    if os.name != "posix" or os.geteuid() != 0 or os.environ.get("CELIUS_AGENT_HOME"):
+        return
+    if paths.credential.exists():
+        return  # root signed in on its own
+    try:
+        system = json.loads(SYSTEM_CONF.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    user, home = system.get("user"), system.get("home")
+    if not user or not home or user == "root":
+        return
+    command = ["env", f"CELIUS_AGENT_HOME={home}", sys.executable, "-m", "celius_agent", *argv]
+    os.execvp("runuser", ["runuser", "-u", user, "--", *command])
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="celius", description="Celius on this device")
     parser.add_argument("--version", action="version", version=__version__)
@@ -386,6 +426,8 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     paths = Paths(Path(args.home) if args.home else default_home())
+    if not args.home:
+        _run_as_service_user(paths, sys.argv[1:] if argv is None else argv)
     handlers = {
         None: cmd_chat,
         "chat": cmd_chat,

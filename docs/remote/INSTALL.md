@@ -42,7 +42,7 @@ makes the device wait in that user's list; without it, type the code in Celius.
 |---|---|---|
 | Upgrade | `irm https://…/install.ps1?upgrade=1 \| iex` | `curl -fsSL https://…/install.sh \| sudo bash -s -- --upgrade` |
 | Remove | `irm https://…/install.ps1?uninstall=1 \| iex` | `curl -fsSL https://…/install.sh \| sudo bash -s -- --uninstall` |
-| Options | — | after `sudo bash -s --`: `--name`, `--run-as`, `--no-service`, `--ca-file` |
+| Options | — | after `sudo bash -s --`: `--name`, `--run-as USER` (`root` for a dedicated container), `--no-service`, `--ca-file` |
 
 The server fills in its own `APP_PUBLIC_URL` and serves the `celius` package it was built
 with (`/install/celius_agent-<version>-py3-none-any.whl`). The sections below describe what
@@ -137,8 +137,16 @@ sudo ./install/install-linux.sh --server https://celius.example.com --celius-use
   `Restart=always` and sandboxing that keeps your own folders usable (`ProtectSystem=full`,
   `NoNewPrivileges`, `PrivateTmp`).
 - Runs as **the user who ran sudo** (so it can work on that user's code, and `celius` run by
-  that user shares the sign-in), or, when there is none, as a dedicated `celius-agent`
-  system user. Never as root.
+  that user shares the sign-in), or, when there is none (logged in as root, e.g. `pct enter`
+  on a Proxmox container), as a dedicated `celius-agent` system user. `celius` typed by root
+  then runs as that user, with its sign-in, so it can only work in folders `celius-agent` can
+  read (not `/root`).
+- **A container or VM that is just for Celius:** `--run-as root` lets it reach the whole
+  machine (within the folders you allow). Re-running the installer with it moves an existing
+  sign-in, so the device doesn't need accepting again:
+  `curl -fsSL https://celius.example.com/install.sh | bash -s -- --run-as root`.
+- `celius` is linked into `/usr/local/bin` and `/usr/bin` (root shells such as `pct enter`
+  leave `/usr/local/bin` off the PATH).
 - Device home: `~/.config/celius-agent/` of that user (`policy.json`, `credential` mode 0600
   in a 0700 folder, `state/`, `logs/`). `CELIUS_AGENT_HOME` or `celius --home` overrides it.
 - Logs: `journalctl -u celius-agent -f` (and `logs/agent.log`).
