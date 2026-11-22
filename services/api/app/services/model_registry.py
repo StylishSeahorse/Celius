@@ -93,6 +93,7 @@ class ModelProfile:
     structured_output: bool
     max_tool_iterations: int
     max_output_tokens: int | None
+    reasoning_budget_tokens: int | None
     compact_tools: bool
     memory_items: int
     recall_chunks: int
@@ -192,6 +193,12 @@ def build_profile(
     max_output = limits.get("max_output_tokens")
     if not isinstance(max_output, int) or max_output < 1:
         max_output = settings.model_max_output_tokens
+    budget = limits.get("reasoning_budget_tokens")
+    if isinstance(budget, int) and budget > 0:
+        sources["reasoning_budget_tokens"] = "admin"
+    else:
+        budget = settings.model_reasoning_budget_tokens
+        sources["reasoning_budget_tokens"] = "configured"
 
     return ModelProfile(
         model_id=model_id,
@@ -206,6 +213,7 @@ def build_profile(
         structured_output=capability("structured_output", settings.model_enable_structured_output),
         max_tool_iterations=max_iterations,
         max_output_tokens=max_output,
+        reasoning_budget_tokens=budget,
         compact_tools=knobs["compact_tools"],
         memory_items=_cap(settings.memory_prompt_max_items, knobs["memory_items"]),
         recall_chunks=_cap(settings.memory_recall_chunks, knobs["recall_chunks"]),

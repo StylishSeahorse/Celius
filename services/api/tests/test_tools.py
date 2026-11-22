@@ -544,3 +544,30 @@ async def test_model_is_told_which_tools_this_chat_lacks(
     system = fake.requests[0]["messages"][0]["content"]
     assert "Not available in this chat:" in system and "write_file" in system
     assert "Read only" in system
+
+
+async def test_tool_step_reasoning_is_kept_for_the_rest_of_the_run_only(
+    client, auth_headers, sessionmaker, gateway, settings, fake
+):
+    """Interleaved thinking: the next step sees why the previous step called the tool;
+    a later reply in the conversation does not see that thinking."""
+    fake.tool_reasoning = "Plan: list the files first, then answer."
+    fake.turns = [[{"name": "list_files", "arguments": {}}], "There are no files."]
+    conv, _ = await start(client, auth_headers, tool_profile="standard")
+    await drain_runs(sessionmaker, gateway, settings)
+
+    step = fake.requests[1]["messages"][-2]
+    assert step["role"] == "assistant" and step["tool_calls"]
+    assert step["reasoning_content"] == "Plan: list the files first, then answer."
+
+    fake.tool_reasoning = None
+    sent = await client.post(
+        f"/api/v1/conversations/{conv['id']}/messages",
+        headers=auth_headers,
+        json={"client_message_id": os.urandom(8).hex(), "content": "And now?"},
+    )
+    assert sent.status_code == 201, sent.text
+    await drain_runs(sessionmaker, gateway, settings)
+    later = fake.requests[-1]["messages"]
+    assert later[-1]["role"] == "user"
+    assert not any("reasoning_content" in m for m in later)

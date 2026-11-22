@@ -20,6 +20,8 @@ class FakeLlama:
         self.reply = "Hello there, world"
         self.reasoning: str | None = None
         self.reasoning_sent = 0
+        # Thinking streamed before the calls of a scripted tool turn.
+        self.tool_reasoning: str | None = None
         self.context_tokens: int | None = None
         self.vision = False
         self.chat_template: str | None = None
@@ -112,6 +114,8 @@ class FakeLlama:
         if self.turns:
             turn = self.turns.pop(0)
             if isinstance(turn, list):
+                if self.tool_reasoning:
+                    yield _sse({"choices": [{"delta": {"reasoning_content": self.tool_reasoning}}]})
                 for index, call in enumerate(turn):
                     arguments = call.get("arguments", {})
                     if not isinstance(arguments, str):

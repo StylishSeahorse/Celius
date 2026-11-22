@@ -20,6 +20,7 @@ class ModelProfileOut(BaseModel):
     structured_output: bool
     max_tool_iterations: int
     max_output_tokens: int | None
+    reasoning_budget_tokens: int | None
     compact_tools: bool
     memory_items: int
     recall_chunks: int
@@ -60,6 +61,9 @@ class CapabilityOverrides(BaseModel):
 class ModelLimits(BaseModel):
     max_tool_iterations: int | None = Field(default=None, ge=1, le=100)
     max_output_tokens: int | None = Field(default=None, ge=16, le=1_000_000)
+    # Thinking tokens before the model is asked to conclude (llama.cpp). See
+    # MODEL_REASONING_BUDGET_TOKENS for the deployment default.
+    reasoning_budget_tokens: int | None = Field(default=None, ge=256, le=1_000_000)
 
 
 class ModelRegistryUpdate(BaseModel):

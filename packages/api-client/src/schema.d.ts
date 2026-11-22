@@ -4573,6 +4573,8 @@ export interface components {
             max_output_tokens?: number | null;
             /** Max Tool Iterations */
             max_tool_iterations?: number | null;
+            /** Reasoning Budget Tokens */
+            reasoning_budget_tokens?: number | null;
         };
         /** ModelListResponse */
         ModelListResponse: {
@@ -4614,6 +4616,8 @@ export interface components {
             profile_source: string;
             /** Provider */
             provider: string;
+            /** Reasoning Budget Tokens */
+            reasoning_budget_tokens: number | null;
             /** Reasoning Toggle */
             reasoning_toggle: boolean;
             /** Recall Chunks */

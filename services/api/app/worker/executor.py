@@ -438,6 +438,33 @@ LOOP_NOTES = {
 }
 
 
+# Characters per thinking token, generously: the budget, not the guard, should end long
+# thinking, so the guard's length cap stays above it.
+BUDGET_CHARS_PER_TOKEN = 6
+
+
+def _length_cap(settings: Settings, request: ChatRequest) -> int:
+    """The loop guard's thinking-length cap. With a thinking budget the server ends long
+    thinking gracefully (the model still answers from its work); the guard's cap, which
+    retries without thinking, is only a backstop above it."""
+    cap = settings.model_max_reasoning_chars
+    budget = request.reasoning_budget_tokens
+    if cap and budget:
+        cap = max(cap, budget * BUDGET_CHARS_PER_TOKEN)
+    return cap
+
+
+def _step_reasoning(reasoning: str) -> str | None:
+    """A tool step's thinking, to send back with that step for the rest of the run.
+
+    Thinking the loop guard cut short is left out: feeding a loop back to the model
+    invites it to continue the loop."""
+    reasoning = reasoning.strip()
+    if not reasoning or LOOP_REASONING_NOTE.strip() in reasoning:
+        return None
+    return reasoning
+
+
 def _trim_loop(state: _StreamState) -> None:
     """Keep what came before the repetition (all of it for a length cap)."""
     if not state.loop or not state.guards:
@@ -596,7 +623,7 @@ class _Loop:
     def _new_state(self) -> _StreamState:
         state = _StreamState(step=self.p.step)
         if self.settings.model_loop_guard:
-            reasoning = replace(REASONING, max_chars=self.settings.model_max_reasoning_chars)
+            reasoning = replace(REASONING, max_chars=_length_cap(self.settings, self.p.request))
             state.guards = {
                 "reasoning": RepetitionGuard(reasoning),
                 "text": RepetitionGuard(ANSWER),
@@ -790,7 +817,12 @@ class _Loop:
             )
             await db.commit()
         p.request.messages.append(
-            ChatMessage(role="assistant", content=text or None, tool_calls=model_calls)
+            ChatMessage(
+                role="assistant",
+                content=text or None,
+                tool_calls=model_calls,
+                reasoning_content=_step_reasoning(reasoning),
+            )
         )
         return rows
 
@@ -1486,6 +1518,10 @@ async def _prepare(
                 presence_penalty=settings.model_presence_penalty,
                 repeat_penalty=settings.model_repeat_penalty,
                 dry_multiplier=settings.model_dry_multiplier,
+                reasoning_budget_tokens=profile.reasoning_budget_tokens,
+                reasoning_budget_message=settings.model_reasoning_budget_message
+                if profile.reasoning_budget_tokens
+                else None,
             ),
             toolset=toolset,
             iterations=run.tool_iterations,
@@ -1566,11 +1602,11 @@ async def _restore_steps(db, prepared: _Prepared, output: Message) -> bool:
         )
     ).all()
     text_by_step: dict[int, str] = {}
+    reasoning_by_step: dict[int, str] = {}
     for part in parts:
-        if part.type == "text" and part.data and "step" in part.data:
-            text_by_step[part.data["step"]] = text_by_step.get(part.data["step"], "") + (
-                part.text or ""
-            )
+        if part.type in ("text", "reasoning") and part.data and "step" in part.data:
+            target = text_by_step if part.type == "text" else reasoning_by_step
+            target[part.data["step"]] = target.get(part.data["step"], "") + (part.text or "")
     by_step: dict[int, list[ToolCall]] = {}
     for call in calls:
         by_step.setdefault(call.step, []).append(call)
@@ -1583,6 +1619,7 @@ async def _restore_steps(db, prepared: _Prepared, output: Message) -> bool:
             ChatMessage(
                 role="assistant",
                 content=text_by_step.get(step) or None,
+                reasoning_content=_step_reasoning(reasoning_by_step.get(step, "")),
                 tool_calls=[
                     {
                         "id": row.model_call_id,
