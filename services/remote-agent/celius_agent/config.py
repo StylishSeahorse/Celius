@@ -2,7 +2,7 @@
 
 Agent home (override with CELIUS_AGENT_HOME or --home):
   Windows: %LOCALAPPDATA%\\CeliusAgent      Linux/macOS: ~/.config/celius-agent
-    config.json   server address, agent id, TLS options (written by `register`)
+    config.json   server address, agent id, TLS options (written by `celius login`)
     policy.json   what this machine allows: folders, shell, write, agent types. Edited
                   by the machine's owner; Celius can only narrow it, never widen it.
     credential    the machine credential (DPAPI-encrypted on Windows, mode 0600 elsewhere)

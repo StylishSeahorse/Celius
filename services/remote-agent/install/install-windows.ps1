@@ -1,18 +1,20 @@
 <#
 .SYNOPSIS
-  Install the Celius agent for the current Windows user (docs/remote/INSTALL.md).
+  Install Celius on this Windows PC for the current user (docs/remote/INSTALL.md).
 
 .DESCRIPTION
-  Creates a private Python environment in %LOCALAPPDATA%\CeliusAgent, registers this PC
-  with Celius using a pairing code, and adds a scheduled task that starts the agent when
-  you sign in and restarts it if it stops.
+  Creates a private Python environment in %LOCALAPPDATA%\CeliusAgent, puts the `celius`
+  command on your PATH, signs this PC in (it shows a code; you accept the device in Celius,
+  Remote machines), and adds a scheduled task that runs the agent when you sign in to
+  Windows, so Celius can use this PC while you are away from it.
 
-  It runs as you, not as a Windows service: it can then use your own folders and your
-  Claude Code sign-in, its credential is encrypted with DPAPI for your account only, and it
-  never holds administrator rights.
+  It runs as you, not as a Windows service: it can use your own folders, its sign-in is
+  encrypted with DPAPI for your account only, and it never holds administrator rights.
+
+  Then open a new terminal and run `celius` in a project folder to chat on this PC.
 
 .EXAMPLE
-  .\install-windows.ps1 -Server https://celius.example -Code ABCD-EFGH-JKLM
+  .\install-windows.ps1 -Server https://celius.example -CeliusUser alice
 .EXAMPLE
   .\install-windows.ps1 -Upgrade
 .EXAMPLE
@@ -21,10 +23,14 @@
 [CmdletBinding(DefaultParameterSetName = "Install")]
 param(
   [Parameter(ParameterSetName = "Install", Mandatory = $true)][string]$Server,
-  [Parameter(ParameterSetName = "Install", Mandatory = $true)][string]$Code,
-  [Parameter(ParameterSetName = "Install")][switch]$Claude,
+  # Your Celius user name: the device then waits in your list in Celius.
+  [Parameter(ParameterSetName = "Install")][string]$CeliusUser,
+  # A name for this PC in Celius (default: its computer name).
+  [Parameter(ParameterSetName = "Install")][string]$Name,
   [Parameter(ParameterSetName = "Install")][switch]$AllowInsecureHttp,
   [Parameter(ParameterSetName = "Install")][string]$CaFile,
+  # Install and sign in only; no scheduled task.
+  [Parameter(ParameterSetName = "Install")][switch]$NoTask,
   [Parameter(ParameterSetName = "Upgrade", Mandatory = $true)][switch]$Upgrade,
   [Parameter(ParameterSetName = "Uninstall", Mandatory = $true)][switch]$Uninstall,
   # A Python 3.10+ to build the environment with (default: the py launcher, then python).
@@ -34,14 +40,23 @@ $ErrorActionPreference = "Stop"
 $TaskName = "Celius Agent"
 $Base = Join-Path $env:LOCALAPPDATA "CeliusAgent"
 $Venv = Join-Path $Base "venv"
+$Scripts = Join-Path $Venv "Scripts"
 $Src = Split-Path -Parent $PSScriptRoot
+
+function Set-UserPath([bool]$Present) {
+  $current = [Environment]::GetEnvironmentVariable("Path", "User")
+  $parts = @($current -split ";" | Where-Object { $_ -and ($_.TrimEnd("\") -ne $Scripts) })
+  if ($Present) { $parts += $Scripts }
+  [Environment]::SetEnvironmentVariable("Path", ($parts -join ";"), "User")
+}
 
 if ($Uninstall) {
   Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
   Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
+  Set-UserPath $false
   if (Test-Path $Venv) { Remove-Item -Recurse -Force $Venv }
-  Write-Host "Removed. The agent's data (credential, policy, state) is still in $Base;"
-  Write-Host "revoke the machine in Celius and delete that folder to remove everything."
+  Write-Host "Removed. The device's data (sign-in, policy, state) is still in $Base;"
+  Write-Host "remove the device in Celius and delete that folder to remove everything."
   exit 0
 }
 
@@ -60,42 +75,54 @@ $pyArgs = if ($py.Length -gt 1) { $py[1..($py.Length - 1)] } else { @() }
 if ($LASTEXITCODE -ne 0) { throw "Python 3.10 or newer is required." }
 
 New-Item -ItemType Directory -Force -Path $Base | Out-Null
-if (-not (Test-Path (Join-Path $Venv "Scripts\python.exe"))) {
-  Write-Host "Creating the agent's Python environment in $Venv"
+if (-not (Test-Path (Join-Path $Scripts "python.exe"))) {
+  Write-Host "Creating Celius's Python environment in $Venv"
   & $pyExe @pyArgs -m venv $Venv
 }
-$VenvPython = Join-Path $Venv "Scripts\python.exe"
+$VenvPython = Join-Path $Scripts "python.exe"
 & $VenvPython -m pip install --quiet --upgrade pip
-$extras = if ($Claude) { "monitor,claude" } else { "monitor" }
-& $VenvPython -m pip install --quiet "$Src[$extras]"
-if ($LASTEXITCODE -ne 0) { throw "Installing the agent failed." }
+& $VenvPython -m pip install --quiet "$Src[monitor]"
+if ($LASTEXITCODE -ne 0) { throw "Installing Celius failed." }
+Set-UserPath $true
+$env:Path = "$env:Path;$Scripts"
 
+$hadTask = [bool](Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue)
 if (-not $Upgrade) {
-  $registerArgs = @("-m", "celius_agent", "register", "--server", $Server, "--code", $Code)
-  if ($AllowInsecureHttp) { $registerArgs += "--allow-insecure-http" }
-  if ($CaFile) { $registerArgs += @("--ca-file", $CaFile) }
-  & $VenvPython @registerArgs
-  if ($LASTEXITCODE -ne 0) { throw "Registration failed (is the pairing code still valid?)." }
+  if (Test-Path (Join-Path $Base "credential")) {
+    Write-Host "This PC is already signed in ($Base); keeping that sign-in."
+  } else {
+    $loginArgs = @("-m", "celius_agent", "login", "--server", $Server)
+    if ($CeliusUser) { $loginArgs += @("--user", $CeliusUser) }
+    if ($Name) { $loginArgs += @("--name", $Name) }
+    if ($AllowInsecureHttp) { $loginArgs += "--allow-insecure-http" }
+    if ($CaFile) { $loginArgs += @("--ca-file", $CaFile) }
+    Write-Host ""
+    & $VenvPython @loginArgs
+    if ($LASTEXITCODE -ne 0) { throw "Sign-in did not finish; run the installer again." }
+  }
 }
 
-# Start at sign-in, restart after failures, never time out, and keep running on battery.
-$pythonw = Join-Path $Venv "Scripts\pythonw.exe"
-$action = New-ScheduledTaskAction -Execute $pythonw -Argument "-m celius_agent run" -WorkingDirectory $Base
-$trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
-$settings = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) `
-  -ExecutionTimeLimit ([TimeSpan]::Zero) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
-  -StartWhenAvailable -MultipleInstances IgnoreNew
-$principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
-Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings `
-  -Principal $principal -Description "Celius Remote Agent: runs Celius sessions on this PC" -Force | Out-Null
-Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-Start-ScheduledTask -TaskName $TaskName
+if ((-not $Upgrade -and -not $NoTask) -or ($Upgrade -and $hadTask)) {
+  # Start at sign-in, restart after failures, never time out, and keep running on battery.
+  $pythonw = Join-Path $Scripts "pythonw.exe"
+  $action = New-ScheduledTaskAction -Execute $pythonw -Argument "-m celius_agent agent" -WorkingDirectory $Base
+  $trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
+  $settings = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) `
+    -ExecutionTimeLimit ([TimeSpan]::Zero) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+    -StartWhenAvailable -MultipleInstances IgnoreNew
+  $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
+  Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings `
+    -Principal $principal -Description "Celius agent: lets Celius use this PC" -Force | Out-Null
+  Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+  Start-ScheduledTask -TaskName $TaskName
+  Write-Host ""
+  Write-Host "The agent is running (Task Scheduler: '$TaskName'; log: $Base\logs\agent.log)."
+}
 
-Write-Host ""
-Write-Host "The agent is running (Task Scheduler: '$TaskName'; log: $Base\logs\agent.log)."
 if (-not $Upgrade) {
-  Write-Host "Now: list the folders Celius may use in $Base\policy.json (`"roots`"),"
-  Write-Host "set `"allow_shell`": true if it may run commands, then restart the task:"
-  Write-Host "  Stop-ScheduledTask '$TaskName'; Start-ScheduledTask '$TaskName'"
-  Write-Host "and authorise the machine in Celius (Remote machines)."
+  Write-Host ""
+  Write-Host "Chat on this PC: open a new terminal and run 'celius' in a project folder"
+  Write-Host "(it asks before working there)."
+  Write-Host "To use this PC from Celius, list its folders in $Base\policy.json (`"roots`")"
+  Write-Host "and set `"allow_shell`": true if it may run commands (applies to the next session)."
 }

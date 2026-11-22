@@ -10,7 +10,7 @@ Type=simple
 User=@USER@
 Environment=CELIUS_AGENT_HOME=@HOME@
 Environment=PYTHONUNBUFFERED=1
-ExecStart=@PREFIX@/bin/celius-agent run
+ExecStart=@PREFIX@/bin/celius agent
 # Reconnecting is the agent's job; this only covers crashes.
 Restart=always
 RestartSec=5

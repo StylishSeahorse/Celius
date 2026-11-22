@@ -1,4 +1,4 @@
-"""Entry point for the PyInstaller build (celius-agent.exe)."""
+"""Entry point for the PyInstaller build (celius.exe)."""
 
 from celius_agent.cli import main
 

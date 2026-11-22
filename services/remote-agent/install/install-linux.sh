@@ -1,33 +1,38 @@
 #!/usr/bin/env bash
-# Install the Celius agent on Linux as a systemd service (docs/remote/INSTALL.md).
+# Install Celius on a Linux device (docs/remote/INSTALL.md): the `celius` command, and a
+# systemd service that lets Celius use this device while you are away from it.
 #
-#   sudo ./install-linux.sh --server https://celius.example --code ABCD-EFGH-JKLM
+#   sudo ./install-linux.sh --server https://celius.example [--celius-user alice]
+#
+# It signs the device in: it shows a code, and you accept the device in Celius
+# (Remote machines). Then run `celius` in a folder here to chat on this device.
 #
 # Options:
-#   --user NAME            Run the agent as this user (default: the user who ran sudo, so it
-#                          can reach that user's code; with no sudo user, a dedicated
-#                          'celius-agent' system user is created).
-#   --claude               Also install Claude Code support (claude-agent-sdk).
+#   --celius-user NAME     Your Celius user name: the device waits in your list in Celius.
+#   --name NAME            A name for this device in Celius (default: its hostname).
+#   --run-as USER          Linux user the agent runs as (default: the user who ran sudo, so
+#                          it can reach that user's code and `celius` shares its sign-in;
+#                          with no sudo user, a dedicated 'celius-agent' system user).
 #   --allow-insecure-http  Allow a plain http:// server (trusted networks only).
 #   --ca-file PATH         CA bundle for a server with a private certificate authority.
-#   --no-service           Install and register only (containers without systemd).
-#   --upgrade              Reinstall the agent from this folder and restart the service.
+#   --no-service           Install and sign in only (containers without systemd).
+#   --upgrade              Reinstall Celius from this folder and restart the service.
 #   --uninstall            Stop and remove the service and the program (keeps its data).
 set -euo pipefail
 
-SERVER="" CODE="" RUN_AS="${SUDO_USER:-}" EXTRAS="monitor" INSECURE="" CA_FILE="" SERVICE=1 MODE=install
+SERVER="" CELIUS_USER="" NAME="" RUN_AS="${SUDO_USER:-}" INSECURE="" CA_FILE="" SERVICE=1 MODE=install
 while [ $# -gt 0 ]; do
   case "$1" in
     --server) SERVER="$2"; shift 2 ;;
-    --code) CODE="$2"; shift 2 ;;
-    --user) RUN_AS="$2"; shift 2 ;;
-    --claude) EXTRAS="monitor,claude"; shift ;;
+    --celius-user) CELIUS_USER="$2"; shift 2 ;;
+    --name) NAME="$2"; shift 2 ;;
+    --run-as) RUN_AS="$2"; shift 2 ;;
     --allow-insecure-http) INSECURE="--allow-insecure-http"; shift ;;
     --ca-file) CA_FILE="$2"; shift 2 ;;
     --no-service) SERVICE=0; shift ;;
     --upgrade) MODE=upgrade; shift ;;
     --uninstall) MODE=uninstall; shift ;;
-    -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,21p' "$0"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
 done
@@ -36,16 +41,23 @@ done
 SRC="$(cd "$(dirname "$0")/.." && pwd)"
 PREFIX="${CELIUS_AGENT_PREFIX:-/opt/celius-agent}"
 UNIT=/etc/systemd/system/celius-agent.service
+LINK=/usr/local/bin/celius
 have_systemd() { [ "$SERVICE" -eq 1 ] && command -v systemctl >/dev/null && [ -d /run/systemd/system ]; }
 
 if [ "$MODE" = uninstall ]; then
   if have_systemd; then systemctl disable --now celius-agent 2>/dev/null || true; fi
   rm -f "$UNIT"
   if have_systemd; then systemctl daemon-reload; fi
+  if [ -L "$LINK" ]; then rm -f "$LINK"; fi
   rm -rf "$PREFIX"
-  echo "Removed. The agent's data (credential, policy, state) is kept in its home folder;"
-  echo "revoke the machine in Celius and delete that folder to remove everything."
+  echo "Removed. The device's data (sign-in, policy, state) is kept in its home folder;"
+  echo "remove the device in Celius and delete that folder to remove everything."
   exit 0
+fi
+
+if [ "$MODE" = install ] && [ -z "$SERVER" ]; then
+  echo "--server is required, e.g. --server https://celius.example" >&2
+  exit 2
 fi
 
 PYTHON="${PYTHON:-python3}"
@@ -62,22 +74,27 @@ fi
 id -u "$RUN_AS" >/dev/null 2>&1 || { echo "No such user: $RUN_AS" >&2; exit 1; }
 RUN_HOME="$(getent passwd "$RUN_AS" | cut -d: -f6)"
 AGENT_HOME="${CELIUS_AGENT_HOME:-$RUN_HOME/.config/celius-agent}"
+as_agent() { runuser -u "$RUN_AS" -- env CELIUS_AGENT_HOME="$AGENT_HOME" "$@"; }
 
-echo "Installing the agent into $PREFIX"
+echo "Installing Celius into $PREFIX"
 "$PYTHON" -m venv "$PREFIX"
 "$PREFIX/bin/pip" install --quiet --upgrade pip
-"$PREFIX/bin/pip" install --quiet "${SRC}[${EXTRAS}]"
+"$PREFIX/bin/pip" install --quiet "${SRC}[monitor]"
+ln -sfn "$PREFIX/bin/celius" "$LINK"
 
 if [ "$MODE" = install ]; then
-  if [ -z "$SERVER" ] || [ -z "$CODE" ]; then
-    echo "--server and --code are required." >&2
-    exit 2
-  fi
   install -d -m 700 -o "$RUN_AS" "$AGENT_HOME"
-  args=(register --server "$SERVER" --code "$CODE")
-  [ -n "$INSECURE" ] && args+=("$INSECURE")
-  [ -n "$CA_FILE" ] && args+=(--ca-file "$CA_FILE")
-  runuser -u "$RUN_AS" -- env CELIUS_AGENT_HOME="$AGENT_HOME" "$PREFIX/bin/celius-agent" "${args[@]}"
+  if [ -s "$AGENT_HOME/credential" ]; then
+    echo "This device is already signed in ($AGENT_HOME); keeping that sign-in."
+  else
+    args=(login --server "$SERVER")
+    [ -n "$CELIUS_USER" ] && args+=(--user "$CELIUS_USER")
+    [ -n "$NAME" ] && args+=(--name "$NAME")
+    [ -n "$INSECURE" ] && args+=("$INSECURE")
+    [ -n "$CA_FILE" ] && args+=(--ca-file "$CA_FILE")
+    echo
+    as_agent "$PREFIX/bin/celius" "${args[@]}" || { echo "Sign-in did not finish; run the installer again." >&2; exit 1; }
+  fi
 fi
 
 if have_systemd; then
@@ -88,12 +105,17 @@ if have_systemd; then
   systemctl restart celius-agent
   echo "Service started: systemctl status celius-agent   logs: journalctl -u celius-agent -f"
 else
-  echo "No systemd here: start it with"
-  echo "  runuser -u $RUN_AS -- env CELIUS_AGENT_HOME=$AGENT_HOME $PREFIX/bin/celius-agent run"
+  echo "No systemd here: start the agent with"
+  echo "  runuser -u $RUN_AS -- env CELIUS_AGENT_HOME=$AGENT_HOME $PREFIX/bin/celius agent"
 fi
 if [ "$MODE" = install ]; then
   echo
-  echo "Now: list the folders Celius may use in $AGENT_HOME/policy.json (\"roots\"),"
-  echo "set \"allow_shell\": true if it may run commands, restart the agent, and authorise"
-  echo "the machine in Celius (Remote machines)."
+  if [ "$RUN_AS" = "${SUDO_USER:-}" ]; then
+    echo "Chat on this device: run 'celius' in a project folder (it asks before working there)."
+  else
+    echo "The agent runs as $RUN_AS; to chat here as that user:"
+    echo "  sudo -u $RUN_AS env CELIUS_AGENT_HOME=$AGENT_HOME celius"
+  fi
+  echo "To use this device from Celius, list its folders in $AGENT_HOME/policy.json (\"roots\")"
+  echo "and set \"allow_shell\": true if it may run commands (applies to the next session)."
 fi
