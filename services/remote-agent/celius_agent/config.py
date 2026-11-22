@@ -51,9 +51,12 @@ class AgentConfig:
 
 DEFAULT_POLICY: dict = {
     "_comment": (
-        "What Celius may do on this machine. Nothing runs outside 'roots'. Celius can only "
-        "narrow these settings. Restart the agent after editing."
+        "What Celius may do on this machine. Nothing runs outside 'roots'. You can also "
+        "change these in Celius (Remote machines), unless allow_remote_edit is false. Edits "
+        "apply to the next session."
     ),
+    # false: only someone on this machine can change this file (Celius's editor is refused).
+    "allow_remote_edit": True,
     # Folders sessions may use, e.g. [{"path": "/home/me/code", "write": true}]
     "roots": [],
     # Run shell commands, Python and git (Celius still asks before each one by default).
@@ -79,6 +82,7 @@ class Policy:
     max_output_chars: int = 1_000_000
     memory_limit_mb: int | None = None
     env_deny: list[str] = field(default_factory=list)
+    allow_remote_edit: bool = True
 
     @classmethod
     def from_dict(cls, raw: dict) -> Policy:
@@ -101,6 +105,7 @@ class Policy:
             max_output_chars=max(10_000, int(raw.get("max_output_chars") or 1_000_000)),
             memory_limit_mb=raw.get("memory_limit_mb") or None,
             env_deny=[str(v) for v in raw.get("env_deny") or []],
+            allow_remote_edit=raw.get("allow_remote_edit", True) is not False,
         )
 
     def report(self) -> dict:
@@ -110,6 +115,7 @@ class Policy:
             "allow_shell": self.allow_shell,
             "allow_write": self.allow_write,
             "max_concurrent_commands": self.max_concurrent_commands,
+            "allow_remote_edit": self.allow_remote_edit,
         }
 
 
@@ -151,11 +157,59 @@ def save_config(paths: Paths, config: AgentConfig) -> None:
     _write_json(paths.config, asdict(config))
 
 
-def load_policy(paths: Paths) -> Policy:
+def _policy_raw(paths: Paths) -> dict:
     if not paths.policy.exists():
         paths.ensure()
         _write_json(paths.policy, DEFAULT_POLICY)
     raw = json.loads(paths.policy.read_text(encoding="utf-8"))
+    return raw if isinstance(raw, dict) else {}
+
+
+def load_policy(paths: Paths) -> Policy:
+    return Policy.from_dict(_policy_raw(paths))
+
+
+class PolicyRefused(ValueError):
+    """A change from Celius this machine won't make (shown to the person who asked)."""
+
+
+MAX_ROOTS = 50
+
+
+def update_policy_file(paths: Paths, changes: dict) -> Policy:
+    """A change made in Celius (Remote machines → the machine): checked here, against this
+    machine's own file system, then saved in policy.json. Keys not changed are kept."""
+    raw = _policy_raw(paths)
+    if raw.get("allow_remote_edit") is False:
+        raise PolicyRefused(
+            "This machine's policy can only be changed on the machine itself "
+            f"(allow_remote_edit is false in {paths.policy})."
+        )
+    if "roots" in changes:
+        roots = changes["roots"]
+        if not isinstance(roots, list) or len(roots) > MAX_ROOTS:
+            raise PolicyRefused(f"Give a list of at most {MAX_ROOTS} folders.")
+        cleaned: list[dict] = []
+        for root in roots:
+            path = root.get("path") if isinstance(root, dict) else None
+            if not isinstance(path, str) or not path.strip():
+                raise PolicyRefused("A folder has no path.")
+            expanded = os.path.expanduser(os.path.expandvars(path.strip()))
+            if not os.path.isabs(expanded):
+                raise PolicyRefused(f"{path} is not a full path on this machine.")
+            if not os.path.isdir(expanded):
+                raise PolicyRefused(
+                    f"{path} is not a folder that Celius can reach on this machine (check it "
+                    "exists and that the user the agent runs as can open it)."
+                )
+            resolved = os.path.realpath(expanded)
+            if not any(r["path"] == resolved for r in cleaned):
+                cleaned.append({"path": resolved, "write": bool(root.get("write", True))})
+        raw["roots"] = cleaned
+    for key in ("allow_shell", "allow_write"):
+        if key in changes:
+            raw[key] = bool(changes[key])
+    _write_json(paths.policy, raw)
     return Policy.from_dict(raw)
 
 

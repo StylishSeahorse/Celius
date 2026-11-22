@@ -183,8 +183,18 @@ celius --dir PATH --model NAME
 
 ## The policy file
 
-`policy.json` is the device owner's word. Celius can narrow it (per device, per session),
-never widen it. Changes apply to the next session that opens; nothing needs restarting.
+`policy.json` is the outer limit of what Celius may do on the device: the settings in Celius
+can narrow it (per device, per session), never go beyond it. Changes apply to the next
+session that opens; nothing needs restarting.
+
+**Editing it from Celius.** *Remote machines → the device → What this machine allows* lists
+its folders (read and change, or read only), and whether commands and file changes are
+allowed. Add or remove folders there and choose **Save on the machine**: the device checks
+the change (full paths of folders that exist and that the agent's user can open), saves
+`policy.json`, and Celius shows the result or the device's reason for refusing. The device
+must be online and run Celius 0.3 or newer (`--upgrade`). To keep the file under the
+device's control only, set `"allow_remote_edit": false` in it: Celius's editor is then
+refused, and that setting itself can only be changed on the device.
 
 ```json
 {
@@ -194,6 +204,7 @@ never widen it. Changes apply to the next session that opens; nothing needs rest
   ],
   "allow_shell": true,
   "allow_write": true,
+  "allow_remote_edit": true,
   "max_concurrent_commands": 2,
   "max_command_seconds": 3600,
   "max_output_chars": 1000000,
@@ -207,6 +218,7 @@ never widen it. Changes apply to the next session that opens; nothing needs rest
 | `roots` | `[]` | Folders sessions may use. A session's folder must be inside one; every path is resolved (symlinks followed) and must stay inside the session's folder. `write: false` makes a root read-only. `celius` adds a folder here when you allow it. |
 | `allow_shell` | `false` | Shell commands, Python and git. Without it only list/read/write files work. |
 | `allow_write` | `true` | Creating and changing files. |
+| `allow_remote_edit` | `true` | `roots`, `allow_shell` and `allow_write` can be changed from Celius. `false`: only on the device. |
 | `max_concurrent_commands` | 2 | Commands running at once on this device. |
 | `max_command_seconds` | 3600 | Upper bound for any command's timeout. |
 | `max_output_chars` | 1 000 000 | Output kept per stream; 20 times that stops the command. |

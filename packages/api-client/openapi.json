@@ -5795,6 +5795,26 @@
         "title": "PlanStep",
         "type": "object"
       },
+      "PolicyRoot": {
+        "properties": {
+          "path": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          },
+          "write": {
+            "default": true,
+            "title": "Write",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "PolicyRoot",
+        "type": "object"
+      },
       "ProjectCreate": {
         "properties": {
           "description": {
@@ -6655,6 +6675,50 @@
           "more"
         ],
         "title": "RemoteEventPage",
+        "type": "object"
+      },
+      "RemotePolicyUpdate": {
+        "description": "A change to the machine's own policy file, made in Celius. The machine checks it\n(full paths, existing folders) and may refuse it (`allow_remote_edit: false`).",
+        "properties": {
+          "allow_shell": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allow Shell"
+          },
+          "allow_write": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allow Write"
+          },
+          "roots": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PolicyRoot"
+                },
+                "maxItems": 50,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roots"
+          }
+        },
+        "title": "RemotePolicyUpdate",
         "type": "object"
       },
       "RemoteSessionBrief": {
@@ -15039,6 +15103,60 @@
           }
         },
         "summary": "Disconnect Agent",
+        "tags": [
+          "remote"
+        ]
+      }
+    },
+    "/api/v1/remote/agents/{agent_id}/policy": {
+      "put": {
+        "description": "Change the folders and permissions in the machine's own policy file. The machine\nchecks the change and saves it (or says why not); waits up to 30 s for it.",
+        "operationId": "update_machine_policy_api_v1_remote_agents__agent_id__policy_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Agent Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemotePolicyUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteAgentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Machine Policy",
         "tags": [
           "remote"
         ]

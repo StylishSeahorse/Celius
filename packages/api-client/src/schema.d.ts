@@ -1753,6 +1753,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/remote/agents/{agent_id}/policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Machine Policy
+         * @description Change the folders and permissions in the machine's own policy file. The machine
+         *     checks the change and saves it (or says why not); waits up to 30 s for it.
+         */
+        put: operations["update_machine_policy_api_v1_remote_agents__agent_id__policy_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/remote/agents/{agent_id}/revoke": {
         parameters: {
             query?: never;
@@ -4877,6 +4898,16 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** PolicyRoot */
+        PolicyRoot: {
+            /** Path */
+            path: string;
+            /**
+             * Write
+             * @default true
+             */
+            write: boolean;
+        };
         /** ProjectCreate */
         ProjectCreate: {
             /** Description */
@@ -5182,6 +5213,19 @@ export interface components {
             last_seq: number;
             /** More */
             more: boolean;
+        };
+        /**
+         * RemotePolicyUpdate
+         * @description A change to the machine's own policy file, made in Celius. The machine checks it
+         *     (full paths, existing folders) and may refuse it (`allow_remote_edit: false`).
+         */
+        RemotePolicyUpdate: {
+            /** Allow Shell */
+            allow_shell?: boolean | null;
+            /** Allow Write */
+            allow_write?: boolean | null;
+            /** Roots */
+            roots?: components["schemas"]["PolicyRoot"][] | null;
         };
         /** RemoteSessionBrief */
         RemoteSessionBrief: {
@@ -9895,6 +9939,41 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_machine_policy_api_v1_remote_agents__agent_id__policy_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RemotePolicyUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoteAgentOut"];
                 };
             };
             /** @description Validation Error */

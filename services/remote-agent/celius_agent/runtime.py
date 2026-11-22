@@ -12,7 +12,7 @@ import logging
 import shutil
 from collections.abc import Callable
 
-from celius_agent.config import Policy
+from celius_agent.config import Policy, PolicyRefused
 from celius_agent.paths import PathRefused, check_working_directory
 from celius_agent.state import SessionState, StateStore
 from celius_agent.tools import TOOLS, ToolEnv, error, fetch_file, find_python, shell_name
@@ -29,12 +29,16 @@ class Runtime:
         store: StateStore,
         policy: Policy,
         policy_loader: Callable[[], Policy] | None = None,
+        policy_editor: Callable[[dict], Policy] | None = None,
     ):
         self.store = store
         self.policy = policy
         # Re-reads the machine's policy file (e.g. after `celius` allowed a new folder).
         self.policy_loader = policy_loader
+        # Saves a change made in Celius to the policy file (and returns the new policy).
+        self.policy_editor = policy_editor
         self.policy_changed = False  # tell Celius at the next chance
+        self.results: list[dict] = []  # outcomes of commands outside sessions, to send
         self.sessions: dict[str, SessionState] = store.load_sessions()
         self.running: dict[str, ToolEnv] = {}  # command id -> env (for cancel)
         self.tasks: set[asyncio.Task] = set()
@@ -204,10 +208,14 @@ class Runtime:
                     env.cancel.set()
             elif kind == "interrupt":
                 await self._interrupt(session_id)
+            elif kind == "policy.update":
+                self._policy_update(command_id, payload)
             else:
                 log.warning("Unknown command kind %r", kind)
         except Exception:
             log.exception("Command %s (%s) failed", command_id, kind)
+            if kind == "policy.update":
+                self._result(command_id, "failed", error="The agent failed")
             if kind in ("tool.execute", "file.fetch") and session_id in self.sessions:
                 await self.emit(
                     session_id,
@@ -220,6 +228,39 @@ class Runtime:
                 command_id,
                 {"id": command_id, "kind": kind, "session_id": session_id, "state": "done"},
             )
+
+    def _result(
+        self, command_id: str, status: str, result: dict | None = None, error: str | None = None
+    ) -> None:
+        self.results.append(
+            {
+                "type": "result",
+                "command_id": command_id,
+                "status": status,
+                "result": result,
+                "error": error,
+            }
+        )
+        self.wakeup.set()
+
+    def _policy_update(self, command_id: str, payload: dict) -> None:
+        """Folders and permissions changed in Celius: the machine checks and saves them."""
+        if self.policy_editor is None:
+            self._result(command_id, "failed", error="This agent can't change its policy file")
+            return
+        changes = payload.get("policy") if isinstance(payload.get("policy"), dict) else {}
+        try:
+            fresh = self.policy_editor(changes)
+        except PolicyRefused as exc:
+            self._result(command_id, "failed", error=str(exc))
+            return
+        except (OSError, ValueError) as exc:
+            self._result(command_id, "failed", error=f"Can't save the policy file: {exc}")
+            return
+        log.info("Policy changed in Celius: %s", fresh.report())
+        self.policy = fresh
+        self.policy_changed = True
+        self._result(command_id, "completed", result={"local_policy": fresh.report()})
 
     # ------------------------------------------------------------------ sessions
 

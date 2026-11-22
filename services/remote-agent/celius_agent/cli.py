@@ -32,6 +32,7 @@ from celius_agent.config import (
     load_config,
     load_policy,
     save_config,
+    update_policy_file,
 )
 from celius_agent.connection import AuthError, Connection, post_json
 from celius_agent.credentials import load_credential, save_credential
@@ -100,7 +101,12 @@ async def run_agent(paths: Paths, config: AgentConfig, stop: asyncio.Event) -> i
     policy = load_policy(paths)
     if not policy.roots:
         log.warning("No folders allowed yet (roots in %s)", paths.policy)
-    runtime = Runtime(StateStore(paths.state), policy, policy_loader=lambda: load_policy(paths))
+    runtime = Runtime(
+        StateStore(paths.state),
+        policy,
+        policy_loader=lambda: load_policy(paths),
+        policy_editor=lambda changes: update_policy_file(paths, changes),
+    )
     await runtime.recover_interrupted()
     connection = Connection(config, runtime, credential, Monitor([r["path"] for r in policy.roots]))
     log.info("Celius agent %s starting (machine %s)", __version__, config.agent_id)

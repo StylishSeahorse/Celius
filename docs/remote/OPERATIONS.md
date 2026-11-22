@@ -17,7 +17,7 @@ the remote tool calls by the existing `worker`. No new container, port, volume o
 | Storage | All remote state is in PostgreSQL (`remote_*` tables). Downloads are passed through, not stored. |
 | Backups | Covered by the existing `make backup` (database dump). Agents keep their own credential and outbox on the machine; nothing there needs backing up: after a restore, agents reconnect and resend anything Central doesn't have. |
 | Retention | The worker's maintenance pass deletes terminal output older than `REMOTE_OUTPUT_RETENTION_DAYS` (30), finished commands older than 30 days, and device sign-in requests a day after they expire. Other session events go when their conversation is deleted. |
-| Audit | `audit_events` actions `remote_device.login_requested/refused`, `remote_agent.accepted/signed_in/updated/revoked/deleted/connected/disconnected/credential_rotated/disconnect_requested`, `remote_session.opened/interrupted/terminated`, plus the existing `tool_call.*` for every approval. |
+| Audit | `audit_events` actions `remote_device.login_requested/refused`, `remote_agent.accepted/signed_in/updated/policy_changed/revoked/deleted/connected/disconnected/credential_rotated/disconnect_requested`, `remote_session.opened/interrupted/terminated`, plus the existing `tool_call.*` for every approval. |
 
 ### Upgrade and rollback
 

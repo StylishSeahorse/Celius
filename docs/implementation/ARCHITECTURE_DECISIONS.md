@@ -753,3 +753,32 @@ next model turn and takes it into account, without stopping.
   tool call or a long stream; that matches Claude Code's behaviour. To interrupt now,
   use Stop.
 - **Extra cost:** a message that arrives mid-answer costs one more model turn.
+
+## C-19: The machine's policy file can be edited from Celius
+
+Status: accepted · 2026-11-22 · amends C-16 (the policy file was only editable on the machine)
+
+**Context.** Adding a folder meant editing `policy.json` on the device, which is awkward on
+a headless server or a container reached through `pct enter`. Users asked to manage a
+device's folders and permissions from the portal.
+
+**Decision.**
+- `PUT /remote/agents/{id}/policy` sends a `policy.update` command with `roots`,
+  `allow_shell` and `allow_write`. The **machine** validates it against its own file system
+  (full paths of existing folders the agent's user can open, at most 50, deduplicated),
+  writes `policy.json` atomically (other keys kept), reloads, and answers with a new
+  `result` frame (commands outside sessions had no way to report) and a `policy` frame.
+  Central records `remote_agent.policy_changed` in the audit log only when it was applied.
+- `allow_remote_edit` (default `true`; `false` refuses every edit from Celius) can only be
+  set on the machine; Central refuses early when the machine reports it `false`, and the
+  agent refuses regardless. Agents before 0.3 don't report it and are not offered the editor.
+- The machine must be online: the change is made by the machine or not at all; Celius never
+  holds a policy the machine hasn't confirmed.
+
+**Consequence.** Whoever controls the Celius account can widen what the agent may reach, up
+to everything the agent's OS user can read. That user (a dedicated `celius-agent` by default
+for root installs), `allow_remote_edit: false`, and per-command approvals remain the limits.
+
+**Rejected.** Keeping the policy in Central and pushing it as authoritative (the machine
+would lose the final say); editing arbitrary keys (limits and `env_deny` stay on the
+machine).

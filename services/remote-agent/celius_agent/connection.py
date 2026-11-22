@@ -269,6 +269,8 @@ class Connection:
                 await ws.send(
                     json.dumps({"type": "policy", "local_policy": self.runtime.policy.report()})
                 )
+            while self.runtime.results:
+                await ws.send(json.dumps(self.runtime.results.pop(0)))
             if await self._flush(ws):
                 continue
             # Within one connection every frame arrives and is acked; after a drop the

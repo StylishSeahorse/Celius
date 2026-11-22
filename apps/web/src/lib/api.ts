@@ -241,6 +241,11 @@ export const api = {
   refuseDevice: (user_code: string) => request<void>("/remote/devices/refuse", json("POST", { user_code })),
   updateRemoteAgent: (id: string, body: { name?: string; config?: RemoteAgentConfig }) =>
     request<RemoteAgent>(`/remote/agents/${id}`, json("PATCH", body)),
+  /** Change the folders and permissions in the machine's own policy file (it checks them). */
+  updateMachinePolicy: (
+    id: string,
+    body: { roots?: { path: string; write: boolean }[]; allow_shell?: boolean; allow_write?: boolean },
+  ) => request<RemoteAgent>(`/remote/agents/${id}/policy`, json("PUT", body)),
   revokeRemoteAgent: (id: string) => request<RemoteAgent>(`/remote/agents/${id}/revoke`, json("POST")),
   disconnectRemoteAgent: (id: string) => request<void>(`/remote/agents/${id}/disconnect`, json("POST")),
   deleteRemoteAgent: (id: string) => request<void>(`/remote/agents/${id}`, json("DELETE")),

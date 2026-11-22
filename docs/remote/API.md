@@ -21,6 +21,7 @@ Messages, approvals and cancellation of remote conversations use the **existing*
 | `GET /agents` | | `{items: [Machine]}` |
 | `GET /agents/{id}` | | `Machine` |
 | `PATCH /agents/{id}` | `{name?, config?}` | `Machine` (`config`: `allow_shell`, `allow_write`, `approval` = `always`\|`profile`, `max_sessions`, `network`) |
+| `PUT /agents/{id}/policy` | `{roots?: [{path, write}], allow_shell?, allow_write?}` | `Machine` with the new `local_policy`, once the machine has checked and saved it (waits ≤ 30 s). 400 `policy_refused` with the machine's reason; 409 `policy_locked` (`allow_remote_edit: false`), `agent_outdated` (agent before 0.3), `machine_offline`; 504 `machine_timeout` |
 | `POST /agents/{id}/revoke` | | `Machine`: credentials revoked, socket closed, sessions ended, queued commands cancelled |
 | `POST /agents/{id}/disconnect` | | 202: the agent closes its connection and reconnects |
 | `DELETE /agents/{id}` | | 204: revoke and forget (conversations stay) |
@@ -116,6 +117,7 @@ agent → hello      {protocol, agent_version, hostname, os, os_version, arch,
                                     permissions, next_seq}}}
 agent → heartbeat  {resources}                      every heartbeat_seconds
 agent → policy     {local_policy}                   the policy file changed
+agent → result     {command_id, status, result?, error?}   outcome of a command with no session
       ← command    {id, kind, session_id, run_id, payload}
 agent → events     {session_id, events: [{seq, type, run_id?, occurred_at, data}]}
       ← ack        {session_id, seq, error?}         highest contiguous seq stored
@@ -135,6 +137,7 @@ Command kinds and payloads:
 | `cancel` | `{command_id}` | the command completes as cancelled |
 | `interrupt` | | running commands cancelled |
 | `agent.disconnect` | `{reconnect: true}` | the agent closes and reconnects |
+| `policy.update` | `{policy: {roots?, allow_shell?, allow_write?}}` (no session) | `result` (completed with `{local_policy}`, or failed with the reason) and a `policy` frame |
 
 Delivery: commands at least once, executed at most once (the agent journals ids).
 Events: written to the agent's outbox before sending; stored by Central once per

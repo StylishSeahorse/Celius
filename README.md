@@ -259,8 +259,9 @@ The model can call tools in the conversation's private workspace:
 - Celius's own agent (your model, memory and tools) does the work in both cases
 - The device connects out to the server; no open ports or SSH. Sign-in accepted by you,
   per-device credentials, revocation, `celius logout`
-- Nothing runs outside the folders the machine's owner allows in its policy file; commands
-  are off by default and ask before running unless you choose otherwise
+- Nothing runs outside the folders allowed in the machine's policy file, which you can edit
+  from Celius (the machine checks and saves it, or locks it to edits on the machine itself);
+  commands are off by default and ask before running unless you choose otherwise
 - Work continues when every client is closed or the network drops; nothing is lost or
   run twice when it comes back
 - [Install Celius on a device](docs/remote/INSTALL.md) · [how it works](docs/remote/ARCHITECTURE.md)
@@ -488,7 +489,7 @@ docs/                 Backlog, ADRs, deployment, operations, acceptance tests, s
   - [0009: Memory and recall](docs/adr/0009-memory-and-recall.md)
 - Assistant roadmap: [roadmap and status](docs/implementation/CELIUS_ROADMAP.md) ·
   [audit](docs/implementation/AUDIT.md) ·
-  [decisions C-01…C-18](docs/implementation/ARCHITECTURE_DECISIONS.md) ·
+  [decisions C-01…C-19](docs/implementation/ARCHITECTURE_DECISIONS.md) ·
   [implementation log](docs/implementation/IMPLEMENTATION_LOG.md)
 
 ## Not yet verified

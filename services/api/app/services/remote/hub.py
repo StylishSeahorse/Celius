@@ -69,6 +69,10 @@ def clean_local_policy(raw: Any) -> dict:
         "allow_shell": bool(raw.get("allow_shell", False)),
         "allow_write": bool(raw.get("allow_write", False)),
         "max_concurrent_commands": raw.get("max_concurrent_commands"),
+        # None: an agent too old to say (it can't be edited from Celius either).
+        "allow_remote_edit": raw["allow_remote_edit"]
+        if isinstance(raw.get("allow_remote_edit"), bool)
+        else None,
     }
 
 
@@ -252,6 +256,8 @@ class AgentConnection:
                 await self._events(frame)
             elif kind == "policy":
                 await self._policy(frame)
+            elif kind == "result":
+                await self._result(frame)
             elif kind == "bye":
                 self.clean = True
                 return
@@ -272,6 +278,33 @@ class AgentConnection:
                     RemoteAgent.connection_id == self.connection_id,
                 )
                 .values(**values)
+            )
+            await db.commit()
+
+    async def _result(self, frame: dict) -> None:
+        """The outcome of a command that belongs to no session (e.g. policy.update)."""
+        try:
+            command_id = uuid.UUID(str(frame.get("command_id")))
+        except ValueError:
+            return
+        status = "completed" if frame.get("status") == "completed" else "failed"
+        result = frame.get("result") if isinstance(frame.get("result"), dict) else None
+        error = frame.get("error")
+        async with self.factory() as db:
+            await db.execute(
+                update(RemoteCommand)
+                .where(
+                    RemoteCommand.id == command_id,
+                    RemoteCommand.agent_id == self.agent_id,
+                    RemoteCommand.session_id.is_(None),
+                    RemoteCommand.status.in_(("pending", "delivered", "running")),
+                )
+                .values(
+                    status=status,
+                    result=_bounded_dict(result) if result is not None else None,
+                    error=str(error)[:2000] if error else None,
+                    completed_at=utcnow(),
+                )
             )
             await db.commit()
 

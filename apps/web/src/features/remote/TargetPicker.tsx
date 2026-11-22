@@ -117,8 +117,8 @@ function ChooseFolder({
         </p>
         {roots.length === 0 ? (
           <p className="text-amber-700 dark:text-amber-300">
-            This machine allows no folders yet. Add one to the agent's policy file on the machine (roots),
-            then restart the agent.
+            This machine allows no folders yet. Add one in Remote machines (this machine → What this machine
+            allows), or run celius in a folder on the machine.
           </p>
         ) : (
           <label className="block space-y-1">

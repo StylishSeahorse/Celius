@@ -65,6 +65,7 @@ from app.schemas.remote import (
     RemoteAgentUpdate,
     RemoteEventOut,
     RemoteEventPage,
+    RemotePolicyUpdate,
     RemoteSessionBrief,
     RemoteSessionCreate,
     RemoteSessionList,
@@ -77,7 +78,7 @@ from app.services import conversations as conversation_svc
 from app.services.audit import audit
 from app.services.remote import identity
 from app.services.remote import sessions as svc
-from app.services.remote.hub import AgentConnection
+from app.services.remote.hub import AgentConnection, clean_local_policy
 
 DB = Annotated[AsyncSession, Depends(get_db)]
 AppSettings = Annotated[Settings, Depends(get_settings)]
@@ -302,6 +303,83 @@ async def update_agent(
             **changed,
         )
         await db.commit()
+    return await get_agent(agent_id, auth, db, settings)
+
+
+@router.put("/agents/{agent_id}/policy", response_model=RemoteAgentOut)
+async def update_machine_policy(
+    agent_id: uuid.UUID,
+    body: RemotePolicyUpdate,
+    request: Request,
+    auth: CurrentAuth,
+    db: DB,
+    factory: Factory,
+    settings: AppSettings,
+) -> RemoteAgentOut:
+    """Change the folders and permissions in the machine's own policy file. The machine
+    checks the change and saves it (or says why not); waits up to 30 s for it."""
+    agent = await svc.owned_agent(db, auth.user.id, agent_id)
+    if agent.status != "active":
+        raise AppError(409, "agent_not_active", "This machine was removed")
+    local = agent.local_policy or {}
+    if local.get("allow_remote_edit") is False:
+        raise AppError(
+            409,
+            "policy_locked",
+            "This machine only accepts changes made on the machine itself "
+            "(allow_remote_edit is false in its policy file)",
+        )
+    if local.get("allow_remote_edit") is None:
+        raise AppError(
+            409,
+            "agent_outdated",
+            "Update Celius on this machine to change its folders from here "
+            "(run its install command again with --upgrade)",
+        )
+    if not svc.is_online(agent, settings):
+        raise AppError(409, "machine_offline", "The machine is offline; try again when it's back")
+    changes = body.model_dump(exclude_none=True)
+    if not changes:
+        return await get_agent(agent_id, auth, db, settings)
+    command = svc.enqueue_command(
+        db,
+        agent.id,
+        "policy.update",
+        payload={"policy": changes},
+        expires_at=utcnow() + timedelta(seconds=30),
+    )
+    await db.commit()
+    command_id = command.id
+    deadline = time.monotonic() + 35
+    while time.monotonic() < deadline:
+        await asyncio.sleep(settings.remote_poll_interval_seconds)
+        async with factory() as poll:
+            current = await poll.get(RemoteCommand, command_id)
+            if current is None or current.status not in FINAL_COMMAND_STATUSES:
+                continue
+            if current.status != "completed":
+                raise AppError(
+                    400 if current.status == "failed" else 504,
+                    "policy_refused" if current.status == "failed" else "machine_timeout",
+                    current.error or "The machine did not apply the change",
+                )
+            reported = (current.result or {}).get("local_policy")
+            break
+    else:
+        raise AppError(504, "machine_timeout", "The machine did not answer in time")
+    agent = await svc.owned_agent(db, auth.user.id, agent_id)
+    if isinstance(reported, dict):
+        agent.local_policy = clean_local_policy(reported)
+    audit(
+        db,
+        auth.user.id,
+        "remote_agent.policy_changed",
+        "remote_agent",
+        agent.id,
+        _ip(request),
+        **changes,
+    )
+    await db.commit()
     return await get_agent(agent_id, auth, db, settings)
 
 

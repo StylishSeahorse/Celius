@@ -404,11 +404,6 @@ function MachineDetail({
   const [sessions, setSessions] = useState<RemoteSession[] | null>(null);
   const [name, setName] = useState(agent.name);
   const config = agent.config as RemoteAgentConfig;
-  const local = agent.local_policy as {
-    roots?: { path: string; write: boolean }[];
-    allow_shell?: boolean;
-    allow_write?: boolean;
-  };
   const r = resourcesOf(agent.resources);
 
   useEffect(() => {
@@ -496,29 +491,7 @@ function MachineDetail({
         )}
       </section>
 
-      <section className="space-y-2">
-        <h3 className="font-medium">What this machine allows</h3>
-        <p className="text-muted">
-          Set on the machine itself, in the agent's policy file. Celius can only narrow it.
-        </p>
-        <ul className="space-y-1">
-          <li>
-            Folders:{" "}
-            {local.roots?.length ? (
-              local.roots.map((root) => (
-                <code key={root.path} className="mr-2 rounded bg-panel px-1.5 py-0.5 text-xs">
-                  {root.path}
-                  {root.write ? "" : " (read only)"}
-                </code>
-              ))
-            ) : (
-              <span className="text-amber-700 dark:text-amber-300">none yet: sessions can't open</span>
-            )}
-          </li>
-          <li>Commands (shell, Python, git): {local.allow_shell ? "allowed" : "not allowed"}</li>
-          <li>Writing files: {local.allow_write ? "allowed" : "not allowed"}</li>
-        </ul>
-      </section>
+      <MachinePolicy agent={agent} onChanged={onChanged} />
 
       {agent.status !== "revoked" && (
         <section className="space-y-3">
@@ -635,5 +608,169 @@ function Gauge({ label, value, detail }: { label: string; value: string; detail?
       <div className="text-lg font-medium">{value}</div>
       {detail && <div className="truncate text-xs text-muted" title={detail}>{detail}</div>}
     </div>
+  );
+}
+
+type LocalPolicy = {
+  roots?: { path: string; write: boolean }[];
+  allow_shell?: boolean;
+  allow_write?: boolean;
+  allow_remote_edit?: boolean | null;
+};
+
+/** The machine's own policy file: what Celius may do there at all. Edited here, checked and
+ * saved by the machine (which can lock it with allow_remote_edit: false). */
+function MachinePolicy({ agent, onChanged }: { agent: RemoteAgent; onChanged: () => void }) {
+  const local = agent.local_policy as LocalPolicy;
+  const [roots, setRoots] = useState(local.roots ?? []);
+  const [shell, setShell] = useState(Boolean(local.allow_shell));
+  const [write, setWrite] = useState(Boolean(local.allow_write));
+  const [adding, setAdding] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const key = JSON.stringify([local.roots ?? [], Boolean(local.allow_shell), Boolean(local.allow_write)]);
+
+  useEffect(() => {
+    // The machine changed it (or a save came back): show what it has now.
+    setRoots(local.roots ?? []);
+    setShell(Boolean(local.allow_shell));
+    setWrite(Boolean(local.allow_write));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  const locked = local.allow_remote_edit === false;
+  const outdated = local.allow_remote_edit == null;
+  const editable = agent.status === "active" && !locked && !outdated;
+  const dirty = JSON.stringify([roots, shell, write]) !== key;
+  const windows = agent.os === "windows";
+  const candidate = adding.trim();
+  const absolute = windows ? /^[A-Za-z]:[\\/]|^\\\\/.test(candidate) : candidate.startsWith("/") || candidate.startsWith("~");
+
+  function add() {
+    if (!absolute || roots.some((r) => r.path === candidate)) return;
+    setRoots([...roots, { path: candidate, write: true }]);
+    setAdding("");
+    setSaved(false);
+  }
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    setSaved(false);
+    try {
+      await api.updateMachinePolicy(agent.id, { roots, allow_shell: shell, allow_write: write });
+      setSaved(true);
+      onChanged();
+    } catch (err) {
+      setError(message(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="space-y-3" aria-label="What this machine allows">
+      <h3 className="font-medium">What this machine allows</h3>
+      <p className="text-muted">
+        The machine's own policy file: Celius can't go beyond it. Changes are checked and saved by the machine
+        and apply to the next session.
+      </p>
+      {locked && (
+        <p className="text-amber-700 dark:text-amber-300">
+          Locked on the machine: change these in its policy file (allow_remote_edit is false).
+        </p>
+      )}
+      {outdated && agent.status === "active" && (
+        <p className="text-amber-700 dark:text-amber-300">
+          Update Celius on this machine to change these from here (run its install command again with --upgrade).
+        </p>
+      )}
+
+      <div className="space-y-1.5">
+        <span className="block text-muted">Folders</span>
+        {roots.length === 0 && (
+          <p className="text-amber-700 dark:text-amber-300">None yet: sessions can't open on this machine.</p>
+        )}
+        <ul className="space-y-1">
+          {roots.map((root, index) => (
+            <li key={root.path} className="flex flex-wrap items-center gap-2">
+              <code className="min-w-0 flex-1 truncate rounded bg-panel px-1.5 py-0.5 text-xs" title={root.path}>
+                {root.path}
+              </code>
+              {editable ? (
+                <>
+                  <select
+                    aria-label={`Access to ${root.path}`}
+                    value={root.write ? "write" : "read"}
+                    onChange={(e) => {
+                      setRoots(roots.map((r, i) => (i === index ? { ...r, write: e.target.value === "write" } : r)));
+                      setSaved(false);
+                    }}
+                    className="rounded-md border border-line bg-canvas px-1.5 py-0.5 text-xs"
+                  >
+                    <option value="write">Read and change</option>
+                    <option value="read">Read only</option>
+                  </select>
+                  <button
+                    className={button}
+                    aria-label={`Remove ${root.path}`}
+                    onClick={() => (setRoots(roots.filter((_, i) => i !== index)), setSaved(false))}
+                  >
+                    Remove
+                  </button>
+                </>
+              ) : (
+                <span className="text-xs text-muted">{root.write ? "read and change" : "read only"}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+        {editable && (
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              value={adding}
+              onChange={(e) => setAdding(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && add()}
+              placeholder={windows ? "C:\\Users\\me\\code" : "/home/me/code"}
+              aria-label="Folder to add"
+              className="min-w-0 flex-1 rounded-md border border-line bg-canvas px-2 py-1 font-mono text-xs outline-none focus:border-accent"
+            />
+            <button className={button} disabled={!absolute} onClick={add}>
+              Add folder
+            </button>
+          </div>
+        )}
+      </div>
+
+      <label className="flex items-center gap-2">
+        <input type="checkbox" checked={shell} disabled={!editable} onChange={(e) => (setShell(e.target.checked), setSaved(false))} />
+        Commands (shell, Python, git)
+      </label>
+      <label className="flex items-center gap-2">
+        <input type="checkbox" checked={write} disabled={!editable} onChange={(e) => (setWrite(e.target.checked), setSaved(false))} />
+        Creating and changing files
+      </label>
+
+      {editable && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button className={primary} disabled={!dirty || busy || !agent.online} onClick={() => void save()}>
+            {busy ? "Saving on the machine…" : "Save on the machine"}
+          </button>
+          {dirty && (
+            <button
+              className={button}
+              disabled={busy}
+              onClick={() => (setRoots(local.roots ?? []), setShell(Boolean(local.allow_shell)), setWrite(Boolean(local.allow_write)))}
+            >
+              Undo changes
+            </button>
+          )}
+          {!agent.online && <span className="text-xs text-muted">The machine must be online to save.</span>}
+          {saved && !dirty && <span className="text-xs text-green-700 dark:text-green-400">Saved on the machine.</span>}
+        </div>
+      )}
+      {error && <p className="text-red-600 dark:text-red-400">{error}</p>}
+    </section>
   );
 }

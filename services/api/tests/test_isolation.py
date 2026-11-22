@@ -24,6 +24,7 @@ from tests.test_sharing import person
 # Bodies that pass validation, so the ownership check is what answers.
 BODIES = {
     ("PATCH", "/api/v1/remote/agents/{agent_id}"): {"name": "Bob's now"},
+    ("PUT", "/api/v1/remote/agents/{agent_id}/policy"): {"roots": [{"path": "/"}]},
     ("POST", "/api/v1/conversations/{conversation_id}/messages"): {
         "client_message_id": "isolation-test-01",
         "content": "hi",

@@ -62,6 +62,20 @@ class RemoteAgentUpdate(BaseModel):
     config: RemoteAgentConfig | None = None
 
 
+class PolicyRoot(BaseModel):
+    path: str = Field(min_length=1, max_length=1000)
+    write: bool = True
+
+
+class RemotePolicyUpdate(BaseModel):
+    """A change to the machine's own policy file, made in Celius. The machine checks it
+    (full paths, existing folders) and may refuse it (`allow_remote_edit: false`)."""
+
+    roots: list[PolicyRoot] | None = Field(default=None, max_length=50)
+    allow_shell: bool | None = None
+    allow_write: bool | None = None
+
+
 class RemoteSessionSummary(BaseModel):
     """Shown with a conversation: where it runs."""
 

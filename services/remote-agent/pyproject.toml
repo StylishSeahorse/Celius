@@ -1,6 +1,6 @@
 [project]
 name = "celius-agent"
-version = "0.2.0"
+version = "0.3.0"
 description = "Celius on this device: sign in, chat here, and let Celius work on it"
 requires-python = ">=3.10"
 dependencies = [

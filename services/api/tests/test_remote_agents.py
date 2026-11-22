@@ -15,7 +15,7 @@ from app.config import get_settings
 from app.db import get_session_factory
 from app.db.base import utcnow
 from app.main import create_app
-from app.models import RemoteCommand, RemoteDeviceRequest, RemoteSessionEvent, User
+from app.models import AuditEvent, RemoteCommand, RemoteDeviceRequest, RemoteSessionEvent, User
 from app.services.model_gateway import get_model_gateway
 from app.services.remote import identity
 from tests.conftest import PASSWORD
@@ -562,3 +562,74 @@ async def test_retention_prunes_old_output_commands_and_sign_ins(
         kept = [e.type for e in (await db.scalars(select(RemoteSessionEvent))).all()]
         assert sorted(kept) == ["file.changed", "session.opened"]
         assert await db.get(RemoteSession, uuid.UUID(session["id"])) is not None
+
+
+async def test_the_machines_policy_is_changed_from_celius(app, http, headers, sessionmaker):
+    machine = await register_machine(http, headers)
+    url = f"{agent_url(machine)}/policy"
+    change = {"roots": [{"path": "/srv/new", "write": False}], "allow_shell": True}
+    assert (await http.put(url, json=change, headers=headers)).json()["error"]["code"] == (
+        "agent_outdated"  # never connected: nothing says it can be edited
+    )
+    async with ws(app, machine["token"]) as sock:
+        policy = {**hello()["local_policy"], "allow_remote_edit": True}
+        await sock.send_json(hello(local_policy=policy))
+        await sock.receive_until("welcome")
+
+        pending = asyncio.create_task(http.put(url, json=change, headers=headers))
+        command = await sock.receive_until("command")
+        assert command["kind"] == "policy.update" and command["session_id"] is None
+        assert command["payload"] == {"policy": change}
+        saved = {**policy, "roots": [{"path": "/srv/new", "write": False}], "allow_shell": True}
+        await sock.send_json(
+            {
+                "type": "result",
+                "command_id": command["id"],
+                "status": "completed",
+                "result": {"local_policy": saved},
+            }
+        )
+        response = await pending
+        assert response.status_code == 200, response.text
+        assert response.json()["local_policy"]["roots"] == [{"path": "/srv/new", "write": False}]
+
+        # The machine refuses what it can't do; the reason reaches the person.
+        pending = asyncio.create_task(
+            http.put(url, json={"roots": [{"path": "nope"}]}, headers=headers)
+        )
+        command = await sock.receive_until("command")
+        await sock.send_json(
+            {
+                "type": "result",
+                "command_id": command["id"],
+                "status": "failed",
+                "error": "nope is not a full path on this machine.",
+            }
+        )
+        refused = await pending
+        assert refused.status_code == 400
+        assert refused.json()["error"]["code"] == "policy_refused"
+        assert refused.json()["error"]["message"] == "nope is not a full path on this machine."
+
+        # Locked on the machine: refused without asking it.
+        await sock.send_json(
+            {"type": "policy", "local_policy": {**saved, "allow_remote_edit": False}}
+        )
+        await asyncio.sleep(0.3)
+        locked = await http.put(url, json=change, headers=headers)
+        assert locked.status_code == 409 and locked.json()["error"]["code"] == "policy_locked"
+        await sock.send_json({"type": "bye"})
+        await asyncio.sleep(0.1)
+
+    offline = await http.put(url, json=change, headers=headers)
+    assert offline.json()["error"]["code"] == "policy_locked"  # still what it last said
+    async with sessionmaker() as db:
+        actions = (
+            await db.scalars(
+                select(AuditEvent.action).where(AuditEvent.action == "remote_agent.policy_changed")
+            )
+        ).all()
+    assert actions == ["remote_agent.policy_changed"]  # the refused change isn't recorded
+    # Another person can't change it.
+    other = await _other_user_headers(http, sessionmaker)
+    assert (await http.put(url, json=change, headers=other)).status_code == 404

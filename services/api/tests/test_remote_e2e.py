@@ -51,6 +51,7 @@ from celius_agent.config import (  # noqa: E402
     Paths,
     load_policy,  # noqa: E402
     save_config,
+    update_policy_file,
 )
 from celius_agent.connection import Connection  # noqa: E402
 from celius_agent.credentials import save_credential  # noqa: E402
@@ -185,7 +186,10 @@ class AgentProcess:
         config = load_config(self.paths)
         policy = load_policy(self.paths)
         self.runtime = Runtime(
-            StateStore(self.paths.state), policy, policy_loader=lambda: load_policy(self.paths)
+            StateStore(self.paths.state),
+            policy,
+            policy_loader=lambda: load_policy(self.paths),
+            policy_editor=lambda changes: update_policy_file(self.paths, changes),
         )
         connection = Connection(
             config, self.runtime, load_credential(self.paths.credential), Monitor()
@@ -641,3 +645,43 @@ async def test_ended_session_is_not_moved_back_to_the_sandbox(http, server, tmp_
     )
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "remote_session_ended"
+
+
+async def test_folders_added_in_celius_are_saved_on_the_machine(http, server, tmp_path):
+    work = tmp_path / "code"
+    work.mkdir()
+    later = tmp_path / "added-later"
+    later.mkdir()
+    agent = AgentProcess(tmp_path / "agent-home", server, [work])
+    agent_id = await agent.register(http, "Box")
+    agent.start()
+    try:
+        await until(lambda: _online(http, agent_id), what="the machine to come online")
+        response = await http.put(
+            f"/api/v1/remote/agents/{agent_id}/policy",
+            json={
+                "roots": [{"path": str(work)}, {"path": str(later), "write": False}],
+                "allow_shell": True,
+            },
+        )
+        assert response.status_code == 200, response.text
+        roots = response.json()["local_policy"]["roots"]
+        assert {"path": os.path.realpath(later), "write": False} in roots
+        on_disk = json.loads(agent.paths.policy.read_text())
+        assert {"path": os.path.realpath(later), "write": False} in on_disk["roots"]
+        assert on_disk["allow_shell"] is True
+
+        # A session can now open there, read only.
+        session = await open_session(http, agent_id, later)
+        assert session["status"] == "idle"
+
+        # Something the machine can't do is refused with its reason, and nothing changes.
+        refused = await http.put(
+            f"/api/v1/remote/agents/{agent_id}/policy",
+            json={"roots": [{"path": str(tmp_path / "missing")}]},
+        )
+        assert refused.status_code == 400
+        assert "not a folder" in refused.json()["error"]["message"]
+        assert json.loads(agent.paths.policy.read_text())["roots"] == on_disk["roots"]
+    finally:
+        await agent.shutdown()
