@@ -8,8 +8,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, JSONType, Timestamps, UUIDPrimaryKey, utcnow
 
-ACCOUNT_KINDS = ("calendar", "email")
-ACCOUNT_PROVIDERS = {"calendar": ("caldav",), "email": ("imap", "gmail")}
+ACCOUNT_KINDS = ("calendar", "email", "social")
+ACCOUNT_PROVIDERS = {"calendar": ("caldav",), "email": ("imap", "gmail"), "social": ("meta",)}
 
 
 class IntegrationAccount(UUIDPrimaryKey, Timestamps, Base):
@@ -117,3 +117,59 @@ class AutomationEvent(UUIDPrimaryKey, Base):
         DateTime(timezone=True), default=utcnow, nullable=False
     )
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class EventSource(UUIDPrimaryKey, Timestamps, Base):
+    """A venue or business whose posts the event finder reads (ADR C-17): an Instagram
+    Business/Creator account by username, or a Facebook Page by URL."""
+
+    __tablename__ = "event_sources"
+    __table_args__ = (Index("ix_event_sources_owner_id", "owner_id"),)
+
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    platform: Mapped[str] = mapped_column(String(16), nullable=False)  # instagram | facebook
+    handle: Mapped[str] = mapped_column(String(300), nullable=False)
+    label: Mapped[str | None] = mapped_column(String(200))
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # The newest post already read (its time), so a scan only reads newer ones.
+    seen_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error: Mapped[str | None] = mapped_column(String(500))
+
+
+class EventSuggestion(UUIDPrimaryKey, Timestamps, Base):
+    """An event found in a post, waiting for the user to add it to a calendar or dismiss
+    it. One per event: the same event posted by several sources is merged (dedup_key)."""
+
+    __tablename__ = "event_suggestions"
+    __table_args__ = (
+        Index("ix_event_suggestions_owner_id_status", "owner_id", "status"),
+        Index("ux_event_suggestions_owner_id_dedup_key", "owner_id", "dedup_key", unique=True),
+    )
+
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    source_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("event_sources.id", ondelete="SET NULL")
+    )
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    all_day: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    venue: Mapped[str | None] = mapped_column(String(300))
+    address: Mapped[str | None] = mapped_column(String(500))
+    price: Mapped[str | None] = mapped_column(String(200))
+    summary: Mapped[str | None] = mapped_column(Text)
+    ticket_url: Mapped[str | None] = mapped_column(String(1000))
+    post_url: Mapped[str | None] = mapped_column(String(1000))
+    image_url: Mapped[str | None] = mapped_column(String(2000))
+    posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Other posts that announced the same event.
+    also_posted: Mapped[list] = mapped_column(JSONType, default=list, nullable=False)
+    dedup_key: Mapped[str] = mapped_column(String(300), nullable=False)
+    calendar_event_id: Mapped[str | None] = mapped_column(String(1000))
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

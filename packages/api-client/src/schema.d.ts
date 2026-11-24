@@ -735,6 +735,128 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/events/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Scan Now */
+        post: operations["scan_now_api_v1_events_scan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Event Settings */
+        get: operations["get_event_settings_api_v1_events_settings_get"];
+        /** Update Event Settings */
+        put: operations["update_event_settings_api_v1_events_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sources */
+        get: operations["list_sources_api_v1_events_sources_get"];
+        put?: never;
+        /** Create Source */
+        post: operations["create_source_api_v1_events_sources_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/sources/{source_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Source */
+        delete: operations["delete_source_api_v1_events_sources__source_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Source */
+        patch: operations["update_source_api_v1_events_sources__source_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/events/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Suggestions */
+        get: operations["list_suggestions_api_v1_events_suggestions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/suggestions/{suggestion_id}/add": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Suggestion */
+        post: operations["add_suggestion_api_v1_events_suggestions__suggestion_id__add_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/suggestions/{suggestion_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dismiss Suggestion */
+        post: operations["dismiss_suggestion_api_v1_events_suggestions__suggestion_id__dismiss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/exports": {
         parameters: {
             query?: never;
@@ -1105,6 +1227,23 @@ export interface paths {
          * @description The Google consent URL. The browser goes there; Google sends it back to the callback.
          */
         post: operations["google_start_api_v1_integrations_google_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/meta/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Meta Start */
+        post: operations["meta_start_api_v1_integrations_meta_start_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2539,6 +2678,11 @@ export interface components {
             /** Items */
             items: components["schemas"]["ActivityItem"][];
         };
+        /** AddToCalendar */
+        AddToCalendar: {
+            /** Calendar */
+            calendar?: string | null;
+        };
         /** AgentTaskBrief */
         AgentTaskBrief: {
             /**
@@ -3284,6 +3428,34 @@ export interface components {
             /** Id */
             id: string;
         };
+        /** EventSettings */
+        EventSettings: {
+            /** Calendar */
+            calendar: string | null;
+            /** Every Days */
+            every_days: number;
+            /** Facebook Configured */
+            facebook_configured: boolean;
+            /** Meta Account */
+            meta_account: string | null;
+            /** Meta Configured */
+            meta_configured: boolean;
+            /** Meta Connected */
+            meta_connected: boolean;
+            /** Meta Error */
+            meta_error: string | null;
+            /** Scanned At */
+            scanned_at: string | null;
+            /** Scanning */
+            scanning: boolean;
+        };
+        /** EventSettingsUpdate */
+        EventSettingsUpdate: {
+            /** Calendar */
+            calendar?: string | null;
+            /** Every Days */
+            every_days?: number | null;
+        };
         /** ExportCreate */
         ExportCreate: {
             /**
@@ -3867,6 +4039,11 @@ export interface components {
             duplicate: boolean;
             message: components["schemas"]["MessageOut"];
             run: components["schemas"]["RunOut"];
+        };
+        /** MetaStartOut */
+        MetaStartOut: {
+            /** Url */
+            url: string;
         };
         /** ModelCapabilities */
         ModelCapabilities: {
@@ -4715,6 +4892,45 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** SourceIn */
+        SourceIn: {
+            /** Handle */
+            handle: string;
+            /** Label */
+            label?: string | null;
+            /**
+             * Platform
+             * @enum {string}
+             */
+            platform: "instagram" | "facebook";
+        };
+        /** SourceOut */
+        SourceOut: {
+            /** Enabled */
+            enabled: boolean;
+            /** Handle */
+            handle: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Label */
+            label: string | null;
+            /** Last Checked At */
+            last_checked_at: string | null;
+            /** Last Error */
+            last_error: string | null;
+            /** Platform */
+            platform: string;
+        };
+        /** SourceUpdate */
+        SourceUpdate: {
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Label */
+            label?: string | null;
+        };
         /** SteerIn */
         SteerIn: {
             /** Client Id */
@@ -4770,6 +4986,45 @@ export interface components {
             /** Endpoint */
             endpoint: string;
             keys: components["schemas"]["PushKeys"];
+        };
+        /** SuggestionOut */
+        SuggestionOut: {
+            /** Address */
+            address: string | null;
+            /** All Day */
+            all_day: boolean;
+            /** Also Posted */
+            also_posted: string[];
+            /** Ends At */
+            ends_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Image Url */
+            image_url: string | null;
+            /** Post Url */
+            post_url: string | null;
+            /** Price */
+            price: string | null;
+            /** Source */
+            source: string | null;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /** Status */
+            status: string;
+            /** Summary */
+            summary: string | null;
+            /** Ticket Url */
+            ticket_url: string | null;
+            /** Title */
+            title: string;
+            /** Venue */
+            venue: string | null;
         };
         /** SyncAck */
         SyncAck: {
@@ -6765,6 +7020,295 @@ export interface operations {
             };
         };
     };
+    scan_now_api_v1_events_scan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    get_event_settings_api_v1_events_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventSettings"];
+                };
+            };
+        };
+    };
+    update_event_settings_api_v1_events_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventSettingsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sources_api_v1_events_sources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceOut"][];
+                };
+            };
+        };
+    };
+    create_source_api_v1_events_sources_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SourceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_source_api_v1_events_sources__source_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_source_api_v1_events_sources__source_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SourceUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_suggestions_api_v1_events_suggestions_get: {
+        parameters: {
+            query?: {
+                status?: "pending" | "added" | "dismissed";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_suggestion_api_v1_events_suggestions__suggestion_id__add_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                suggestion_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddToCalendar"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_suggestion_api_v1_events_suggestions__suggestion_id__dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                suggestion_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     create_export_api_v1_exports_post: {
         parameters: {
             query?: never;
@@ -7436,6 +7980,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    meta_start_api_v1_integrations_meta_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetaStartOut"];
                 };
             };
         };

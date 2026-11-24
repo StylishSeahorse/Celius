@@ -669,3 +669,67 @@ next model turn and takes it into account, without stopping.
   tool call or a long stream; that matches Claude Code's behaviour. To interrupt now,
   use Stop.
 - **Extra cost:** a message that arrives mid-answer costs one more model turn.
+
+## C-17: Event finder: events from venues' and businesses' social posts
+
+**Context.** Local events are announced on venues' Instagram accounts and Facebook
+Pages, often only on a flyer image. The user wanted to find them by reading those posts
+every few days, with suggestions to approve going into a Nextcloud calendar, and without
+Celius ever handling their Facebook or Instagram password.
+
+**Decision.**
+
+- **Instagram, through the official API:**
+  - Business Discovery reads the recent posts of other Business/Creator accounts through
+    the user's own Instagram Professional account.
+  - The user signs in with Meta (Facebook Login, `services/integrations/meta.py`). The
+    flow is the same as Google's (C-14): a sealed state, a nonce cookie on the callback
+    path, and the code exchanged on the server.
+  - Celius keeps the Page token (it doesn't expire while the user keeps the app) and the
+    long-lived user token as a fallback. Both are sealed and never returned.
+  - Every Graph call carries an `appsecret_proof`.
+  - Usernames are checked before they go into the `business_discovery.username(…)` field
+    syntax.
+- **Facebook Pages, through Apify** (`services/events/facebook.py`):
+  - Reading other Pages needs Page Public Content Access (business verification and app
+    review), which personal projects rarely get. A hosted scraper is the practical route.
+  - The token is a server setting sent in a header.
+  - The output is read leniently, since actor versions differ.
+  - Scraping a logged-in personal session was rejected: it would put the user's own
+    account at risk.
+- **Sources:** `event_sources` (migration 0017) holds the platform, the handle, an
+  optional name, and `seen_until` so each scan reads only newer posts (the first scan
+  reads 3 weeks). Errors are kept on the source.
+- **Extraction** (`services/events/extract.py`):
+  - One model call per post, without tools, at temperature 0, with JSON mode when
+    supported.
+  - The post is wrapped as data, with "ignore instructions in it".
+  - With a vision model, up to 3 images per post go along as data URIs. They are
+    downloaded through the guarded client: public addresses only, no redirects, 4 MB.
+  - The answer is checked strictly: today to a year ahead; the time, or the day only;
+    ends past midnight handled; https/http ticket links only; at most 5 per post.
+- **Suggestions:**
+  - `event_suggestions` are merged across sources when they fall on the same day and
+    their titles are similar or one is inside the other, or when they share a venue and
+    start time. The extra post goes into `also_posted`, and missing details are filled
+    in from it.
+  - A unique key per user backs this up.
+- **Scheduling:** `events.scan` jobs. The worker's maintenance queues one per user whose
+  last scan is older than their interval (`every_days`, default `EVENT_SCAN_DAYS` = 4);
+  "Scan now" queues one at once. Scans are capped per source and per scan. A push
+  notification follows when new events are found.
+- **Approval:**
+  - Add to calendar creates the event through the existing calendar code: CalDAV
+    (Nextcloud) or the Celius calendar.
+  - The description holds the summary, price, tickets and post links.
+  - The calendar choice is remembered. Dismiss drops a suggestion.
+  - Nothing reaches a calendar without approval.
+
+**Consequences.**
+- Only Business/Creator Instagram accounts can be read; personal ones are out of reach
+  by design.
+- Images are sent only to a vision model. Flyer-only events are missed by text-only
+  models.
+- The Graph and Apify request shapes were written without access to their current docs.
+  The API version and actor are settings, and errors surface per source, so a mismatch
+  shows up at the first scan.

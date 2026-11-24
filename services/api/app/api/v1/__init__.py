@@ -7,6 +7,7 @@ from app.api.v1 import (
     auth,
     automation,
     conversations,
+    events,
     exports,
     files,
     health,
@@ -41,6 +42,7 @@ router.include_router(skills.router)
 router.include_router(agent_tasks.router)
 router.include_router(assistant.router)
 router.include_router(integrations.router)
+router.include_router(events.router)
 router.include_router(insights.router)
 router.include_router(push.router)
 router.include_router(admin.router)

@@ -37,7 +37,7 @@ from app.schemas.integrations import (
 from app.services.assistant import tasks as user_tasks
 from app.services.audit import audit
 from app.services.automation import service as automation_svc
-from app.services.integrations import accounts, google
+from app.services.integrations import accounts, google, meta
 from app.services.integrations import calendar as cal
 from app.services.integrations.email import EmailError, Mailbox
 from app.services.sync import record_sync
@@ -113,7 +113,9 @@ async def update_account(
     account = await accounts.owned(db, auth.user.id, account_id)
     if body.allow_private_network and not auth.user.is_admin:
         raise AppError(403, "admin_only", "Only an administrator can allow the local network")
-    if account.provider == "gmail" and (body.config is not None or body.password is not None):
+    if account.provider in ("gmail", "meta") and (
+        body.config is not None or body.password is not None
+    ):
         raise AppError(
             422, "oauth_account", "A Gmail account's servers are fixed; it signs in with Google"
         )
@@ -143,6 +145,11 @@ async def check_account(
         if account.kind == "calendar":
             async with cal.CalDAV(account, settings) as client:
                 await client.check()
+        elif account.provider == "meta":
+            try:
+                await meta.check(settings, accounts.credentials(settings, account))
+            except meta.MetaError as exc:
+                raise AppError(502, "meta_error", str(exc)) from exc
         else:
             await Mailbox(account, settings).check()
     except (cal.CalendarError, EmailError, AppError) as exc:

@@ -59,6 +59,8 @@ from app.models.integrations import (
     AutomationEvent,
     AutomationRun,
     CalendarEvent,
+    EventSource,
+    EventSuggestion,
     IntegrationAccount,
 )
 from app.models.memory import (
@@ -91,6 +93,8 @@ __all__ = [
     "AutomationEvent",
     "AutomationRun",
     "CalendarEvent",
+    "EventSource",
+    "EventSuggestion",
     "IntegrationAccount",
     "ACTIVE_TASK_STATUSES",
     "PRIORITIES",

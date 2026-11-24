@@ -250,6 +250,21 @@ class Settings(BaseSettings):
     google_oauth_client_id: str | None = None
     google_oauth_client_secret: SecretStr | None = None
     google_oauth_redirect_url: str | None = None
+    # Event finder (ADR C-17). "Sign in with Meta" (Facebook Login) gives read access to
+    # Instagram Business/Creator accounts through Business Discovery. A Meta app of type
+    # Business; redirect URI APP_PUBLIC_URL + /api/v1/integrations/meta/callback.
+    meta_app_id: str | None = None
+    meta_app_secret: SecretStr | None = None
+    meta_redirect_url: str | None = None
+    meta_graph_version: str = "v23.0"
+    # Facebook Pages have no open API for other Pages' posts: an Apify actor reads them.
+    apify_token: SecretStr | None = None
+    apify_facebook_actor: str = "apify~facebook-posts-scraper"
+    # How often each user's sources are read (they can change it), posts per source per
+    # scan, and the most posts looked at by the model per scan.
+    event_scan_days: int = Field(default=4, ge=1, le=60)
+    event_posts_per_source: int = Field(default=12, ge=1, le=50)
+    event_max_posts_per_scan: int = Field(default=60, ge=1, le=500)
     # Web Push notifications (replies ready, approvals). Keys are derived from APP_SECRET_KEY.
     push_enabled: bool = True
     # VAPID contact, e.g. mailto:you@example.com (defaults to APP_PUBLIC_URL).

@@ -40,6 +40,10 @@ CONFIG = {
 
 
 def clean_config(provider: str, config: dict[str, Any]) -> dict[str, Any]:
+    if provider == "meta":
+        # Filled from Meta's answer at sign-in (services/integrations/meta.py), never typed.
+        keys = ("ig_user_id", "ig_username", "page_id", "page_name")
+        return {k: str(config.get(k) or "") for k in keys}
     if provider == "gmail":
         # Google's servers whatever is asked: the OAuth token must not go anywhere else.
         address = str(config.get("username") or "").strip().lower()

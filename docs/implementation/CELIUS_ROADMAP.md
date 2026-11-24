@@ -125,6 +125,7 @@ Existing base kept: runs persist every tool call and resume after a worker crash
 | Automation manager UI (create, enable/disable, history, failures) | ✅ | Today > Automations |
 | Linking emails to tasks/projects | 🟡 | via automations and the model (`create_task` from an email); no stored link |
 | "When a project changes status" | ⬜ | projects have no status yet |
+| Event finder: venues' Instagram (Business Discovery) and Facebook Pages (Apify) → event suggestions → Nextcloud calendar | ✅ | C-17; migration 0017; untested against the live APIs |
 
 ## Phase 7: continuous improvement ✅ (real-model measurements pending)
 

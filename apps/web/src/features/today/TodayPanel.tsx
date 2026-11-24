@@ -2,9 +2,10 @@ import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 import { ApiError, api, type TaskFields } from "../../lib/api";
 import type { AssistantSettings, Briefing, UserTask } from "../../lib/types";
+import { EventsView } from "./Events";
 import { AccountsView, AutomationsView, CalendarView } from "./Integrations";
 
-type Tab = "today" | "tasks" | "calendar" | "automations" | "settings";
+type Tab = "today" | "tasks" | "calendar" | "events" | "automations" | "settings";
 
 const button = "rounded-md border border-line px-2.5 py-1 text-sm hover:bg-panel disabled:opacity-40";
 const small = "rounded-md border border-line px-2 py-0.5 text-xs hover:bg-panel disabled:opacity-40";
@@ -39,7 +40,11 @@ export function TodayPanel({
   onOpenSkills: () => void;
 }) {
   // Coming back from "Sign in with Google" opens the accounts.
-  const [tab, setTab] = useState<Tab>(() => (window.location.hash.includes("google=") ? "settings" : "today"));
+  const [tab, setTab] = useState<Tab>(() => {
+    const hash = window.location.hash;
+    if (hash.includes("tab=events") || hash.includes("meta=")) return "events";
+    return hash.includes("google=") ? "settings" : "today";
+  });
   const [briefing, setBriefing] = useState<Briefing | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
@@ -86,6 +91,7 @@ export function TodayPanel({
               ["today", briefing ? `Briefing · ${briefing.date}` : "Briefing"],
               ["tasks", "Tasks"],
               ["calendar", "Calendar"],
+              ["events", "Events"],
               ["automations", "Automations"],
               ["settings", "Settings"],
             ] as [Tab, string][]
@@ -94,7 +100,7 @@ export function TodayPanel({
               key={key}
               onClick={() => setTab(key)}
               aria-current={tab === key ? "page" : undefined}
-              className={`rounded-md px-3 py-1 text-sm ${tab === key ? "bg-panel font-medium" : "text-muted hover:text-ink"}`}
+              className={`shrink-0 whitespace-nowrap rounded-md px-3 py-1 text-sm ${tab === key ? "bg-panel font-medium" : "text-muted hover:text-ink"}`}
             >
               {label}
             </button>
@@ -113,6 +119,7 @@ export function TodayPanel({
           )}
           {tab === "tasks" && <TaskList key={version} onChanged={changed} />}
           {tab === "calendar" && <CalendarView />}
+          {tab === "events" && <EventsView />}
           {tab === "automations" && <AutomationsView />}
           {tab === "settings" && (
             <>

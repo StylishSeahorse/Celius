@@ -349,7 +349,7 @@ export function AccountsView() {
             <span className="flex-1">
               {a.name}{" "}
               <span className="text-xs text-muted">
-                ({a.kind === "calendar" ? "CalDAV calendar" : a.provider === "gmail" ? "Gmail, signed in with Google" : "IMAP/SMTP email"})
+                ({a.kind === "calendar" ? "CalDAV calendar" : a.provider === "gmail" ? "Gmail, signed in with Google" : a.provider === "meta" ? "Instagram, for the event finder" : "IMAP/SMTP email"})
               </span>
               {(status[a.id] || a.last_error) && <span className="block text-xs text-muted">{status[a.id] ?? a.last_error}</span>}
             </span>

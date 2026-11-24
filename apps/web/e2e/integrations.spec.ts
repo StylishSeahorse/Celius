@@ -113,3 +113,28 @@ test("sign in with Google: consent round trip comes back to the accounts", async
   expect(consent!.searchParams.get("code_challenge_method")).toBe("S256");
   expect(page.url()).toMatch(/#\/today$/);
 });
+
+test("event finder: add venues, pick the calendar, nothing found yet", async ({ page }) => {
+  const handle = `venue_${Date.now().toString(36)}`;
+  const panel = await openToday(page);
+  await panel.getByRole("button", { name: "Events" }).click();
+  await expect(panel.getByText("Nothing waiting.")).toBeVisible();
+  await panel.getByLabel("Account").fill(`@${handle}`);
+  await panel.getByLabel("Name").fill("The Fox");
+  await panel.getByRole("button", { name: "Add", exact: true }).click();
+  const row = panel.getByTestId("event-source").filter({ hasText: handle });
+  await expect(row).toContainText("The Fox");
+  await expect(row).toContainText(`Instagram @${handle}`);
+  await panel.getByLabel("Account").fill("bad name{id}");
+  await panel.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(panel.getByRole("alert")).toContainText("username");
+
+  await panel.getByLabel("Check every").selectOption("7");
+  await expect(panel.getByLabel("Check every")).toHaveValue("7");
+  // Without a Meta app on this server, the sign-in is explained instead of offered.
+  await expect(panel.getByText(/needs Sign in with Meta|Sign in with Meta/).first()).toBeVisible();
+
+  await row.getByRole("button", { name: "Remove The Fox" }).click();
+  await expect(row).toHaveCount(0);
+  await page.request.put("/api/v1/events/settings", { data: { every_days: 4 } });
+});

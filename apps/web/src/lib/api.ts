@@ -3,6 +3,9 @@ import type {
   AutomationRun,
   CalendarEventList,
   IntegrationAccount,
+  EventSource,
+  EventSuggestion,
+  EventSettings,
   AssistantSettings,
   Briefing,
   UserTask,
@@ -346,6 +349,21 @@ export const api = {
     request<AssistantSettings>("/assistant/settings", json("PUT", body)),
 
   accounts: () => request<IntegrationAccount[]>("/integrations/accounts"),
+  eventSettings: () => request<EventSettings>("/events/settings"),
+  updateEventSettings: (body: { every_days?: number; calendar?: string }) =>
+    request<EventSettings>("/events/settings", json("PUT", body)),
+  scanEvents: () => request<{ queued: boolean }>("/events/scan", json("POST")),
+  eventSources: () => request<EventSource[]>("/events/sources"),
+  addEventSource: (body: { platform: "instagram" | "facebook"; handle: string; label?: string }) =>
+    request<EventSource>("/events/sources", json("POST", body)),
+  updateEventSource: (id: string, body: { enabled?: boolean; label?: string }) =>
+    request<EventSource>(`/events/sources/${id}`, json("PATCH", body)),
+  deleteEventSource: (id: string) => request<void>(`/events/sources/${id}`, json("DELETE")),
+  eventSuggestions: () => request<EventSuggestion[]>("/events/suggestions"),
+  addEventSuggestion: (id: string, calendar?: string) =>
+    request<EventSuggestion>(`/events/suggestions/${id}/add`, json("POST", calendar ? { calendar } : {})),
+  dismissEventSuggestion: (id: string) => request<EventSuggestion>(`/events/suggestions/${id}/dismiss`, json("POST")),
+  metaStart: () => request<{ url: string }>("/integrations/meta/start", json("POST")),
   createAccount: (body: {
     kind: "calendar" | "email";
     provider: "caldav" | "imap";

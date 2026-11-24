@@ -10,11 +10,12 @@ Alice's data must be unchanged afterwards.
 import os
 import re
 import uuid
+from datetime import UTC, datetime
 
 import pytest
 
 from app.main import create_app
-from app.models import AgentTask, Conversation
+from app.models import AgentTask, Conversation, EventSuggestion
 from tests.fakes import FakeLlama, drain_jobs, drain_runs
 from tests.test_files import upload
 from tests.test_push import Device
@@ -40,6 +41,8 @@ BODIES = {
     ("POST", "/api/v1/skills/{skill_id}/feedback"): {"outcome": "success"},
     ("PATCH", "/api/v1/agent-tasks/{agent_task_id}"): {"status": "abandoned"},
     ("PATCH", "/api/v1/tasks/{user_task_id}"): {"title": "taken over"},
+    ("PATCH", "/api/v1/events/sources/{source_id}"): {"enabled": False},
+    ("POST", "/api/v1/events/suggestions/{suggestion_id}/add"): {},
     ("PATCH", "/api/v1/integrations/accounts/{account_id}"): {"name": "taken over"},
     ("PATCH", "/api/v1/automations/{automation_id}"): {"name": "taken over"},
     ("PATCH", "/api/v1/projects/{project_id}"): {"name": "taken over"},
@@ -209,6 +212,27 @@ async def alices_world(client, sessionmaker, settings, gateway, fake, admin_head
         headers=alice,
     )
     ids["steer_id"] = steered.json()["id"]
+    source = await client.post(
+        "/api/v1/events/sources",
+        json={"platform": "instagram", "handle": "alices_venue"},
+        headers=alice,
+    )
+    ids["source_id"] = source.json()["id"]
+    async with sessionmaker() as db:
+        owner = (await db.get(Conversation, uuid.UUID(conv["id"]))).owner_id
+        found = EventSuggestion(
+            id=uuid.uuid4(),
+            owner_id=owner,
+            status="pending",
+            title="Alice's event",
+            starts_at=datetime(2027, 1, 1, tzinfo=UTC),
+            all_day=False,
+            also_posted=[],
+            dedup_key="alice",
+        )
+        db.add(found)
+        await db.commit()
+    ids["suggestion_id"] = str(found.id)
     await client.post("/api/v1/push/subscriptions", json=Device().subscription(), headers=alice)
     invitation = await client.post("/api/v1/admin/invitations", json={}, headers=admin_headers)
     ids["invitation_id"] = invitation.json()["id"]

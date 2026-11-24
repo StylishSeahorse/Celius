@@ -44,6 +44,10 @@ class FakeLlama:
         self.review_reply = '{"decision": "ask", "reason": "Not sure"}'
         self.review_requests: list[dict[str, Any]] = []
         self.review_fail = False
+        # Event extraction (services/events/extract.py): the reply for the first key found
+        # in the post, else no events.
+        self.events_by_text: dict[str, str] = {}
+        self.events_requests: list[dict[str, Any]] = []
         self.skill_requests: list[dict[str, Any]] = []
         self.embeddings_fail = False
 
@@ -92,6 +96,23 @@ class FakeLlama:
                 return httpx.Response(
                     200,
                     content=_text_stream(self.review_reply),
+                    headers={"content-type": "text/event-stream"},
+                )
+            if isinstance(system, str) and system.startswith("You find events"):
+                self.events_requests.append(body)
+                content = body["messages"][-1]["content"]
+                text = (
+                    " ".join(p.get("text", "") for p in content if isinstance(p, dict))
+                    if isinstance(content, list)
+                    else content
+                )
+                reply = next(
+                    (r for key, r in self.events_by_text.items() if key in text),
+                    '{"events": []}',
+                )
+                return httpx.Response(
+                    200,
+                    content=_text_stream(reply),
                     headers={"content-type": "text/event-stream"},
                 )
             if isinstance(system, str) and system.startswith("You turn finished work"):

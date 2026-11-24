@@ -168,6 +168,11 @@ The model can call tools in the conversation's private workspace:
   with an app password. Search and read without
   marking mail read, summarise and find action items, save replies to Drafts.
   **Sending asks you every time**, whatever the tool permissions
+- **Event finder:** list the venues and businesses you follow (Instagram Business
+  accounts through Meta's official API, Facebook Pages through Apify). Every few days
+  Celius reads their new posts, finds events (also on flyers) and suggests them in
+  Today > Events; approved ones go to your Nextcloud or Celius calendar
+  ([setup](docs/deployment/event-finder.md))
 - Automations that run on their own: "when a task becomes overdue, notify me", "every
   morning, prepare a briefing", "when an invoice email arrives, add a task", "tell me
   when this page changes". Create them in Today > Automations or by asking in a chat;

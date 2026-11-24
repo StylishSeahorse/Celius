@@ -2,6 +2,55 @@
 
 Newest first. Each entry: what changed, how it was verified, what is left.
 
+## 2026-11-24: event finder (venues' Instagram and Facebook posts → events)
+
+**Asked for.** Find events in venues' and businesses' posts, mostly on Instagram and
+also on Facebook. Check every 4 days, with suggestions to approve going into a Nextcloud
+calendar.
+
+**Changes.** See C-17.
+- **Storage:** migration 0017 (`event_sources`, `event_suggestions`); a `social`/`meta`
+  account kind.
+- **Sign-in:** `services/integrations/meta.py` (Sign in with Meta, Page token,
+  Business Discovery).
+- **Reading and extracting:** `services/events/facebook.py` (Apify),
+  `services/events/extract.py` (prompt, images, strict parsing) and
+  `services/events/service.py` (sources, de-duplication, scans, schedule, adding to the
+  calendar).
+- **API:** `/events/...` and `/integrations/meta/...`.
+- **Web:** Today > Events.
+- **Setup guide:** `docs/deployment/event-finder.md`.
+
+**Not checked against live docs.** The environment couldn't reach developers.facebook.com
+or apify.com, so the Graph API calls (Facebook Login, `me/accounts`, Business Discovery
+fields) and the Apify actor input/output were written from knowledge. The API version and
+the actor are settings, and errors show per source.
+
+**Verification.**
+- `tests/test_event_finder.py` (9), with fake Graph, Apify, image host, model and
+  CalDAV, covers:
+  - Meta sign-in: tokens sealed and never returned, `appsecret_proof`, servers fixed, no
+    linked Instagram, another browser;
+  - source checks (including a username that tries to break the field syntax);
+  - a scan reading flyers (data URIs to a vision model), skipping the menu and old posts,
+    merging the venue's and the Facebook post into one suggestion with details filled in,
+    a push notification, and the next scan reading nothing old;
+  - errors kept per source (not signed in, no Apify token, expired Meta token);
+  - the every-N-days schedule;
+  - approval into a CalDAV calendar, with the calendar remembered;
+  - dismissing, owner isolation, and strict answer parsing.
+- The isolation sweep covers the new routes.
+- e2e `integrations.spec.ts` "event finder…" on desktop and mobile.
+- Screenshots checked at desktop and phone width. The Today tabs now stay on one line and
+  scroll.
+- Totals:
+  - API suite **680 passed, 7 skipped** (SQLite);
+  - event finder, migrations, isolation and integrations on PostgreSQL 16: **33 passed**;
+  - full e2e **105 passed**.
+
+**Left.** The first real scan with the user's Meta app and Apify token. A chat tool to
+ask about found events.
+
 ## 2026-11-10: steering, messages to a reply while it works
 
 **Existing implementation.** Sending during a reply was refused (`run_in_progress`); the

@@ -17,6 +17,7 @@ from app.db import SessionFactory
 from app.services import monitoring
 from app.services.assistant.tasks import fire_due_reminders
 from app.services.automation import engine as automation_engine
+from app.services.events import service as event_finder
 from app.services.files.service import cleanup_expired_uploads
 from app.services.jobs import claim_next_job, recover_stale_jobs, run_job
 from app.services.memory import consolidate as memory_consolidation
@@ -122,6 +123,7 @@ async def run_worker(
                 await prune_stream_events(factory, settings.run_delta_retention_minutes)
                 await automation_engine.prune(factory)
                 await memory_consolidation.queue_due(factory, settings)
+                await event_finder.queue_due(factory, settings)
                 await _record_sandbox_health(settings)
                 await _monitor(factory, settings, gateway, worker_id)
                 last_maintenance = now
