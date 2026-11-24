@@ -152,5 +152,5 @@ if (-not $Upgrade) {
   Write-Host "Chat on this PC: open a new terminal and run 'celius' in a project folder"
   Write-Host "(it asks before working there)."
   Write-Host "To use this PC from Celius, list its folders in $Base\policy.json (`"roots`")"
-  Write-Host "and set `"allow_shell`": true if it may run commands (applies to the next session)."
+  Write-Host "and set `"allow_shell`": true if it may run commands (applies from the next command)."
 }

@@ -65,6 +65,24 @@ class ToolEnv:
         )
 
 
+def agent_user() -> str:
+    try:
+        import pwd
+
+        return pwd.getpwuid(os.geteuid()).pw_name
+    except (ImportError, KeyError, AttributeError):
+        return os.environ.get("USERNAME") or os.environ.get("USER") or "this user"
+
+
+def permission_denied(path: str) -> str:
+    where = f" {path}" if path else ""
+    return (
+        f"Permission denied:{where}. Celius runs as '{agent_user()}' on this machine, which "
+        "can't change this. Give that user access to it, or (Linux) install Celius with "
+        "--run-as root for the whole machine."
+    )
+
+
 def result(content: str, data: dict | None = None, is_error: bool = False) -> dict:
     return {"content": content, "data": data or {}, "is_error": is_error}
 
@@ -198,18 +216,32 @@ def _write_file(env: ToolEnv, args: dict) -> tuple[dict, dict | None]:
         if b"\x00" not in raw[:8192]:
             old_text = raw.decode("utf-8", errors="replace")
     data = content.encode("utf-8")
-    os.makedirs(os.path.dirname(full), exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(full), prefix=".celius-")
     try:
-        with os.fdopen(fd, "wb") as handle:
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+    except PermissionError:
+        return error(permission_denied(os.path.dirname(full))), None
+    owner = os.stat(full) if existed else None
+    try:
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(full), prefix=".celius-")
+    except PermissionError:
+        # The folder can't take a new file, but the file itself may be writable: write in place.
+        if not (existed and os.access(full, os.W_OK)):
+            return error(permission_denied(full)), None
+        with open(full, "wb") as handle:
             handle.write(data)
-        if existed:
-            shutil.copymode(full, tmp)
-        os.replace(tmp, full)
-    except BaseException:
-        if os.path.exists(tmp):
-            os.unlink(tmp)
-        raise
+    else:
+        try:
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(data)
+            if owner is not None:
+                shutil.copymode(full, tmp)
+                if hasattr(os, "chown") and os.geteuid() == 0:
+                    os.chown(tmp, owner.st_uid, owner.st_gid)  # keep the file's owner
+            os.replace(tmp, full)
+        except BaseException:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
+            raise
     rel = relative(env.workdir, full)
     diff = None
     if len(data) <= DIFF_MAX_BYTES:
@@ -401,7 +433,10 @@ def _seconds(args: dict, default: float = 120) -> float:
 
 async def run_shell(env: ToolEnv, args: dict) -> dict:
     if not env.shell_allowed:
-        return error("Shell commands are not allowed on this machine (policy: allow_shell)")
+        return error(
+            "Commands are not allowed in this session on this machine (turn them on in Celius: "
+            "Remote machines → the machine → What this machine allows)"
+        )
     command = args.get("command")
     if not isinstance(command, str) or not command.strip():
         return error("command is required")

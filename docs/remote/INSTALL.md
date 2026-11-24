@@ -184,8 +184,8 @@ celius --dir PATH --model NAME
 ## The policy file
 
 `policy.json` is the outer limit of what Celius may do on the device: the settings in Celius
-can narrow it (per device, per session), never go beyond it. Changes apply to the next
-session that opens; nothing needs restarting.
+can narrow it (per device, per session), never go beyond it. Changes apply from the next
+command, also in sessions already open; nothing needs restarting.
 
 **Editing it from Celius.** *Remote machines → the device → What this machine allows* lists
 its folders (read and change, or read only), and whether commands and file changes are

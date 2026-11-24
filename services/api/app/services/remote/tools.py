@@ -175,7 +175,13 @@ async def dispatch(ctx: ToolContext, tool: str, arguments: dict) -> ToolOutput:
             session_id=session.id,
             run_id=ctx.run_id,
             tool_call_id=ctx.tool_call_id,
-            payload={"tool": tool, "arguments": arguments, "timeout_seconds": int(limit)},
+            payload={
+                "tool": tool,
+                "arguments": arguments,
+                "timeout_seconds": int(limit),
+                # As they are now, not when the session opened (they may have been changed).
+                "permissions": effective_permissions(agent, session),
+            },
             # Not delivered by then (machine offline): it never runs.
             expires_at=utcnow() + timedelta(seconds=settings.remote_offline_wait_seconds),
         )

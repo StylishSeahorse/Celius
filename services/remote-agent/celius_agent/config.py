@@ -53,7 +53,7 @@ DEFAULT_POLICY: dict = {
     "_comment": (
         "What Celius may do on this machine. Nothing runs outside 'roots'. You can also "
         "change these in Celius (Remote machines), unless allow_remote_edit is false. Edits "
-        "apply to the next session."
+        "apply from the next command."
     ),
     # false: only someone on this machine can change this file (Celius's editor is refused).
     "allow_remote_edit": True,

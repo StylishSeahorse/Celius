@@ -685,3 +685,32 @@ async def test_folders_added_in_celius_are_saved_on_the_machine(http, server, tm
         assert json.loads(agent.paths.policy.read_text())["roots"] == on_disk["roots"]
     finally:
         await agent.shutdown()
+
+
+async def test_commands_turned_on_in_celius_work_in_an_open_session(
+    http, server, worker, fake, sessionmaker, tmp_path
+):
+    """Reported: commands enabled after the chat's session opened were still refused."""
+    work = tmp_path / "code"
+    (work / "project").mkdir(parents=True)
+    agent = AgentProcess(tmp_path / "agent-home", server, [work], allow_shell=False)
+    agent_id = await agent.register(http, "Box")
+    agent.start()
+    try:
+        await until(lambda: _online(http, agent_id), what="the machine to come online")
+        session = await open_session(http, agent_id, work / "project")
+
+        response = await http.put(
+            f"/api/v1/remote/agents/{agent_id}/policy", json={"allow_shell": True}
+        )
+        assert response.status_code == 200, response.text
+
+        fake.turns = [[{"name": "run_shell", "arguments": {"command": "echo on > out.txt"}}]]
+        fake.reply = "Done."
+        sent = await send(http, session["conversation_id"], "Write a file with a command")
+        await approve(http, await pending_call(http, session["conversation_id"]))
+        run = await finished(sessionmaker, sent["run"]["id"])
+        assert run.status.value == "completed", run.error_message
+        assert (work / "project" / "out.txt").read_text().strip() == "on"
+    finally:
+        await agent.shutdown()

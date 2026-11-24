@@ -144,8 +144,10 @@ signed-in user accepts it in Celius:
 ### 4.3 Commands (Central → agent), at-least-once, executed at most once
 `command {id, kind, session_id, payload}`; kinds: `session.open`, `session.close`,
 `tool.execute`, `interrupt`, `cancel` (a command), `file.fetch`, `agent.disconnect`.
-On `session.open` the agent re-reads its policy file, so edits apply to the next session
-without a restart, and sends `policy {local_policy}` so Central's copy stays current.
+On `session.open` and before each tool command the agent re-reads its policy file, and each
+`tool.execute` carries Central's current effective permissions, so edits apply from the next
+command, in open sessions too, without a restart; a changed policy is sent as
+`policy {local_policy}` so Central's copy stays current.
 - Central marks a command `delivered` when sent and re-sends `pending`/`delivered`
   commands on every new connection.
 - The agent records each command id durably **before** acting on it; a re-delivered id is

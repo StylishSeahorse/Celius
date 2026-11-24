@@ -674,7 +674,7 @@ function MachinePolicy({ agent, onChanged }: { agent: RemoteAgent; onChanged: ()
       <h3 className="font-medium">What this machine allows</h3>
       <p className="text-muted">
         The machine's own policy file: Celius can't go beyond it. Changes are checked and saved by the machine
-        and apply to the next session.
+        and apply from the next command, also in chats already running there.
       </p>
       {locked && (
         <p className="text-amber-700 dark:text-amber-300">

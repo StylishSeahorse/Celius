@@ -166,6 +166,13 @@ if [ "$MODE" = install ]; then
 fi
 
 if have_systemd; then
+  if [ "$RUN_AS" = root ]; then
+    # Chosen to manage the whole machine: /etc, /usr and the real /tmp must stay usable.
+    SANDBOX="# --run-as root: no file system sandbox (the machine is Celius's to manage)."
+  else
+    SANDBOX="ProtectSystem=full
+PrivateTmp=yes"
+  fi
   cat >"$UNIT" <<UNIT
 # Celius agent (installed by install-linux.sh).
 [Unit]
@@ -189,8 +196,7 @@ TimeoutStopSec=30
 
 # Hardening that leaves the user's own folders (the policy's roots) usable.
 NoNewPrivileges=yes
-PrivateTmp=yes
-ProtectSystem=full
+$SANDBOX
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes
@@ -217,5 +223,5 @@ if [ "$MODE" = install ]; then
     echo "with: ... | bash -s -- --run-as root"
   fi
   echo "To use this device from Celius, list its folders in $AGENT_HOME/policy.json (\"roots\")"
-  echo "and set \"allow_shell\": true if it may run commands (applies to the next session)."
+  echo "and set \"allow_shell\": true if it may run commands (applies from the next command)."
 fi

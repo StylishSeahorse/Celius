@@ -15,7 +15,15 @@ from collections.abc import Callable
 from celius_agent.config import Policy, PolicyRefused
 from celius_agent.paths import PathRefused, check_working_directory
 from celius_agent.state import SessionState, StateStore
-from celius_agent.tools import TOOLS, ToolEnv, error, fetch_file, find_python, shell_name
+from celius_agent.tools import (
+    TOOLS,
+    ToolEnv,
+    error,
+    fetch_file,
+    find_python,
+    permission_denied,
+    shell_name,
+)
 
 log = logging.getLogger("celius_agent.runtime")
 
@@ -342,8 +350,27 @@ class Runtime:
         async def emit(type_: str, data: dict) -> None:
             await self.emit(session.id, type_, data, run_id)
 
+        if isinstance(payload.get("permissions"), dict):
+            # What Celius allows now (it may have changed since the session opened).
+            session.permissions = payload["permissions"]
+            self.store.save_session(session)
+        refused = None
+        self.reload_policy()  # edits to policy.json count from the next command
+        if session.status == "open":
+            try:
+                # Against the policy as it is now: folders may have been added or removed.
+                _, session.writable = check_working_directory(
+                    session.working_directory, self.policy.roots
+                )
+            except PathRefused:
+                refused = (
+                    f"{session.working_directory} is no longer one of the folders this machine "
+                    "allows (its policy roots)"
+                )
         if session.status != "open":
             outcome = error("This session is not open on the machine")
+        elif refused:
+            outcome = error(refused)
         else:
             env = ToolEnv(
                 workdir=session.working_directory,
@@ -371,6 +398,10 @@ class Runtime:
                     await emit("command.started", {"command_id": command_id, "tool": name})
                     try:
                         outcome = await handler(env, arguments)
+                    except PermissionError as exc:
+                        outcome = error(permission_denied(exc.filename or ""))
+                    except OSError as exc:
+                        outcome = error(f"{exc.strerror or exc}: {exc.filename or ''}".strip())
                     finally:
                         self.running.pop(command_id, None)
         content = outcome.get("content")
